@@ -24,6 +24,11 @@ class LMPCT_CAPI {
 	 * @return void
 	 */
 	public static function send_events( array $events, array $settings, $source_url ) {
+		// DSGVO: Ohne Marketing-Einwilligung wird kein Request abgesetzt.
+		if ( class_exists( 'LMPCT_Consent' ) && ! LMPCT_Consent::has_marketing_consent() ) {
+			return;
+		}
+
 		$pixel_id = preg_replace( '/\D+/', '', (string) ( $settings['pixel_id'] ?? '' ) );
 		$token    = (string) ( $settings['capi_token'] ?? '' );
 
@@ -59,8 +64,9 @@ class LMPCT_CAPI {
 			'access_token' => $token,
 		);
 
-		if ( ! empty( $settings['test_event_code'] ) ) {
-			$body['test_event_code'] = (string) $settings['test_event_code'];
+		$test_code = self::active_test_event_code( $settings );
+		if ( '' !== $test_code ) {
+			$body['test_event_code'] = $test_code;
 		}
 
 		/**
@@ -99,6 +105,33 @@ class LMPCT_CAPI {
 				error_log( '[LMPCT] CAPI-Antwort: ' . wp_remote_retrieve_body( $response ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			}
 		}
+	}
+
+	/**
+	 * Test Event Code mit 12h-Auto-Expiry: Abgelaufene Codes werden serverseitig
+	 * ignoriert und direkt aus der Datenbank entfernt, damit kein versehentliches
+	 * Test-Tracking im Live-Betrieb passiert.
+	 *
+	 * @param array $settings Plugin-Einstellungen.
+	 * @return string Aktiver Test-Code oder leerer String.
+	 */
+	private static function active_test_event_code( array $settings ) {
+		$code = (string) ( $settings['test_event_code'] ?? '' );
+		if ( '' === $code ) {
+			return '';
+		}
+
+		$created_at = (int) ( $settings['test_code_created_at'] ?? 0 );
+		$max_age    = defined( 'HOUR_IN_SECONDS' ) ? 12 * HOUR_IN_SECONDS : 43200;
+
+		if ( $created_at > 0 && ( time() - $created_at ) > $max_age ) {
+			$settings['test_event_code']      = '';
+			$settings['test_code_created_at'] = 0;
+			update_option( LMPCT_Settings::OPTION_SETTINGS, $settings );
+			return '';
+		}
+
+		return $code;
 	}
 
 	/**

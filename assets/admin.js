@@ -4,6 +4,27 @@
 ( function () {
 	'use strict';
 
+	// Dezente Erfolgs-Meldung unten rechts (Toast).
+	var toastTimer = null;
+	function showToast( text ) {
+		var toast = document.getElementById( 'lmpct-toast' );
+		if ( ! toast ) {
+			toast = document.createElement( 'div' );
+			toast.id = 'lmpct-toast';
+			toast.setAttribute( 'role', 'status' );
+			toast.innerHTML = '<span class="dashicons dashicons-yes-alt"></span><span class="lmpct-toast-text"></span>';
+			document.body.appendChild( toast );
+		}
+		toast.querySelector( '.lmpct-toast-text' ).textContent = text;
+		toast.classList.add( 'lmpct-toast-visible' );
+		if ( toastTimer ) {
+			clearTimeout( toastTimer );
+		}
+		toastTimer = setTimeout( function () {
+			toast.classList.remove( 'lmpct-toast-visible' );
+		}, 2000 );
+	}
+
 	document.addEventListener( 'DOMContentLoaded', function () {
 		// Toggle-Switches, die ihr Formular direkt absenden (Status-Spalte, globaler Schalter).
 		document.querySelectorAll( 'input[data-lmpct-autosubmit]' ).forEach( function ( input ) {
@@ -14,6 +35,48 @@
 				}
 			} );
 		} );
+
+		// Einstellungs-Toggles sofort per AJAX speichern (nonce-gesichert).
+		if ( window.lmpctAdmin && window.fetch ) {
+			document.querySelectorAll( 'input[data-lmpct-autosave]' ).forEach( function ( input ) {
+				input.addEventListener( 'change', function () {
+					var body = new URLSearchParams( {
+						action: 'lmpct_save_toggle',
+						nonce: window.lmpctAdmin.nonce,
+						key: input.getAttribute( 'data-lmpct-autosave' ),
+						value: input.checked ? '1' : '0'
+					} );
+					window.fetch( window.lmpctAdmin.ajaxUrl, {
+						method: 'POST',
+						credentials: 'same-origin',
+						headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+						body: body.toString()
+					} ).then( function ( response ) {
+						return response.json();
+					} ).then( function ( result ) {
+						if ( result && result.success ) {
+							showToast( window.lmpctAdmin.savedText );
+						}
+					} ).catch( function () {
+						/* Fehler still ignorieren – der reguläre Speichern-Button bleibt der Fallback. */
+					} );
+				} );
+			} );
+		}
+
+		// CAPI-Token eingegeben/eingefügt -> Conversions API automatisch aktivieren.
+		var tokenField = document.getElementById( 'lmpct-capi-token' );
+		var capiToggle = document.querySelector( 'input[data-lmpct-autosave="capi_enabled"]' );
+		if ( tokenField && capiToggle ) {
+			var maybeEnableCapi = function () {
+				if ( '' !== tokenField.value.trim() && ! capiToggle.checked ) {
+					capiToggle.checked = true;
+					capiToggle.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+				}
+			};
+			tokenField.addEventListener( 'input', maybeEnableCapi );
+			tokenField.addEventListener( 'change', maybeEnableCapi );
+		}
 
 		// Sicherheitsabfrage vor dem Löschen.
 		document.querySelectorAll( '.lmpct-delete-button' ).forEach( function ( button ) {

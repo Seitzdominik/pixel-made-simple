@@ -1,7 +1,16 @@
 <?php
 /**
  * Frontend: Basis-Skripte (Meta, Google Ads, TikTok), URL-Matching,
- * Consent-Script-Blocking und Auslösen der CAPI.
+ * Consent-gesteuerte Initialisierung und Auslösen der CAPI.
+ *
+ * Consent-Logik:
+ * - Liegt eine Marketing-Einwilligung vor (oder ist die Erkennung aus bzw.
+ *   kein Banner installiert), werden die Skripte direkt ausgegeben.
+ * - Blockiert ein erkanntes Banner noch, werden die Skripte in einen
+ *   Bootstrap gekapselt, der auf die Consent-Events der Banner lauscht und
+ *   das Tracking ohne Seiten-Reload startet, sobald eingewilligt wurde.
+ * - Google Ads mit aktivem Consent Mode v2 lädt immer sofort – genau dafür
+ *   existiert der Consent Mode (Defaults stehen auf "denied").
  *
  * @package Lightweight_Meta_Pixel_CAPI_Tracker
  */
@@ -66,21 +75,9 @@ class LMPCT_Frontend {
 			)
 		);
 
-		if ( empty( $meta_events ) ) {
-			return;
-		}
-
-		// Im Script-Blocking-Modus gilt: Ohne _fbp-Cookie lief das Browser-Pixel
-		// noch nie (kein Consent) – dann wird auch serverseitig nichts gesendet.
-		$consent_ok = empty( self::$settings['consent_blocking'] ) || ! empty( $_COOKIE['_fbp'] );
-
-		/**
-		 * CAPI-Consent überschreiben, z. B. um das Consent-Cookie des eigenen
-		 * Banners direkt auszuwerten.
-		 *
-		 * @param bool $consent_ok Ob die CAPI senden darf.
-		 */
-		if ( apply_filters( 'lmpct_capi_consent', $consent_ok ) ) {
+		if ( ! empty( $meta_events ) ) {
+			// Die Consent-Prüfung (DSGVO) übernimmt LMPCT_CAPI::send_events()
+			// unmittelbar vor dem HTTP-Request.
 			LMPCT_CAPI::send_events( $meta_events, self::$settings, self::current_source_url() );
 		}
 	}
@@ -119,7 +116,7 @@ class LMPCT_Frontend {
 		}
 
 		/**
-		 * Tracking global unterbinden, z. B. durch ein Consent-Plugin.
+		 * Tracking global unterbinden, z. B. durch eine eigene Consent-Logik.
 		 *
 		 * add_filter( 'lmpct_allow_tracking', fn( $allow ) => my_consent_given() );
 		 *
@@ -229,24 +226,6 @@ class LMPCT_Frontend {
 	}
 
 	/**
-	 * Attribute für Inline-Skripte: im Script-Blocking-Modus werden alle
-	 * Tracking-Skripte als text/plain ausgegeben, bis das Consent-Banner
-	 * sie freischaltet (Kategorie "marketing").
-	 *
-	 * @return array
-	 */
-	private static function script_attributes() {
-		if ( empty( self::$settings['consent_blocking'] ) ) {
-			return array();
-		}
-
-		return array(
-			'type'                => 'text/plain',
-			'data-cookiecategory' => 'marketing',
-		);
-	}
-
-	/**
 	 * Basis-Skripte + Events aller aktiven Plattformen im <head> ausgeben.
 	 *
 	 * @return void
@@ -256,16 +235,51 @@ class LMPCT_Frontend {
 			return;
 		}
 
+		$consent_given = LMPCT_Consent::has_marketing_consent();
+		$deferred_js   = '';
+
 		echo "\n<!-- Lightweight Meta Pixel & CAPI Tracker -->\n";
 
+		// Meta Pixel.
 		if ( self::meta_active() ) {
-			self::print_meta();
+			$meta_js = self::build_meta_js();
+			if ( $consent_given ) {
+				wp_print_inline_script_tag( $meta_js );
+				$pixel_id     = preg_replace( '/\D+/', '', (string) self::$settings['pixel_id'] );
+				$noscript_url = 'https://www.facebook.com/tr?id=' . rawurlencode( $pixel_id ) . '&ev=PageView&noscript=1';
+				echo '<noscript><img height="1" width="1" style="display:none" alt="" src="' . esc_url( $noscript_url ) . '" /></noscript>' . "\n";
+			} else {
+				$deferred_js .= $meta_js;
+			}
 		}
+
+		// Google Ads: Mit Consent Mode v2 immer sofort laden (Defaults = denied),
+		// ohne Consent Mode wie die anderen Plattformen verzögern.
 		if ( self::google_active() ) {
-			self::print_google();
+			$tag_id = preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['google_tag_id'] );
+			$src    = 'https://www.googletagmanager.com/gtag/js?id=' . rawurlencode( $tag_id );
+
+			if ( $consent_given || ! empty( self::$settings['google_consent_mode'] ) ) {
+				wp_print_inline_script_tag( self::build_google_js() );
+				echo '<script async src="' . esc_url( $src ) . '"></script>' . "\n"; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- Bewusst direkt im Head, wie von Google vorgesehen.
+			} else {
+				$deferred_js .= self::build_google_js()
+					. "var lmpctGs=document.createElement('script');lmpctGs.async=true;lmpctGs.src='" . esc_url( $src ) . "';document.head.appendChild(lmpctGs);\n";
+			}
 		}
+
+		// TikTok Pixel.
 		if ( self::tiktok_active() ) {
-			self::print_tiktok();
+			if ( $consent_given ) {
+				wp_print_inline_script_tag( self::build_tiktok_js() );
+			} else {
+				$deferred_js .= self::build_tiktok_js();
+			}
+		}
+
+		// Verzögerte Skripte: warten auf die Einwilligung im Cookie-Banner.
+		if ( '' !== $deferred_js ) {
+			wp_print_inline_script_tag( self::build_consent_bootstrap( $deferred_js ) );
 		}
 
 		echo "<!-- / Lightweight Meta Pixel & CAPI Tracker -->\n";
@@ -275,12 +289,12 @@ class LMPCT_Frontend {
 	 * Meta Pixel: Loader, PageView und gematchte Events (mit eventID zur
 	 * Deduplizierung gegen die CAPI).
 	 *
-	 * @return void
+	 * @return string
 	 */
-	private static function print_meta() {
+	private static function build_meta_js() {
 		$pixel_id = preg_replace( '/\D+/', '', (string) self::$settings['pixel_id'] );
 		if ( '' === $pixel_id ) {
-			return;
+			return '';
 		}
 
 		$js  = "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');\n";
@@ -296,28 +310,19 @@ class LMPCT_Frontend {
 			$js    .= "fbq('" . $method . "','" . esc_js( $name ) . "',{},{eventID:'" . esc_js( $event['event_id'] ) . "'});\n";
 		}
 
-		wp_print_inline_script_tag( $js, self::script_attributes() );
-
-		// Der noscript-Fallback feuert bedingungslos und entfällt daher im
-		// Script-Blocking-Modus (kein Tracking ohne Consent).
-		if ( empty( self::$settings['consent_blocking'] ) ) {
-			$noscript_url = 'https://www.facebook.com/tr?id=' . rawurlencode( $pixel_id ) . '&ev=PageView&noscript=1';
-			echo '<noscript><img height="1" width="1" style="display:none" alt="" src="' . esc_url( $noscript_url ) . '" /></noscript>' . "\n";
-		}
+		return $js;
 	}
 
 	/**
 	 * Google Ads (gtag.js) inkl. Consent Mode v2 Defaults und Conversions.
+	 * Die Consent-Defaults stehen bewusst VOR gtag('config').
 	 *
-	 * Das Inline-Skript steht bewusst VOR dem externen gtag.js, damit die
-	 * Consent-Defaults sicher gesetzt sind, bevor der Tag verarbeitet wird.
-	 *
-	 * @return void
+	 * @return string
 	 */
-	private static function print_google() {
+	private static function build_google_js() {
 		$tag_id = preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['google_tag_id'] );
 		if ( '' === $tag_id ) {
-			return;
+			return '';
 		}
 
 		$js = "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}\n";
@@ -336,24 +341,18 @@ class LMPCT_Frontend {
 			$js .= "gtag('event','conversion',{'send_to':'" . esc_js( $tag_id . '/' . $event['google_label'] ) . "'});\n";
 		}
 
-		wp_print_inline_script_tag( $js, self::script_attributes() );
-
-		$src     = 'https://www.googletagmanager.com/gtag/js?id=' . rawurlencode( $tag_id );
-		$blocked = ! empty( self::$settings['consent_blocking'] )
-			? ' type="text/plain" data-cookiecategory="marketing"'
-			: '';
-		echo '<script' . $blocked . ' async src="' . esc_url( $src ) . '"></script>' . "\n"; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- Bewusst direkt im Head, wie von Google vorgesehen.
+		return $js;
 	}
 
 	/**
 	 * TikTok Pixel: offizieller Loader, PageView und gematchte Events.
 	 *
-	 * @return void
+	 * @return string
 	 */
-	private static function print_tiktok() {
+	private static function build_tiktok_js() {
 		$pixel_id = preg_replace( '/[^A-Za-z0-9]+/', '', (string) self::$settings['tiktok_pixel_id'] );
 		if ( '' === $pixel_id ) {
-			return;
+			return '';
 		}
 
 		$js  = '!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};' . "\n";
@@ -369,6 +368,26 @@ class LMPCT_Frontend {
 
 		$js .= "}(window,document,'ttq');\n";
 
-		wp_print_inline_script_tag( $js, self::script_attributes() );
+		return $js;
+	}
+
+	/**
+	 * Consent-Bootstrap: prüft Client-seitig die Banner-Cookies und lauscht
+	 * auf die Consent-Events der Banner, damit das Tracking ohne Seiten-Reload
+	 * startet, sobald der Besucher einwilligt.
+	 *
+	 * @param string $deferred_js Skripte, die erst nach Einwilligung laufen dürfen.
+	 * @return string
+	 */
+	private static function build_consent_bootstrap( $deferred_js ) {
+		$events_json = wp_json_encode( array_values( LMPCT_Consent::consent_events() ) );
+
+		return '(function(){var lmpctDone=false;'
+			. LMPCT_Consent::consent_check_js()
+			. 'function lmpctInit(){if(lmpctDone){return;}lmpctDone=true;' . "\n" . $deferred_js . '}'
+			. 'if(lmpctHasConsent()){lmpctInit();}'
+			. 'var lmpctEvts=' . $events_json . ';'
+			. 'lmpctEvts.forEach(function(e){var f=function(){setTimeout(function(){if(lmpctHasConsent()){lmpctInit();}},100);};document.addEventListener(e,f);window.addEventListener(e,f);});'
+			. '})();';
 	}
 }

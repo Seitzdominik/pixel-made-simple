@@ -85,16 +85,17 @@ class LMPCT_Settings {
 	 */
 	public static function get() {
 		$defaults = array(
-			// Global.
-			'exclude_admins'      => 1,
-			'consent_blocking'    => 0,
+			// Global. Consent-Erkennung ist bei Neuinstallation bewusst aktiv (DSGVO).
+			'exclude_admins'        => 1,
+			'consent_detection'     => 1,
 			// Meta.
-			'pixel_enabled'       => 0,
-			'pixel_id'            => '',
-			'capi_enabled'        => 0,
-			'capi_token'          => '',
-			'test_event_code'     => '',
-			'hash_email'          => 0,
+			'pixel_enabled'         => 0,
+			'pixel_id'              => '',
+			'capi_enabled'          => 0,
+			'capi_token'            => '',
+			'test_event_code'       => '',
+			'test_code_created_at'  => 0,
+			'hash_email'            => 0,
 			// Google Ads.
 			'google_enabled'      => 0,
 			'google_tag_id'       => '',
@@ -118,20 +119,34 @@ class LMPCT_Settings {
 	public static function sanitize_settings( $input ) {
 		$input = is_array( $input ) ? $input : array();
 
+		$test_code = preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['test_event_code'] ?? '' ) );
+
+		// Test-Code-Zeitstempel: bei neuem/geändertem Code neu setzen, bei
+		// unverändertem Code beibehalten (Basis für das 12h-Auto-Expiry).
+		$old        = get_option( self::OPTION_SETTINGS, array() );
+		$old_code   = is_array( $old ) ? (string) ( $old['test_event_code'] ?? '' ) : '';
+		$old_ts     = is_array( $old ) ? (int) ( $old['test_code_created_at'] ?? 0 ) : 0;
+		$created_at = 0;
+
+		if ( '' !== $test_code ) {
+			$created_at = ( $test_code === $old_code && $old_ts > 0 ) ? $old_ts : time();
+		}
+
 		return array(
-			'exclude_admins'      => empty( $input['exclude_admins'] ) ? 0 : 1,
-			'consent_blocking'    => empty( $input['consent_blocking'] ) ? 0 : 1,
-			'pixel_enabled'       => empty( $input['pixel_enabled'] ) ? 0 : 1,
-			'pixel_id'            => preg_replace( '/\D+/', '', (string) ( $input['pixel_id'] ?? '' ) ),
-			'capi_enabled'        => empty( $input['capi_enabled'] ) ? 0 : 1,
-			'capi_token'          => trim( sanitize_textarea_field( (string) ( $input['capi_token'] ?? '' ) ) ),
-			'test_event_code'     => preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['test_event_code'] ?? '' ) ),
-			'hash_email'          => empty( $input['hash_email'] ) ? 0 : 1,
-			'google_enabled'      => empty( $input['google_enabled'] ) ? 0 : 1,
-			'google_tag_id'       => preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) ( $input['google_tag_id'] ?? '' ) ),
-			'google_consent_mode' => empty( $input['google_consent_mode'] ) ? 0 : 1,
-			'tiktok_enabled'      => empty( $input['tiktok_enabled'] ) ? 0 : 1,
-			'tiktok_pixel_id'     => preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['tiktok_pixel_id'] ?? '' ) ),
+			'exclude_admins'       => empty( $input['exclude_admins'] ) ? 0 : 1,
+			'consent_detection'    => empty( $input['consent_detection'] ) ? 0 : 1,
+			'pixel_enabled'        => empty( $input['pixel_enabled'] ) ? 0 : 1,
+			'pixel_id'             => preg_replace( '/\D+/', '', (string) ( $input['pixel_id'] ?? '' ) ),
+			'capi_enabled'         => empty( $input['capi_enabled'] ) ? 0 : 1,
+			'capi_token'           => trim( sanitize_textarea_field( (string) ( $input['capi_token'] ?? '' ) ) ),
+			'test_event_code'      => $test_code,
+			'test_code_created_at' => $created_at,
+			'hash_email'           => empty( $input['hash_email'] ) ? 0 : 1,
+			'google_enabled'       => empty( $input['google_enabled'] ) ? 0 : 1,
+			'google_tag_id'        => preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) ( $input['google_tag_id'] ?? '' ) ),
+			'google_consent_mode'  => empty( $input['google_consent_mode'] ) ? 0 : 1,
+			'tiktok_enabled'       => empty( $input['tiktok_enabled'] ) ? 0 : 1,
+			'tiktok_pixel_id'      => preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['tiktok_pixel_id'] ?? '' ) ),
 		);
 	}
 

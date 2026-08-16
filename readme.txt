@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.3.1
+Stable tag: 0.4.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -22,7 +22,9 @@ Ein bewusst minimalistischer Ersatz für überladene Tracking-Plugins wie PixelY
 * **Saubere Meta-Deduplizierung:** Für jedes Meta-Event wird serverseitig eine UUID generiert und identisch an Browser-Pixel (`eventID`) und Conversions API (`event_id`) übergeben. Meta verwirft das Duplikat automatisch.
 * **Conversions API fire-and-forget:** Serverseitiger Versand via `wp_remote_post()` nicht-blockierend – kein Einfluss auf die Ladezeit. user_data mit Client-IP, User-Agent, `_fbp`/`_fbc` (Fallback aus `fbclid`), optional SHA-256-gehashte E-Mail eingeloggter Nutzer.
 * **Google Consent Mode v2:** Setzt auf Wunsch `ad_storage`, `ad_user_data`, `ad_personalization` und `analytics_storage` vor dem Tag-Laden auf `denied` – dein Consent-Banner sendet das Update.
-* **DSGVO-Script-Blocking:** Optional werden alle Tracking-Skripte als `type="text/plain"` mit `data-cookiecategory="marketing"` ausgegeben, sodass Consent-Banner (Cookiebot, Complianz & Co.) sie erst nach Einwilligung freischalten. Die CAPI sendet dann nur, wenn das `_fbp`-Cookie existiert.
+* **Intelligente Cookie-Consent-Erkennung (DSGVO):** Erkennt installierte Cookie-Banner automatisch (Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies, WP Consent API) und blockiert Browser- und CAPI-Events bis zur Marketing-Einwilligung. Nach dem Klick auf „Akzeptieren" startet das Tracking sofort ohne Seiten-Reload. Websites ohne Banner werden niemals blockiert.
+* **Test-Code Auto-Expiry:** Der Meta Test Event Code deaktiviert sich nach 12 Stunden automatisch – kein versehentliches Test-Tracking im Live-Betrieb.
+* **Komfort:** Toggles speichern sofort per AJAX (nonce-gesichert, mit dezenter Bestätigung); das Einfügen eines CAPI-Tokens aktiviert die Conversions API automatisch.
 * **Sicherheit:** Nonces, Capability-Checks (`manage_options`), konsequente Sanitization/Escaping, CAPI-Token nur serverseitig.
 * **Übersetzbar (i18n):** Englische Quellstrings, POT-Vorlage und deutsche Übersetzung (`de_DE`) in `/languages`. Kompatibel mit Loco Translate, Poedit und Polylang/WPML-Sprachdateien.
 
@@ -43,18 +45,17 @@ Trage den Test Event Code aus dem Events Manager (Tab „Test-Events") ein. Die 
 
 = Wie funktioniert das Zusammenspiel mit meinem Cookie-Banner? =
 
-Zwei Mechanismen, kombinierbar:
+Die automatische Cookie-Banner-Erkennung (Standard: aktiv) prüft serverseitig die Consent-Cookies der gängigen Banner-Plugins und die WP Consent API. Ohne Marketing-Einwilligung werden die Browser-Skripte verzögert (sie lauschen auf die Banner-Events und starten sofort nach dem Klick auf „Akzeptieren") und die CAPI bricht vor dem HTTP-Request ab. Ist gar kein bekanntes Banner installiert, wird nichts blockiert.
 
-1. **Script-Blocking-Modus** (Tab „Allgemein"): Alle Skripte werden als `type="text/plain" data-cookiecategory="marketing"` ausgegeben und erst vom Banner freigeschaltet.
-2. **Google Consent Mode v2**: Die Consent-Defaults stehen auf `denied`, bis dein Banner `gtag('consent','update',...)` sendet.
+Zusätzlich gilt: **Google Consent Mode v2** lädt gtag.js designgemäß sofort mit `denied`-Defaults – dein Banner sendet das `gtag('consent','update',...)`.
 
-Zusätzlich lässt sich das gesamte Tracking serverseitig per Filter unterdrücken:
+Für nicht unterstützte Banner lässt sich das Consent-Ergebnis per Filter setzen:
+
+`add_filter( 'lmpct_has_marketing_consent', function ( $consent ) { return my_marketing_consent(); } );`
+
+Und das gesamte Tracking serverseitig unterdrücken:
 
 `add_filter( 'lmpct_allow_tracking', function ( $allow ) { return my_consent_check(); } );`
-
-Und das CAPI-Consent-Gating (Standard: `_fbp`-Cookie vorhanden) ist überschreibbar:
-
-`add_filter( 'lmpct_capi_consent', function ( $ok ) { return my_marketing_consent(); } );`
 
 = Funktioniert das Plugin mit Page-Caching? =
 
@@ -62,8 +63,10 @@ Die Browser-Pixel: ja. Die Conversions API wird jedoch nur ausgelöst, wenn PHP 
 
 = Welche Filter gibt es? =
 
-* `lmpct_allow_tracking` – Tracking global erlauben/unterbinden (Consent).
-* `lmpct_capi_consent` – CAPI-Consent-Gating überschreiben (Standard im Script-Blocking-Modus: `_fbp`-Cookie vorhanden).
+* `lmpct_allow_tracking` – Tracking global erlauben/unterbinden.
+* `lmpct_has_marketing_consent` – Consent-Ergebnis der automatischen Banner-Erkennung überschreiben.
+* `lmpct_consent_banner_active` – eigenes Banner bei der Erkennung registrieren.
+* `lmpct_consent_events` – zusätzliche Banner-Events für den Frontend-Listener.
 * `lmpct_capi_event_data` – einzelnes CAPI-Event vor dem Versand anpassen (z. B. `custom_data` mit Werten ergänzen).
 * `lmpct_capi_user_data` – `user_data`-Payload anpassen.
 * `lmpct_graph_api_version` – Graph-API-Version überschreiben (Zukunftssicherheit bei Meta-Deprecations).
@@ -78,6 +81,13 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja. `uninstall.php` löscht alle Plugin-Optionen inklusive des gespeicherten Access Tokens.
 
 == Changelog ==
+
+= 0.4.0 =
+* Neu: Intelligente Cookie-Consent-Erkennung (DSGVO, Standard: aktiv) – erkennt Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies und die WP Consent API; blockiert Browser- + CAPI-Events bis zur Einwilligung und startet das Tracking nach dem Banner-Klick ohne Reload. Ersetzt das bisherige text/plain-Script-Blocking.
+* Neu: Test Event Code deaktiviert sich nach 12 Stunden automatisch (serverseitig, inkl. Aufräumen in der Datenbank).
+* Neu: Toggles speichern sofort per AJAX (nonce-gesichert) mit dezenter Erfolgs-Meldung.
+* Neu: CAPI-Toggle aktiviert sich automatisch beim Eingeben/Einfügen eines Access Tokens.
+* Neue Filter: lmpct_has_marketing_consent, lmpct_consent_banner_active, lmpct_consent_events (ersetzt lmpct_capi_consent).
 
 = 0.3.1 =
 * Neu: Automatische Updates via GitHub Releases (plugin-update-checker v5, Release Assets).

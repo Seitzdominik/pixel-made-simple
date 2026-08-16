@@ -26,6 +26,8 @@ class LMPCT_Admin {
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'render_notices' ) );
 
+		add_action( 'wp_ajax_lmpct_save_toggle', array( __CLASS__, 'handle_toggle_autosave' ) );
+
 		add_action( 'admin_post_lmpct_save_event', array( __CLASS__, 'handle_save_event' ) );
 		add_action( 'admin_post_lmpct_delete_event', array( __CLASS__, 'handle_delete_event' ) );
 		add_action( 'admin_post_lmpct_toggle_event', array( __CLASS__, 'handle_toggle_event' ) );
@@ -100,6 +102,53 @@ class LMPCT_Admin {
 
 		wp_enqueue_style( 'lmpct-admin', LMPCT_PLUGIN_URL . 'assets/admin.css', array( 'dashicons' ), LMPCT_VERSION );
 		wp_enqueue_script( 'lmpct-admin', LMPCT_PLUGIN_URL . 'assets/admin.js', array(), LMPCT_VERSION, true );
+
+		wp_localize_script(
+			'lmpct-admin',
+			'lmpctAdmin',
+			array(
+				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+				'nonce'     => wp_create_nonce( 'lmpct_toggle_autosave' ),
+				'savedText' => __( 'Saved.', 'lightweight-meta-pixel-capi-tracker' ),
+			)
+		);
+	}
+
+	/**
+	 * AJAX: einzelnen Einstellungs-Toggle sofort speichern (nonce-gesichert).
+	 *
+	 * @return void
+	 */
+	public static function handle_toggle_autosave() {
+		check_ajax_referer( 'lmpct_toggle_autosave', 'nonce' );
+
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
+		}
+
+		$allowed = array(
+			'exclude_admins',
+			'consent_detection',
+			'pixel_enabled',
+			'capi_enabled',
+			'hash_email',
+			'google_enabled',
+			'google_consent_mode',
+			'tiktok_enabled',
+		);
+
+		$key = sanitize_key( wp_unslash( $_POST['key'] ?? '' ) );
+
+		if ( ! in_array( $key, $allowed, true ) ) {
+			wp_send_json_error( array( 'message' => 'invalid_key' ), 400 );
+		}
+
+		$settings         = LMPCT_Settings::get();
+		$settings[ $key ] = empty( $_POST['value'] ) ? 0 : 1;
+
+		update_option( LMPCT_Settings::OPTION_SETTINGS, LMPCT_Settings::sanitize_settings( $settings ) );
+
+		wp_send_json_success( array( 'key' => $key, 'value' => $settings[ $key ] ) );
 	}
 
 	/**
@@ -143,18 +192,21 @@ class LMPCT_Admin {
 	/**
 	 * Wiederverwendbarer Toggle-Switch im WP-Stil.
 	 *
-	 * @param string $name    name-Attribut.
-	 * @param bool   $checked Zustand.
-	 * @param string $label   Screenreader-Label.
-	 * @param bool   $submit  Formular bei Änderung automatisch absenden.
+	 * @param string $name         name-Attribut.
+	 * @param bool   $checked      Zustand.
+	 * @param string $label        Screenreader-Label.
+	 * @param bool   $submit       Formular bei Änderung automatisch absenden.
+	 * @param string $autosave_key Einstellungs-Schlüssel für das sofortige
+	 *                             AJAX-Speichern (leer = kein Autosave).
 	 * @return void
 	 */
-	private static function toggle( $name, $checked, $label, $submit = false ) {
+	private static function toggle( $name, $checked, $label, $submit = false, $autosave_key = '' ) {
 		?>
 		<label class="lmpct-toggle">
 			<input type="checkbox" name="<?php echo esc_attr( $name ); ?>" value="1"
 				<?php checked( $checked ); ?>
-				<?php echo $submit ? 'data-lmpct-autosubmit="1"' : ''; ?> />
+				<?php echo $submit ? 'data-lmpct-autosubmit="1"' : ''; ?>
+				<?php echo '' !== $autosave_key ? 'data-lmpct-autosave="' . esc_attr( $autosave_key ) . '"' : ''; ?> />
 			<span class="lmpct-toggle-slider" aria-hidden="true"></span>
 			<span class="screen-reader-text"><?php echo esc_html( $label ); ?></span>
 		</label>
@@ -188,7 +240,7 @@ class LMPCT_Admin {
 	 * @param string $toggle_label   Screenreader-Label des Master-Toggles.
 	 * @return void
 	 */
-	private static function accordion_open( $title, $toggle_name, $toggle_checked, $toggle_label ) {
+	private static function accordion_open( $title, $toggle_name, $toggle_checked, $toggle_label, $autosave_key = '' ) {
 		$classes = 'postbox lmpct-accordion';
 		if ( $toggle_checked ) {
 			$classes .= ' lmpct-on';
@@ -200,7 +252,7 @@ class LMPCT_Admin {
 			<div class="postbox-header lmpct-accordion-header">
 				<h2 class="hndle"><?php echo esc_html( $title ); ?></h2>
 				<div class="lmpct-accordion-controls">
-					<?php self::toggle( $toggle_name, $toggle_checked, $toggle_label ); ?>
+					<?php self::toggle( $toggle_name, $toggle_checked, $toggle_label, false, $autosave_key ); ?>
 					<button type="button" class="lmpct-accordion-button" aria-expanded="<?php echo $toggle_checked ? 'true' : 'false'; ?>">
 						<span class="screen-reader-text">
 							<?php
@@ -336,22 +388,22 @@ class LMPCT_Admin {
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Do not track administrators', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
 					<td>
-						<?php self::toggle( 'lmpct_settings[exclude_admins]', ! empty( $s['exclude_admins'] ), __( 'Do not track administrators', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+						<?php self::toggle( 'lmpct_settings[exclude_admins]', ! empty( $s['exclude_admins'] ), __( 'Do not track administrators', 'lightweight-meta-pixel-capi-tracker' ), false, 'exclude_admins' ); ?>
 						<p class="description"><?php esc_html_e( 'Recommended: logged-in administrators trigger neither pixel nor server events.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><?php esc_html_e( 'GDPR / cookie banner mode', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
+					<th scope="row"><?php esc_html_e( 'Automatic cookie banner detection (GDPR)', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
 					<td>
-						<?php self::toggle( 'lmpct_settings[consent_blocking]', ! empty( $s['consent_blocking'] ), __( 'Enable script blocking for consent banners', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
-						<p class="description"><?php esc_html_e( 'Outputs all tracking scripts as type="text/plain" with data-cookiecategory="marketing" so your consent banner (e.g. Cookiebot, Complianz) can unblock them after consent. Server-side CAPI events are then only sent once the _fbp cookie exists.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+						<?php self::toggle( 'lmpct_settings[consent_detection]', ! empty( $s['consent_detection'] ), __( 'Enable automatic cookie banner detection', 'lightweight-meta-pixel-capi-tracker' ), false, 'consent_detection' ); ?>
+						<p class="description"><?php esc_html_e( 'Automatically detects installed cookie banners and blocks browser and CAPI events until consent is given. Supports Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies and any banner using the WP Consent API. Automatic blocking cannot be guaranteed for unlisted third-party banners. Sites without a cookie banner are never blocked.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
 			</table>
 
 			<h2 class="lmpct-section-title"><?php esc_html_e( 'Platforms', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
 
-			<?php self::accordion_open( __( 'Meta (Facebook)', 'lightweight-meta-pixel-capi-tracker' ), 'lmpct_settings[pixel_enabled]', ! empty( $s['pixel_enabled'] ), __( 'Enable Meta tracking', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+			<?php self::accordion_open( __( 'Meta (Facebook)', 'lightweight-meta-pixel-capi-tracker' ), 'lmpct_settings[pixel_enabled]', ! empty( $s['pixel_enabled'] ), __( 'Enable Meta tracking', 'lightweight-meta-pixel-capi-tracker' ), 'pixel_enabled' ); ?>
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row">
@@ -367,7 +419,7 @@ class LMPCT_Admin {
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Enable Conversions API', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
 					<td>
-						<?php self::toggle( 'lmpct_settings[capi_enabled]', ! empty( $s['capi_enabled'] ), __( 'Enable Conversions API', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+						<?php self::toggle( 'lmpct_settings[capi_enabled]', ! empty( $s['capi_enabled'] ), __( 'Enable Conversions API', 'lightweight-meta-pixel-capi-tracker' ), false, 'capi_enabled' ); ?>
 						<p class="description"><?php esc_html_e( 'Additionally sends matched events to Meta server-side – deduplicated via the same event ID as in the browser.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
@@ -391,19 +443,20 @@ class LMPCT_Admin {
 						<input type="text" id="lmpct-test-code" class="regular-text code"
 							name="lmpct_settings[test_event_code]" value="<?php echo esc_attr( $s['test_event_code'] ); ?>"
 							placeholder="TEST12345" autocomplete="off" />
+						<p class="description"><?php esc_html_e( 'The test code is automatically deactivated after 12 hours to prevent accidental test tracking on a live site.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Advanced Matching (email)', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
 					<td>
-						<?php self::toggle( 'lmpct_settings[hash_email]', ! empty( $s['hash_email'] ), __( 'Enable Advanced Matching', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+						<?php self::toggle( 'lmpct_settings[hash_email]', ! empty( $s['hash_email'] ), __( 'Enable Advanced Matching', 'lightweight-meta-pixel-capi-tracker' ), false, 'hash_email' ); ?>
 						<p class="description"><?php esc_html_e( 'Sends the email address of logged-in users to the Conversions API as a SHA-256 hash (better match quality). Mind data privacy.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
 			</table>
 			<?php self::accordion_close(); ?>
 
-			<?php self::accordion_open( __( 'Google Ads', 'lightweight-meta-pixel-capi-tracker' ), 'lmpct_settings[google_enabled]', ! empty( $s['google_enabled'] ), __( 'Enable Google Ads tracking', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+			<?php self::accordion_open( __( 'Google Ads', 'lightweight-meta-pixel-capi-tracker' ), 'lmpct_settings[google_enabled]', ! empty( $s['google_enabled'] ), __( 'Enable Google Ads tracking', 'lightweight-meta-pixel-capi-tracker' ), 'google_enabled' ); ?>
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row">
@@ -419,14 +472,14 @@ class LMPCT_Admin {
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Google Consent Mode v2 (default)', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
 					<td>
-						<?php self::toggle( 'lmpct_settings[google_consent_mode]', ! empty( $s['google_consent_mode'] ), __( 'Enable Google Consent Mode v2 defaults', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+						<?php self::toggle( 'lmpct_settings[google_consent_mode]', ! empty( $s['google_consent_mode'] ), __( 'Enable Google Consent Mode v2 defaults', 'lightweight-meta-pixel-capi-tracker' ), false, 'google_consent_mode' ); ?>
 						<p class="description"><?php esc_html_e( 'Sets ad_storage, ad_user_data, ad_personalization and analytics_storage to "denied" by default before the tag loads. Your consent banner then sends the consent update. Recommended for the EU.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
 			</table>
 			<?php self::accordion_close(); ?>
 
-			<?php self::accordion_open( __( 'TikTok', 'lightweight-meta-pixel-capi-tracker' ), 'lmpct_settings[tiktok_enabled]', ! empty( $s['tiktok_enabled'] ), __( 'Enable TikTok Pixel', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+			<?php self::accordion_open( __( 'TikTok', 'lightweight-meta-pixel-capi-tracker' ), 'lmpct_settings[tiktok_enabled]', ! empty( $s['tiktok_enabled'] ), __( 'Enable TikTok Pixel', 'lightweight-meta-pixel-capi-tracker' ), 'tiktok_enabled' ); ?>
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row">

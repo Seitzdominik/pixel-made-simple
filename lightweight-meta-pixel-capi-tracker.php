@@ -3,7 +3,7 @@
  * Plugin Name:       Lightweight Meta Pixel & CAPI Tracker
  * Plugin URI:        https://sdv.design
  * Description:       Lightweight, high-performance tracking for Meta Pixel & Conversions API, Google Ads (Consent Mode v2) and TikTok Pixel – with URL-based multi-platform events and clean event deduplication.
- * Version:           0.3.1
+ * Version:           0.4.0
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LMPCT_VERSION', '0.3.1' );
+define( 'LMPCT_VERSION', '0.4.0' );
 define( 'LMPCT_PLUGIN_FILE', __FILE__ );
 define( 'LMPCT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LMPCT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -30,7 +30,7 @@ if ( file_exists( LMPCT_PLUGIN_DIR . 'plugin-update-checker/plugin-update-checke
 	require_once LMPCT_PLUGIN_DIR . 'plugin-update-checker/plugin-update-checker.php';
 
 	$lmpct_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
-		'https://github.com/Seitzdominik/lightweigth-tracker',
+		'https://github.com/Seitzdominik/lightweigth-tracker/',
 		__FILE__,
 		'lightweight-meta-pixel-capi-tracker'
 	);
@@ -51,6 +51,7 @@ function lmpct_load_textdomain() {
 add_action( 'init', 'lmpct_load_textdomain' );
 
 require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-settings.php';
+require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-consent.php';
 require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-capi.php';
 require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-frontend.php';
 
