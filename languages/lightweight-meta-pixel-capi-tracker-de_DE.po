@@ -1,0 +1,420 @@
+# German translation (Du-Form) for Lightweight Meta Pixel & CAPI Tracker.
+# Copyright (C) 2026 Dominik Seitz
+msgid ""
+msgstr ""
+"Project-Id-Version: Lightweight Meta Pixel & CAPI Tracker 0.3.1\n"
+"Report-Msgid-Bugs-To: https://sdv.design\n"
+"POT-Creation-Date: 2026-08-16 16:30+0000\n"
+"PO-Revision-Date: 2026-08-16 16:30+0000\n"
+"Last-Translator: Dominik Seitz <seitz.entertainment@gmail.com>\n"
+"Language-Team: German\n"
+"Language: de_DE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: lightweight-meta-pixel-capi-tracker\n"
+
+#. Plugin Name of the plugin
+#: lightweight-meta-pixel-capi-tracker.php
+#: includes/class-lmpct-admin.php:240
+#: includes/class-lmpct-admin.php:284
+msgid "Lightweight Meta Pixel & CAPI Tracker"
+msgstr "Lightweight Meta Pixel & CAPI Tracker"
+
+#. Plugin URI of the plugin
+#: lightweight-meta-pixel-capi-tracker.php
+#: lightweight-meta-pixel-capi-tracker.php
+msgid "https://sdv.design"
+msgstr "https://sdv.design"
+
+#. Description of the plugin
+#: lightweight-meta-pixel-capi-tracker.php
+msgid "Lightweight, high-performance tracking for Meta Pixel & Conversions API, Google Ads (Consent Mode v2) and TikTok Pixel – with URL-based multi-platform events and clean event deduplication."
+msgstr "Schlankes, performantes Tracking für Meta Pixel & Conversions API, Google Ads (Consent Mode v2) und TikTok Pixel – mit URL-basierten Multi-Plattform-Events und sauberer Event-Deduplizierung."
+
+#. Author of the plugin
+#: lightweight-meta-pixel-capi-tracker.php
+msgid "Dominik Seitz"
+msgstr "Dominik Seitz"
+
+#: includes/class-lmpct-admin.php:45
+#: includes/class-lmpct-admin.php:64
+msgid "Settings"
+msgstr "Einstellungen"
+
+#: includes/class-lmpct-admin.php:51
+#: includes/class-lmpct-admin.php:63
+msgid "Meta Pixel & CAPI Tracker"
+msgstr "Meta Pixel & CAPI Tracker"
+
+#: includes/class-lmpct-admin.php:52
+msgid "Pixel Tracker"
+msgstr "Pixel Tracker"
+
+#: includes/class-lmpct-admin.php:71
+#: includes/class-lmpct-admin.php:72
+#: includes/class-lmpct-admin.php:277
+msgid "Info & Help"
+msgstr "Info & Hilfe"
+
+#: includes/class-lmpct-admin.php:116
+msgid "Event saved."
+msgstr "Event gespeichert."
+
+#: includes/class-lmpct-admin.php:117
+msgid "Event deleted."
+msgstr "Event gelöscht."
+
+#: includes/class-lmpct-admin.php:118
+msgid "Event status updated."
+msgstr "Event-Status aktualisiert."
+
+#: includes/class-lmpct-admin.php:119
+msgid "Setting saved."
+msgstr "Einstellung gespeichert."
+
+#: includes/class-lmpct-admin.php:120
+msgid "The event could not be saved. Please fill in all required fields correctly."
+msgstr "Das Event konnte nicht gespeichert werden. Bitte fülle alle Pflichtfelder korrekt aus."
+
+#: includes/class-lmpct-admin.php:121
+msgid "Please enable at least one platform for this event."
+msgstr "Bitte aktiviere mindestens eine Plattform für dieses Event."
+
+#: includes/class-lmpct-admin.php:122
+msgid "Google Ads is enabled for this event but the conversion label is missing."
+msgstr "Google Ads ist für dieses Event aktiviert, aber das Conversion Label fehlt."
+
+#: includes/class-lmpct-admin.php:123
+msgid "The event could not be found."
+msgstr "Das Event wurde nicht gefunden."
+
+#. translators: %s: platform box title
+#: includes/class-lmpct-admin.php:208
+msgid "Toggle panel: %s"
+msgstr "Bereich umschalten: %s"
+
+#: includes/class-lmpct-admin.php:229
+#: includes/class-lmpct-admin.php:270
+msgid "You do not have permission to access this page."
+msgstr "Du hast keine Berechtigung, diese Seite aufzurufen."
+
+#: includes/class-lmpct-admin.php:243
+msgid "Plugin tabs"
+msgstr "Plugin-Tabs"
+
+#: includes/class-lmpct-admin.php:245
+msgid "General Settings & Platforms"
+msgstr "Allgemeine Einstellungen & Plattformen"
+
+#: includes/class-lmpct-admin.php:248
+msgid "Manage Events"
+msgstr "Events verwalten"
+
+#: includes/class-lmpct-admin.php:281
+msgid "Plugin Information"
+msgstr "Plugin-Informationen"
+
+#. translators: %s: support email address
+#: includes/class-lmpct-admin.php:291
+msgid "If you have questions or found a bug, please email %s."
+msgstr "Bei Fragen oder Bugs melde dich gerne per E-Mail an %s."
+
+#. translators: %s: developer website link
+#: includes/class-lmpct-admin.php:300
+msgid "Developed by %s."
+msgstr "Entwickelt von %s."
+
+#: includes/class-lmpct-admin.php:309
+msgid "Video Tutorial"
+msgstr "Video-Tutorial"
+
+#: includes/class-lmpct-admin.php:314
+msgid "A step-by-step video tutorial on setting up the plugin is coming soon:"
+msgstr "Ein Schritt-für-Schritt-Video-Tutorial zur Einrichtung des Plugins folgt in Kürze:"
+
+#: includes/class-lmpct-admin.php:317
+msgid "Watch the tutorial on YouTube"
+msgstr "Zum Tutorial auf YouTube"
+
+#: includes/class-lmpct-admin.php:334
+msgid "Global Options"
+msgstr "Globale Optionen"
+
+#: includes/class-lmpct-admin.php:337
+#: includes/class-lmpct-admin.php:339
+msgid "Do not track administrators"
+msgstr "Administratoren nicht tracken"
+
+#: includes/class-lmpct-admin.php:340
+msgid "Recommended: logged-in administrators trigger neither pixel nor server events."
+msgstr "Empfohlen: Eingeloggte Administratoren lösen weder Pixel- noch Server-Events aus."
+
+#: includes/class-lmpct-admin.php:344
+msgid "GDPR / cookie banner mode"
+msgstr "DSGVO / Cookie-Banner-Modus"
+
+#: includes/class-lmpct-admin.php:346
+msgid "Enable script blocking for consent banners"
+msgstr "Script-Blocking für Consent-Banner aktivieren"
+
+#: includes/class-lmpct-admin.php:347
+msgid "Outputs all tracking scripts as type=\"text/plain\" with data-cookiecategory=\"marketing\" so your consent banner (e.g. Cookiebot, Complianz) can unblock them after consent. Server-side CAPI events are then only sent once the _fbp cookie exists."
+msgstr "Gibt alle Tracking-Skripte als type=\"text/plain\" mit data-cookiecategory=\"marketing\" aus, damit dein Consent-Banner (z. B. Cookiebot, Complianz) sie nach der Einwilligung freischalten kann. Serverseitige CAPI-Events werden dann erst gesendet, sobald das _fbp-Cookie existiert."
+
+#: includes/class-lmpct-admin.php:352
+#: includes/class-lmpct-admin.php:486
+#: includes/class-lmpct-admin.php:631
+msgid "Platforms"
+msgstr "Plattformen"
+
+#: includes/class-lmpct-admin.php:354
+msgid "Meta (Facebook)"
+msgstr "Meta (Facebook)"
+
+#: includes/class-lmpct-admin.php:354
+msgid "Enable Meta tracking"
+msgstr "Meta-Tracking aktivieren"
+
+#: includes/class-lmpct-admin.php:358
+msgid "Meta Pixel ID"
+msgstr "Meta Pixel ID"
+
+#: includes/class-lmpct-admin.php:359
+msgid "Meta Events Manager → Data sources → your pixel → copy the ID shown below its name."
+msgstr "Meta Events Manager → Datenquellen → Dein Pixel → ID unter dem Namen kopieren."
+
+#: includes/class-lmpct-admin.php:368
+#: includes/class-lmpct-admin.php:370
+msgid "Enable Conversions API"
+msgstr "Conversions API aktivieren"
+
+#: includes/class-lmpct-admin.php:371
+msgid "Additionally sends matched events to Meta server-side – deduplicated via the same event ID as in the browser."
+msgstr "Sendet gematchte Events zusätzlich serverseitig an Meta – dedupliziert über dieselbe Event-ID wie im Browser."
+
+#: includes/class-lmpct-admin.php:376
+msgid "CAPI Access Token"
+msgstr "CAPI Access Token"
+
+#: includes/class-lmpct-admin.php:377
+msgid "Meta Events Manager → Data sources → Settings → Conversions API → “Generate access token”."
+msgstr "Meta Events Manager → Datenquellen → Einstellungen → Conversions API → „Zugriffstoken generieren“."
+
+#: includes/class-lmpct-admin.php:382
+msgid "Secret key. Used exclusively server-side and never rendered in the frontend."
+msgstr "Geheimschlüssel. Wird ausschließlich serverseitig verwendet und niemals im Frontend ausgegeben."
+
+#: includes/class-lmpct-admin.php:387
+msgid "Test Event Code"
+msgstr "Test Event Code"
+
+#: includes/class-lmpct-admin.php:388
+msgid "Meta Events Manager → Test events → copy the “Server events code”. Clear it again after testing!"
+msgstr "Meta Events Manager → Test-Events → „Code für Server-Events“ kopieren. Nach dem Testen wieder leeren!"
+
+#: includes/class-lmpct-admin.php:397
+msgid "Advanced Matching (email)"
+msgstr "Advanced Matching (E-Mail)"
+
+#: includes/class-lmpct-admin.php:399
+msgid "Enable Advanced Matching"
+msgstr "Advanced Matching aktivieren"
+
+#: includes/class-lmpct-admin.php:400
+msgid "Sends the email address of logged-in users to the Conversions API as a SHA-256 hash (better match quality). Mind data privacy."
+msgstr "Sendet bei eingeloggten Nutzern die E-Mail-Adresse als SHA-256-Hash an die Conversions API (bessere Zuordnungsqualität). Beachte den Datenschutz."
+
+#: includes/class-lmpct-admin.php:406
+msgid "Google Ads"
+msgstr "Google Ads"
+
+#: includes/class-lmpct-admin.php:406
+msgid "Enable Google Ads tracking"
+msgstr "Google Ads Tracking aktivieren"
+
+#: includes/class-lmpct-admin.php:410
+msgid "Google Tag ID"
+msgstr "Google Tag ID"
+
+#: includes/class-lmpct-admin.php:411
+msgid "Google Ads → Tools & Settings → Google Tag → copy the ID (AW-XXXXX)."
+msgstr "Google Ads → Tools & Einstellungen → Google-Tag → ID kopieren (AW-XXXXX)."
+
+#: includes/class-lmpct-admin.php:420
+msgid "Google Consent Mode v2 (default)"
+msgstr "Google Consent Mode v2 (Standard)"
+
+#: includes/class-lmpct-admin.php:422
+msgid "Enable Google Consent Mode v2 defaults"
+msgstr "Google Consent Mode v2 Defaults aktivieren"
+
+#: includes/class-lmpct-admin.php:423
+msgid "Sets ad_storage, ad_user_data, ad_personalization and analytics_storage to \"denied\" by default before the tag loads. Your consent banner then sends the consent update. Recommended for the EU."
+msgstr "Setzt ad_storage, ad_user_data, ad_personalization und analytics_storage vor dem Tag-Laden standardmäßig auf „denied“. Dein Consent-Banner sendet anschließend das Consent-Update. Empfohlen für die EU."
+
+#: includes/class-lmpct-admin.php:429
+msgid "TikTok"
+msgstr "TikTok"
+
+#: includes/class-lmpct-admin.php:429
+msgid "Enable TikTok Pixel"
+msgstr "TikTok Pixel aktivieren"
+
+#: includes/class-lmpct-admin.php:433
+msgid "TikTok Pixel ID"
+msgstr "TikTok Pixel ID"
+
+#: includes/class-lmpct-admin.php:434
+msgid "TikTok Ads Manager → Assets → Events → Web events → copy the pixel ID."
+msgstr "TikTok Ads Manager → Assets → Events → Web-Events → Pixel-ID kopieren."
+
+#: includes/class-lmpct-admin.php:445
+msgid "Save Settings"
+msgstr "Einstellungen speichern"
+
+#: includes/class-lmpct-admin.php:465
+msgid "Custom Events"
+msgstr "Benutzerdefinierte Events"
+
+#: includes/class-lmpct-admin.php:470
+msgid "Enable all custom events"
+msgstr "Alle benutzerdefinierten Events aktivieren"
+
+#: includes/class-lmpct-admin.php:472
+msgid "Enable/disable all custom events"
+msgstr "Alle benutzerdefinierten Events aktivieren/deaktivieren"
+
+#: includes/class-lmpct-admin.php:474
+msgid "Apply"
+msgstr "Übernehmen"
+
+#: includes/class-lmpct-admin.php:478
+msgid "Custom events are currently disabled globally. The rules below will not fire."
+msgstr "Benutzerdefinierte Events sind derzeit global deaktiviert. Die Regeln unten werden nicht ausgelöst."
+
+#: includes/class-lmpct-admin.php:484
+#: includes/class-lmpct-admin.php:673
+msgid "Status"
+msgstr "Status"
+
+#: includes/class-lmpct-admin.php:485
+msgid "Name"
+msgstr "Name"
+
+#: includes/class-lmpct-admin.php:487
+msgid "Trigger Condition (URL)"
+msgstr "Trigger-Bedingung (URL)"
+
+#: includes/class-lmpct-admin.php:488
+msgid "Actions"
+msgstr "Aktionen"
+
+#: includes/class-lmpct-admin.php:494
+msgid "No events yet. Create your first event below."
+msgstr "Noch keine Events angelegt. Erstelle unten dein erstes Event."
+
+#. translators: %s: event name
+#: includes/class-lmpct-admin.php:509
+msgid "Enable event “%s”"
+msgstr "Event „%s“ aktivieren"
+
+#: includes/class-lmpct-admin.php:513
+msgid "Toggle"
+msgstr "Umschalten"
+
+#: includes/class-lmpct-admin.php:532
+msgid "Exact path:"
+msgstr "Exakter Pfad:"
+
+#: includes/class-lmpct-admin.php:533
+msgid "URL contains:"
+msgstr "URL enthält:"
+
+#: includes/class-lmpct-admin.php:540
+msgid "Edit"
+msgstr "Bearbeiten"
+
+#: includes/class-lmpct-admin.php:547
+msgid "Really delete this event?"
+msgstr "Möchtest du dieses Event wirklich löschen?"
+
+#: includes/class-lmpct-admin.php:548
+msgid "Delete"
+msgstr "Löschen"
+
+#. translators: %s: event name
+#: includes/class-lmpct-admin.php:593
+msgid "Edit event “%s”"
+msgstr "Event „%s“ bearbeiten"
+
+#: includes/class-lmpct-admin.php:595
+msgid "Create New Event"
+msgstr "Neues Event erstellen"
+
+#: includes/class-lmpct-admin.php:607
+msgid "Event Name (internal)"
+msgstr "Event-Name (intern)"
+
+#: includes/class-lmpct-admin.php:611
+msgid "e.g. Lead magnet confirmation"
+msgstr "z. B. Lead Magnet Bestätigung"
+
+#: includes/class-lmpct-admin.php:613
+msgid "With the “CustomEvent” type, this name is sent as the custom event name."
+msgstr "Beim Typ „CustomEvent“ wird dieser Name als Custom-Event-Name gesendet."
+
+#: includes/class-lmpct-admin.php:618
+msgid "Trigger"
+msgstr "Trigger"
+
+#: includes/class-lmpct-admin.php:621
+msgid "Exact path"
+msgstr "Exakter Pfad"
+
+#: includes/class-lmpct-admin.php:622
+msgid "URL contains"
+msgstr "URL enthält"
+
+#: includes/class-lmpct-admin.php:627
+msgid "“Exact path” compares only the URL path (case and trailing slash are ignored). “URL contains” checks the path including the query string."
+msgstr "„Exakter Pfad“ vergleicht nur den URL-Pfad (Groß-/Kleinschreibung und abschließender Slash werden ignoriert). „URL enthält“ prüft den Pfad inklusive Query-String."
+
+#: includes/class-lmpct-admin.php:638
+msgid "Meta event type"
+msgstr "Meta Event-Typ"
+
+#: includes/class-lmpct-admin.php:654
+msgid "Google Ads conversion label"
+msgstr "Google Ads Conversion Label"
+
+#: includes/class-lmpct-admin.php:655
+msgid "Google Ads → Conversion goals → click the action → Tag setup → snippet → copy the label after the slash (AW-XXX/LABEL)."
+msgstr "Google Ads → Ziel-Conversions → Aktion anklicken → Tag-Einrichtung → Snippet → Label hinter dem Schrägstrich kopieren (AW-XXX/LABEL)."
+
+#: includes/class-lmpct-admin.php:662
+msgid "TikTok event type"
+msgstr "TikTok Event-Typ"
+
+#: includes/class-lmpct-admin.php:675
+#: includes/class-lmpct-admin.php:676
+msgid "Event active"
+msgstr "Event aktiv"
+
+#: includes/class-lmpct-admin.php:684
+msgid "Update Event"
+msgstr "Event aktualisieren"
+
+#: includes/class-lmpct-admin.php:684
+msgid "Create Event"
+msgstr "Event erstellen"
+
+#: includes/class-lmpct-admin.php:692
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: includes/class-lmpct-admin.php:712
+msgid "You do not have permission to perform this action."
+msgstr "Du hast keine Berechtigung für diese Aktion."
+

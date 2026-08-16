@@ -1,0 +1,438 @@
+/* Lightweight Meta Pixel & CAPI Tracker – Admin-Styles (WP-Core-Look) */
+
+/* Toggle-Switch im WordPress-Stil */
+.lmpct-toggle {
+	position: relative;
+	display: inline-block;
+	width: 40px;
+	height: 22px;
+	vertical-align: middle;
+}
+
+.lmpct-toggle input[type="checkbox"] {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+	z-index: 2;
+}
+
+.lmpct-toggle .lmpct-toggle-slider {
+	position: absolute;
+	inset: 0;
+	background: #8c8f94;
+	border-radius: 11px;
+	transition: background-color 0.15s ease-in-out;
+}
+
+.lmpct-toggle .lmpct-toggle-slider::before {
+	content: "";
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 16px;
+	height: 16px;
+	background: #fff;
+	border-radius: 50%;
+	transition: transform 0.15s ease-in-out;
+}
+
+.lmpct-toggle input:checked + .lmpct-toggle-slider {
+	background: #2271b1;
+}
+
+.lmpct-toggle input:checked + .lmpct-toggle-slider::before {
+	transform: translateX(18px);
+}
+
+.lmpct-toggle input:focus-visible + .lmpct-toggle-slider {
+	box-shadow: 0 0 0 1px #fff, 0 0 0 3px #2271b1;
+}
+
+/* Abschnitts-Überschriften */
+.lmpct-section-title {
+	margin: 32px 0 4px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid #dcdcde;
+	max-width: 900px;
+	font-size: 16px;
+}
+
+/* Aufklappbare Plattform-Boxen (postbox-basiert) */
+.lmpct-accordion {
+	max-width: 900px;
+	margin-top: 16px;
+	border-left: 4px solid #c3c4c7;
+	transition: border-color 0.15s ease-in-out;
+}
+
+.lmpct-accordion.lmpct-on {
+	border-left-color: #2271b1;
+}
+
+.lmpct-accordion-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.lmpct-accordion-header:hover {
+	background: #f6f7f7;
+}
+
+.lmpct-accordion-header .hndle {
+	margin: 0;
+	padding: 14px 16px;
+	font-size: 14px;
+	line-height: 1.4;
+	cursor: pointer;
+	border-bottom: 0;
+}
+
+.lmpct-accordion-controls {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding-right: 10px;
+}
+
+.lmpct-accordion-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	color: #787c82;
+	border-radius: 3px;
+}
+
+.lmpct-accordion-button:hover,
+.lmpct-accordion-button:focus-visible {
+	color: #1d2327;
+	background: #f0f0f1;
+}
+
+.lmpct-accordion-arrow::before {
+	content: "\f142"; /* dashicons-arrow-up-alt2 */
+	font: normal 20px/1 dashicons;
+	speak: never;
+	-webkit-font-smoothing: antialiased;
+}
+
+.lmpct-accordion.closed .lmpct-accordion-arrow::before {
+	content: "\f140"; /* dashicons-arrow-down-alt2 */
+}
+
+.lmpct-accordion .inside {
+	padding: 4px 20px 16px;
+	margin: 0;
+	border-top: 1px solid #f0f0f1;
+}
+
+.lmpct-accordion.closed .inside {
+	display: none;
+}
+
+.lmpct-accordion .form-table th {
+	padding-left: 0;
+}
+
+/* Info-Tooltips (reine CSS-Hover-Box) */
+.lmpct-tip {
+	position: relative;
+	display: inline-block;
+	vertical-align: text-bottom;
+	margin-left: 4px;
+	line-height: 1;
+	color: #787c82;
+	cursor: help;
+}
+
+.lmpct-tip .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+.lmpct-tip:hover,
+.lmpct-tip:focus {
+	color: #2271b1;
+	outline: none;
+}
+
+.lmpct-tip .lmpct-tip-box {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	left: 50%;
+	transform: translateX(-50%);
+	width: 280px;
+	padding: 10px 12px;
+	background: #1d2327;
+	color: #f0f0f1;
+	font-size: 12px;
+	line-height: 1.5;
+	border-radius: 4px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 0.15s ease-in-out;
+	z-index: 10000;
+}
+
+.lmpct-tip .lmpct-tip-box::after {
+	content: "";
+	position: absolute;
+	top: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	border: 6px solid transparent;
+	border-top-color: #1d2327;
+}
+
+.lmpct-tip:hover .lmpct-tip-box,
+.lmpct-tip:focus .lmpct-tip-box {
+	visibility: visible;
+	opacity: 1;
+}
+
+/* Einheitliche Breitenberechnung: Padding und Rahmen zählen zur max-width,
+   damit Toggle-Leiste, Tabelle und Cards exakt bündig abschließen. */
+.lmpct-global-toggle-form,
+.lmpct-events-table,
+.lmpct-event-form-card,
+.lmpct-accordion,
+.lmpct-card {
+	box-sizing: border-box;
+}
+
+/* Events-Tab */
+.lmpct-global-toggle-form {
+	max-width: 960px;
+	margin: 12px 0 16px;
+	padding: 10px 16px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.lmpct-global-toggle-label {
+	vertical-align: middle;
+}
+
+.lmpct-wrap .notice.inline {
+	max-width: 928px;
+}
+
+.lmpct-events-table {
+	max-width: 960px;
+	margin-top: 8px;
+}
+
+.lmpct-events-table th,
+.lmpct-events-table td {
+	vertical-align: middle;
+}
+
+.lmpct-events-table .lmpct-col-status {
+	width: 70px;
+}
+
+.lmpct-events-table .lmpct-col-actions {
+	width: 170px;
+}
+
+.lmpct-events-table td[colspan] {
+	padding: 28px 16px;
+	text-align: center;
+	color: #646970;
+}
+
+.lmpct-events-table td form {
+	display: inline-block;
+	margin: 0;
+}
+
+.lmpct-inline-form {
+	margin-left: 4px;
+}
+
+/* Plattform-Badges in der Event-Tabelle */
+.lmpct-badge {
+	display: inline-block;
+	margin: 2px 4px 2px 0;
+	padding: 2px 8px;
+	font-size: 11px;
+	line-height: 1.6;
+	border-radius: 3px;
+	background: #f0f0f1;
+	border: 1px solid #c3c4c7;
+	color: #1d2327;
+	white-space: nowrap;
+}
+
+.lmpct-badge-meta {
+	border-color: #1877f2;
+	background: #eaf1fd;
+}
+
+.lmpct-badge-google {
+	border-color: #188038;
+	background: #e6f4ea;
+}
+
+.lmpct-badge-tiktok {
+	border-color: #1d2327;
+	background: #f0f0f1;
+}
+
+/* Plattform-Zeilen im Event-Formular */
+.lmpct-platform-rows .lmpct-platform-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 8px;
+	padding: 8px 12px;
+	max-width: 560px;
+	background: #fbfbfc;
+	border: 1px solid #f0f0f1;
+	border-radius: 3px;
+}
+
+.lmpct-platform-check {
+	min-width: 120px;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+
+.lmpct-platform-row select,
+.lmpct-platform-row input[type="text"] {
+	min-width: 240px;
+}
+
+/* Controls nicht aktivierter Plattformen abdimmen (rein visuell,
+   Fokus aktiviert die Plattform automatisch per JS) */
+.lmpct-platform-row:has(.lmpct-platform-check input:not(:checked)) select,
+.lmpct-platform-row:has(.lmpct-platform-check input:not(:checked)) input[type="text"],
+.lmpct-platform-row:has(.lmpct-platform-check input:not(:checked)) .lmpct-tip {
+	opacity: 0.45;
+	transition: opacity 0.15s ease-in-out;
+}
+
+/* Event-Formular als Card im WP-Postbox-Stil */
+.lmpct-event-form-card {
+	max-width: 960px;
+	margin-top: 24px;
+	padding: 0;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-left: 4px solid #c3c4c7;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.lmpct-event-form-card > h2 {
+	margin: 0;
+	padding: 14px 20px;
+	font-size: 14px;
+	line-height: 1.4;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.lmpct-event-form-card > form {
+	padding: 0 20px 12px;
+}
+
+/* Info & Hilfe: Karten im gleichen Stil wie die Formular-Card */
+.lmpct-card {
+	max-width: 960px;
+	margin-top: 16px;
+	padding: 0;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-left: 4px solid #2271b1;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.lmpct-card > h2 {
+	margin: 0;
+	padding: 14px 20px;
+	font-size: 14px;
+	line-height: 1.4;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.lmpct-card .lmpct-card-body {
+	padding: 4px 20px 16px;
+}
+
+.lmpct-version-badge {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 2px 10px;
+	font-size: 12px;
+	font-weight: 600;
+	color: #2271b1;
+	background: #eaf1fd;
+	border: 1px solid #2271b1;
+	border-radius: 10px;
+	vertical-align: middle;
+}
+
+.lmpct-video-box {
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+	padding: 14px 16px;
+	background: #f0f6fc;
+	border: 1px solid #c5d9ed;
+	border-left: 4px solid #72aee6;
+	border-radius: 3px;
+}
+
+.lmpct-video-box .dashicons {
+	font-size: 28px;
+	width: 28px;
+	height: 28px;
+	color: #2271b1;
+	margin-top: 2px;
+}
+
+.lmpct-video-box p {
+	margin: 0 0 10px;
+}
+
+.lmpct-video-box p:last-child {
+	margin-bottom: 0;
+}
+
+#lmpct-match-value {
+	margin-left: 8px;
+	vertical-align: baseline;
+}
+
+@media screen and (max-width: 782px) {
+	#lmpct-match-value {
+		margin-left: 0;
+		margin-top: 8px;
+		display: block;
+	}
+
+	.lmpct-platform-rows .lmpct-platform-row {
+		flex-wrap: wrap;
+	}
+}
