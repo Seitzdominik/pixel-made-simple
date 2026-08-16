@@ -30,7 +30,7 @@ if ( file_exists( LMPCT_PLUGIN_DIR . 'plugin-update-checker/plugin-update-checke
 	require_once LMPCT_PLUGIN_DIR . 'plugin-update-checker/plugin-update-checker.php';
 
 	$lmpct_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
-		'https://github.com/Seitzdominik/lightweight-tracker',
+		'https://github.com/Seitzdominik/lightweigth-tracker',
 		__FILE__,
 		'lightweight-meta-pixel-capi-tracker'
 	);
