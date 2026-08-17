@@ -236,44 +236,72 @@ class LMPCT_Frontend {
 		}
 
 		$consent_given = LMPCT_Consent::has_marketing_consent();
-		$deferred_js   = '';
+		$immediate_js  = ''; // Läuft sofort, geschützt durch den globalen Init-Guard.
+		$deferred_js   = ''; // Läuft erst nach Einwilligung, gleicher Guard.
+		$gtag_src      = '';
 
 		echo "\n<!-- Lightweight Meta Pixel & CAPI Tracker -->\n";
 
 		// Meta Pixel.
 		if ( self::meta_active() ) {
-			$meta_js = self::build_meta_js();
 			if ( $consent_given ) {
-				wp_print_inline_script_tag( $meta_js );
-				$pixel_id     = preg_replace( '/\D+/', '', (string) self::$settings['pixel_id'] );
-				$noscript_url = 'https://www.facebook.com/tr?id=' . rawurlencode( $pixel_id ) . '&ev=PageView&noscript=1';
-				echo '<noscript><img height="1" width="1" style="display:none" alt="" src="' . esc_url( $noscript_url ) . '" /></noscript>' . "\n";
+				$immediate_js .= self::build_meta_js();
 			} else {
-				$deferred_js .= $meta_js;
+				$deferred_js .= self::build_meta_js();
 			}
 		}
 
 		// Google Ads: Mit Consent Mode v2 immer sofort laden (Defaults = denied),
 		// ohne Consent Mode wie die anderen Plattformen verzögern.
 		if ( self::google_active() ) {
-			$tag_id = preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['google_tag_id'] );
-			$src    = 'https://www.googletagmanager.com/gtag/js?id=' . rawurlencode( $tag_id );
+			$tag_id   = preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['google_tag_id'] );
+			$gtag_src = 'https://www.googletagmanager.com/gtag/js?id=' . rawurlencode( $tag_id );
 
-			if ( $consent_given || ! empty( self::$settings['google_consent_mode'] ) ) {
-				wp_print_inline_script_tag( self::build_google_js() );
-				echo '<script async src="' . esc_url( $src ) . '"></script>' . "\n"; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- Bewusst direkt im Head, wie von Google vorgesehen.
+			if ( $consent_given ) {
+				$immediate_js .= self::build_google_js();
+			} elseif ( ! empty( self::$settings['google_consent_mode'] ) ) {
+				// Eigener Guard: Läuft VOR der Marketing-Einwilligung (Consent Mode)
+				// und darf die spätere Pixel-Initialisierung nicht blockieren.
+				wp_print_inline_script_tag(
+					'if(!window.lmpctGtagInit){window.lmpctGtagInit=true;' . "\n" . self::build_google_js() . '}'
+				);
+				echo '<script async src="' . esc_url( $gtag_src ) . '"></script>' . "\n"; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- Bewusst direkt im Head, wie von Google vorgesehen.
+				$gtag_src = '';
 			} else {
 				$deferred_js .= self::build_google_js()
-					. "var lmpctGs=document.createElement('script');lmpctGs.async=true;lmpctGs.src='" . esc_url( $src ) . "';document.head.appendChild(lmpctGs);\n";
+					. "var lmpctGs=document.createElement('script');lmpctGs.async=true;lmpctGs.src='" . esc_url( $gtag_src ) . "';document.head.appendChild(lmpctGs);\n";
+				$gtag_src = '';
 			}
 		}
 
 		// TikTok Pixel.
 		if ( self::tiktok_active() ) {
 			if ( $consent_given ) {
-				wp_print_inline_script_tag( self::build_tiktok_js() );
+				$immediate_js .= self::build_tiktok_js();
 			} else {
 				$deferred_js .= self::build_tiktok_js();
+			}
+		}
+
+		// Sofortige Skripte: EIN gebündelter Block hinter dem globalen Guard,
+		// damit Pixel-Init und PageView pro Seitenaufruf maximal einmal laufen
+		// (auch wenn wp_head mehrfach rendert oder Banner-Events erneut feuern).
+		if ( '' !== $immediate_js ) {
+			wp_print_inline_script_tag(
+				'window.lmpctInitialized=window.lmpctInitialized||false;'
+				. 'if(!window.lmpctInitialized){window.lmpctInitialized=true;' . "\n"
+				. $immediate_js
+				. '}'
+			);
+
+			if ( '' !== $gtag_src ) {
+				echo '<script async src="' . esc_url( $gtag_src ) . '"></script>' . "\n"; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript
+			}
+
+			if ( self::meta_active() ) {
+				$pixel_id     = preg_replace( '/\D+/', '', (string) self::$settings['pixel_id'] );
+				$noscript_url = 'https://www.facebook.com/tr?id=' . rawurlencode( $pixel_id ) . '&ev=PageView&noscript=1';
+				echo '<noscript><img height="1" width="1" style="display:none" alt="" src="' . esc_url( $noscript_url ) . '" /></noscript>' . "\n";
 			}
 		}
 
@@ -382,12 +410,16 @@ class LMPCT_Frontend {
 	private static function build_consent_bootstrap( $deferred_js ) {
 		$events_json = wp_json_encode( array_values( LMPCT_Consent::consent_events() ) );
 
-		return '(function(){var lmpctDone=false;'
+		// Globaler Init-Guard (window.lmpctInitialized): garantiert, dass Pixel-
+		// Init und PageView pro Seitenaufruf maximal EINMAL laufen – auch wenn
+		// der Bootstrap doppelt gerendert wird oder Banner-Events (z. B.
+		// surecookies_consent_updated) kurz nach dem Laden erneut feuern.
+		return '(function(){window.lmpctInitialized=window.lmpctInitialized||false;'
 			. LMPCT_Consent::consent_check_js()
-			. 'function lmpctInit(){if(lmpctDone){return;}lmpctDone=true;' . "\n" . $deferred_js . '}'
-			. 'if(lmpctHasConsent()){lmpctInit();}'
+			. 'function lmpctInitTracking(){if(window.lmpctInitialized){return;}window.lmpctInitialized=true;' . "\n" . $deferred_js . '}'
+			. 'if(lmpctHasConsent()){lmpctInitTracking();}'
 			. 'var lmpctEvts=' . $events_json . ';'
-			. 'lmpctEvts.forEach(function(e){var f=function(){setTimeout(function(){if(lmpctHasConsent()){lmpctInit();}},100);};document.addEventListener(e,f);window.addEventListener(e,f);});'
+			. 'lmpctEvts.forEach(function(e){var f=function(){setTimeout(function(){if(lmpctHasConsent()){lmpctInitTracking();}},100);};document.addEventListener(e,f);window.addEventListener(e,f);});'
 			. '})();';
 	}
 }

@@ -73,8 +73,15 @@ class LMPCT_Consent {
 		}
 
 		// 2) Must Have Plugins Cookie Bar / GDPR Cookie Consent (Cookie Law Info).
+		//    STRIKT: Nur die Advertisement-/Marketing-Kategorie zählt als
+		//    Zustimmung. viewed_cookie_policy wird bei JEDER Interaktion gesetzt
+		//    (auch bei "Nur erforderliche akzeptieren") und ist daher KEINE
+		//    Marketing-Einwilligung.
 		if ( isset( $_COOKIE['cookielawinfo-checkbox-advertisement'] ) ) {
 			return 'yes' === self::cookie( 'cookielawinfo-checkbox-advertisement' );
+		}
+		if ( isset( $_COOKIE['cookielawinfo-checkbox-marketing'] ) ) {
+			return 'yes' === self::cookie( 'cookielawinfo-checkbox-marketing' );
 		}
 
 		// 3) CookieYes.
@@ -83,9 +90,10 @@ class LMPCT_Consent {
 			return false !== strpos( $value, 'advertisement:yes' ) || false !== strpos( $value, 'marketing:yes' );
 		}
 
-		// 4) Cookie Law Info (ältere Versionen ohne Kategorie-Cookies).
+		// 4) Cookie Law Info: Banner wurde bedient, aber es existiert keine
+		//    erteilte Marketing-Kategorie (siehe 2) -> blockieren.
 		if ( isset( $_COOKIE['viewed_cookie_policy'] ) ) {
-			return 'yes' === self::cookie( 'viewed_cookie_policy' );
+			return false;
 		}
 
 		// 5) Borlabs Cookie (JSON: consents -> marketing).
@@ -170,9 +178,12 @@ class LMPCT_Consent {
 	 * @return string
 	 */
 	public static function consent_check_js() {
+		// STRIKT für CLI/Must Have Plugins: Nur advertisement/marketing=yes
+		// zählt; ein vorhandenes Kategorie-Cookie mit anderem Wert oder ein
+		// bloßes viewed_cookie_policy (= Banner bedient) blockiert.
 		return 'function lmpctHasConsent(){var c=document.cookie,m;'
-			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=yes')>-1)return true;"
-			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=no')>-1)return false;"
+			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=yes')>-1||c.indexOf('cookielawinfo-checkbox-marketing=yes')>-1)return true;"
+			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=')>-1||c.indexOf('cookielawinfo-checkbox-marketing=')>-1)return false;"
 			. "m=c.match(/cookieyes-consent=([^;]*)/);if(m)return m[1].indexOf('advertisement:yes')>-1||m[1].indexOf('marketing:yes')>-1;"
 			. "m=c.match(/borlabs-cookie=([^;]*)/);if(m){try{var b=JSON.parse(decodeURIComponent(m[1]));return !!(b&&b.consents&&b.consents.marketing&&b.consents.marketing.length!==0);}catch(e){return false;}}"
 			. "m=c.match(/cmplz_marketing=([^;]*)/);if(m)return m[1]==='allow';"
@@ -180,7 +191,7 @@ class LMPCT_Consent {
 			. "m=c.match(/CookieConsent=([^;]*)/);if(m)return decodeURIComponent(m[1]).indexOf('marketing:true')>-1;"
 			. "m=c.match(/surecookies_consent=([^;]*)/);if(m)return /marketing[^,;}]*?(true|yes|1)/i.test(decodeURIComponent(m[1]));"
 			. "if(c.indexOf('real_cookie_banner')>-1)return true;"
-			. "if(c.indexOf('viewed_cookie_policy=yes')>-1)return true;"
+			. "if(c.indexOf('viewed_cookie_policy=')>-1)return false;"
 			. 'return false;}';
 	}
 
