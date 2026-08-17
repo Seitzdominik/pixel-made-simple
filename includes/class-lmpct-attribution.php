@@ -7,8 +7,9 @@
  * CAPI-Events als custom_data bzw. als fbc bereit.
  *
  * First-Touch-Semantik: Vorhandene UTM-Werte werden NICHT überschrieben.
- * Einzige Ausnahme ist die fbclid – sie muss immer zum letzten Anzeigenklick
- * passen, sonst ordnet Meta die Conversion der falschen Kampagne zu.
+ * Einzige Ausnahme sind fbclid und gclid – Klick-IDs müssen immer zum letzten
+ * Anzeigenklick passen, sonst ordnen Meta/Google die Conversion der falschen
+ * Kampagne zu.
  *
  * @package Lightweight_Meta_Pixel_CAPI_Tracker
  */
@@ -39,7 +40,18 @@ class LMPCT_Attribution {
 		'utm_content',
 		'utm_term',
 		'fbclid',
+		'gclid',
 	);
+
+	/**
+	 * Klick-IDs: werden – anders als die UTM-Parameter – nicht First-Touch
+	 * behandelt (siehe capture()) und nicht als custom_data an die Meta CAPI
+	 * gesendet (siehe custom_data()), da sie plattformspezifische Identifier
+	 * ohne Bedeutung für die jeweils andere Plattform sind.
+	 *
+	 * @var string[]
+	 */
+	private static $click_ids = array( 'fbclid', 'gclid' );
 
 	/**
 	 * Request-Cache.
@@ -63,6 +75,67 @@ class LMPCT_Attribution {
 	}
 
 	/**
+	 * Ist der granulare UTM-/Attribution-Passthrough in Formularfelder aktiviert?
+	 *
+	 * Unabhängig von enabled() (utm_passthrough): Diese Funktion füllt lediglich
+	 * Formularfelder im Browser, sendet aber selbst keine Daten an eine Plattform.
+	 * Sie liest zusätzlich das lmpct_attribution-Cookie als Fallback, sofern
+	 * enabled() es überhaupt anlegt – ist utm_passthrough aus, greift nur die
+	 * URL-Parameter-Quelle.
+	 *
+	 * @return bool
+	 */
+	public static function form_fill_enabled() {
+		$settings = LMPCT_Settings::get();
+		return ! empty( $settings['enable_utm_form_fill'] );
+	}
+
+	/**
+	 * Ist der UTM-Form-Fill auf diesem Pfad aktiv?
+	 *
+	 * @param string $path Pfad (z. B. "/kontakt/").
+	 * @return bool
+	 */
+	public static function form_fill_url_allowed( $path ) {
+		$settings = LMPCT_Settings::get();
+		$mode     = (string) ( $settings['utm_form_fill_mode'] ?? 'all' );
+
+		if ( 'all' === $mode ) {
+			return true;
+		}
+
+		$matched = self::path_matches_patterns( (string) $path, LMPCT_Settings::utm_form_fill_url_patterns() );
+
+		return 'exclude' === $mode ? ! $matched : $matched;
+	}
+
+	/**
+	 * Pfad gegen eine Liste von Mustern prüfen (Teilstring-Treffer, ein
+	 * abschließendes "*" wirkt als einfacher Prefix-Platzhalter und wird vor
+	 * dem Vergleich entfernt, z. B. matcht "/lp/*" alles unter "/lp/").
+	 *
+	 * @param string   $path     Pfad.
+	 * @param string[] $patterns Muster.
+	 * @return bool
+	 */
+	private static function path_matches_patterns( $path, array $patterns ) {
+		if ( empty( $patterns ) ) {
+			return false;
+		}
+
+		$path = strtolower( $path );
+
+		foreach ( $patterns as $pattern ) {
+			$needle = strtolower( rtrim( (string) $pattern, '*' ) );
+			if ( '' !== $needle && false !== strpos( $path, $needle ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Kampagnen-Parameter der aktuellen URL erfassen und im Cookie ablegen.
 	 *
 	 * @return void
@@ -82,8 +155,8 @@ class LMPCT_Attribution {
 
 		foreach ( $incoming as $key => $value ) {
 			// First-Touch: bestehende UTM-Werte bleiben erhalten.
-			// Die fbclid wird immer auf den aktuellen Klick aktualisiert.
-			if ( 'fbclid' === $key || ! isset( $merged[ $key ] ) || '' === $merged[ $key ] ) {
+			// Klick-IDs (fbclid/gclid) werden immer auf den aktuellen Klick aktualisiert.
+			if ( in_array( $key, self::$click_ids, true ) || ! isset( $merged[ $key ] ) || '' === $merged[ $key ] ) {
 				$merged[ $key ] = $value;
 			}
 		}
@@ -154,8 +227,8 @@ class LMPCT_Attribution {
 		$custom = array();
 
 		foreach ( self::$params as $key ) {
-			if ( 'fbclid' === $key ) {
-				continue;
+			if ( in_array( $key, self::$click_ids, true ) ) {
+				continue; // fbclid -> fbc() weiter unten; gclid ist Google-spezifisch und für die Meta CAPI irrelevant.
 			}
 			if ( ! empty( $data[ $key ] ) ) {
 				$custom[ $key ] = $data[ $key ];

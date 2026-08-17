@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.5.5
+Stable tag: 0.5.6
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,7 +24,8 @@ Ein bewusst minimalistischer Ersatz für überladene Tracking-Plugins wie PixelY
 * **Google Consent Mode v2:** Setzt auf Wunsch `ad_storage`, `ad_user_data`, `ad_personalization` und `analytics_storage` vor dem Tag-Laden auf `denied` – dein Consent-Banner sendet das Update.
 * **Intelligente Cookie-Consent-Erkennung (DSGVO):** Erkennt installierte Cookie-Banner automatisch (Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies, WP Consent API) und blockiert Browser- und CAPI-Events bis zur Marketing-Einwilligung. Nach dem Klick auf „Akzeptieren" startet das Tracking sofort ohne Seiten-Reload. Websites ohne Banner werden niemals blockiert.
 * **Formular-Auto-Grabber (Zero-Config Lead-Tracking, standardmäßig deaktiviert):** Erkennt Formular-Absendungen automatisch (Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und native HTML-Formulare) und feuert „Lead" oder „Contact" im Browser und via CAPI mit identischer Event-ID. E-Mail und Telefonnummer werden SHA-256-gehasht übergeben – für maximalen Match-Score ohne Klartext-Datenweitergabe. Granular steuerbar: Event-Typ wählbar, optionaler URL-Filter (auf nicht passenden Seiten wird das Skript gar nicht geladen) und automatischer Ausschluss von Suche, Kommentaren und Logins.
-* **First-Touch- & UTM-Attribution (standardmäßig deaktiviert):** Speichert utm_source, utm_medium, utm_campaign, utm_content, utm_term und fbclid beim Erstbesuch 30 Tage in einem First-Party-Cookie und sendet sie bei jedem Server-Event als `custom_data` mit. Die fbclid wird ins `fbc`-Format übersetzt – Conversions bleiben auch Tage nach dem Anzeigenklick zugeordnet.
+* **First-Touch- & UTM-Attribution (standardmäßig deaktiviert):** Speichert utm_source, utm_medium, utm_campaign, utm_content, utm_term, fbclid und gclid beim Erstbesuch 30 Tage in einem First-Party-Cookie und sendet die UTM-Parameter bei jedem Server-Event als `custom_data` mit. Die fbclid wird ins `fbc`-Format übersetzt – Conversions bleiben auch Tage nach dem Anzeigenklick zugeordnet.
+* **Automatischer UTM-Formular-Fill (standardmäßig deaktiviert):** Schreibt utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid und gclid automatisch in passende Formularfelder (per name-Attribut oder CSS-Klasse erkannt), bevor der Besucher absendet – die Kampagnendaten landen so direkt im CRM oder in der Benachrichtigungs-E-Mail. Werte werden zuerst aus der aktuellen URL gelesen, dann aus dem Attribution-Cookie (Unterseiten-Navigation) und zuletzt aus dem Referrer geschätzt. Granular steuerbar über „Auf allen Seiten", „Nur auf bestimmten URLs" oder „Auf bestimmten URLs ausschließen" mit zeilenbasierten Pfad-Mustern (inkl. `*`-Platzhalter).
 * **Live-Debug-Konsole für Admins:** Dezente Leiste am unteren Bildschirmrand mit Consent-Status (inkl. erkanntem Banner), gefeuerten Events, Event-IDs, CAPI-Antwort (⏳ → ✅ 200 OK) und verwendeten Match-Keys. Wird ausschließlich für eingeloggte Administratoren gerendert – reguläre Besucher erhalten kein einziges zusätzliches Byte.
 * **1-Klick Export & Import:** Komplette Konfiguration inkl. Event-Regeln als JSON exportieren und auf der nächsten Kundenwebsite importieren.
 * **Test-Code Auto-Expiry:** Der Meta Test Event Code deaktiviert sich nach 12 Stunden automatisch – kein versehentliches Test-Tracking im Live-Betrieb.
@@ -85,6 +86,12 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja. `uninstall.php` löscht alle Plugin-Optionen inklusive des gespeicherten Access Tokens.
 
 == Changelog ==
+
+= 0.5.6 =
+* Bugfix: Der Meta Test Event Code (Tab „Allgemein") wurde bisher nur an die Conversions API gesendet. Meta's Test-Events-Tool matcht Browser-Pixel-Events aber nur, wenn der Code auch im clientseitigen `fbq()`-Aufruf steckt – das Server-Event erschien dort, das Browser-Event fehlte. Der Code wird jetzt bei PageView, allen URL-Events und Formular-Submits in beiden Kanälen mitgesendet (inkl. des bestehenden 12-Stunden-Auto-Expiry, das jetzt einheitlich für Pixel und CAPI gilt).
+* Neu: Automatischer, granular steuerbarer UTM-/Attribution-Formular-Fill (Tab „Erweitertes Tracking", standardmäßig deaktiviert) – siehe Beschreibung oben. Eigener Master-Toggle, unabhängig vom Formular-Auto-Grabber und vom First-Touch-/UTM-Passthrough-Cookie (nutzt Letzteres aber als optionalen Fallback, falls aktiviert).
+* Erweiterung First-Touch-/UTM-Attribution: gclid wird jetzt wie fbclid als Klick-ID behandelt (Last-Touch statt First-Touch, 30 Tage im Attribution-Cookie) – primär als Datenquelle für den neuen Formular-Fill; wie fbclid nicht Teil des an die Meta CAPI gesendeten `custom_data`.
+* Härtung: Der CAPI Access Token wird jetzt ausschließlich im Tab „Allgemein" ins Seitenquelltext-Markup gerendert. Zuvor tauchte er (esc_attr-escaped, aber unnötig) auch als verstecktes Feld im Tab „Erweitertes Tracking" auf, da jeder Tab sein eigenes Formular absendet. Kein extern ausnutzbares Risiko (erfordert ohnehin die eigene Admin-Session), aber unnötige Angriffsfläche im Admin-HTML. Speichern eines Tabs ohne eigenes Token-Feld überschreibt den Token jetzt nicht mehr mit einem Leerwert.
 
 = 0.5.5 =
 * Privacy-by-Default: Formular-Auto-Grabber und First-Touch-/UTM-Attribution sind bei Neuinstallation jetzt standardmäßig DEAKTIVIERT, da sie zusätzliche personenbezogene Daten verarbeiten (Formularinhalte bzw. Kampagnen-Cookie). Bestehende Installationen sind nicht betroffen, nur frische Installationen starten jetzt restriktiver. Die Live-Debug-Leiste bleibt aktiv (betrifft ausschließlich eingeloggte Administratoren).

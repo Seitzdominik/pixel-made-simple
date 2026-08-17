@@ -113,6 +113,9 @@ class LMPCT_Settings {
 			'form_url_filter'      => '',
 			'form_exclude_system'  => 1,
 			'utm_passthrough'      => 0,
+			'enable_utm_form_fill' => 0,
+			'utm_form_fill_mode'   => 'all',
+			'utm_form_fill_urls'   => '',
 			'debug_bar'            => 1,
 		);
 
@@ -143,13 +146,24 @@ class LMPCT_Settings {
 			$created_at = ( $test_code === $old_code && $old_ts > 0 ) ? $old_ts : time();
 		}
 
+		// Der CAPI-Token hat nur auf Tab "Allgemein" ein echtes Feld (siehe
+		// LMPCT_Admin::render_advanced_tab(), die ihn bewusst NICHT als Hidden-
+		// Feld mitschickt, um seine Sichtbarkeit im Seitenquelltext auf diesen
+		// einen Tab zu beschränken). Fehlt der Schlüssel komplett im Input (weil
+		// von einem anderen Tab gespeichert wurde), bleibt der bisherige Wert
+		// erhalten, statt ihn stillschweigend zu leeren.
+		$old_token  = is_array( $old ) ? (string) ( $old['capi_token'] ?? '' ) : '';
+		$capi_token = array_key_exists( 'capi_token', $input )
+			? trim( sanitize_textarea_field( (string) $input['capi_token'] ) )
+			: $old_token;
+
 		return array(
 			'exclude_admins'       => empty( $input['exclude_admins'] ) ? 0 : 1,
 			'consent_detection'    => empty( $input['consent_detection'] ) ? 0 : 1,
 			'pixel_enabled'        => empty( $input['pixel_enabled'] ) ? 0 : 1,
 			'pixel_id'             => preg_replace( '/\D+/', '', (string) ( $input['pixel_id'] ?? '' ) ),
 			'capi_enabled'         => empty( $input['capi_enabled'] ) ? 0 : 1,
-			'capi_token'           => trim( sanitize_textarea_field( (string) ( $input['capi_token'] ?? '' ) ) ),
+			'capi_token'           => $capi_token,
 			'test_event_code'      => $test_code,
 			'test_code_created_at' => $created_at,
 			'hash_email'           => empty( $input['hash_email'] ) ? 0 : 1,
@@ -165,6 +179,11 @@ class LMPCT_Settings {
 			'form_url_filter'      => self::sanitize_url_filter( $input['form_url_filter'] ?? '' ),
 			'form_exclude_system'  => empty( $input['form_exclude_system'] ) ? 0 : 1,
 			'utm_passthrough'      => empty( $input['utm_passthrough'] ) ? 0 : 1,
+			'enable_utm_form_fill' => empty( $input['enable_utm_form_fill'] ) ? 0 : 1,
+			'utm_form_fill_mode'   => in_array( (string) ( $input['utm_form_fill_mode'] ?? '' ), array( 'all', 'include', 'exclude' ), true )
+				? (string) $input['utm_form_fill_mode']
+				: 'all',
+			'utm_form_fill_urls'   => self::sanitize_url_patterns( $input['utm_form_fill_urls'] ?? '' ),
 			'debug_bar'            => empty( $input['debug_bar'] ) ? 0 : 1,
 		);
 	}
@@ -198,6 +217,47 @@ class LMPCT_Settings {
 		}
 
 		return implode( ', ', array_slice( array_unique( $parts ), 0, 50 ) );
+	}
+
+	/**
+	 * URL-Muster für den UTM-Form-Fill säubern: zeilenbasiert (ein Muster pro
+	 * Zeile), kleingeschrieben. Anders als sanitize_url_filter() bleibt ein
+	 * abschließendes "*" erhalten (einfacher Prefix-Platzhalter, z. B. "/lp/*").
+	 *
+	 * @param mixed $value Rohwert aus dem Formular.
+	 * @return string Normalisierte, zeilengetrennte Liste.
+	 */
+	public static function sanitize_url_patterns( $value ) {
+		$value = sanitize_textarea_field( (string) $value );
+		$lines = preg_split( '/[\r\n]+/', $value );
+		$parts = array();
+
+		foreach ( (array) $lines as $line ) {
+			$line = strtolower( trim( $line ) );
+			$line = preg_replace( '#[^a-z0-9/_\-.%*]#', '', $line );
+
+			if ( '' !== $line ) {
+				$parts[] = substr( $line, 0, 200 );
+			}
+		}
+
+		return implode( "\n", array_slice( array_unique( $parts ), 0, 50 ) );
+	}
+
+	/**
+	 * UTM-Form-Fill-URL-Muster als Array.
+	 *
+	 * @return string[] Leeres Array = kein Muster hinterlegt.
+	 */
+	public static function utm_form_fill_url_patterns() {
+		$settings = self::get();
+		$value    = self::sanitize_url_patterns( $settings['utm_form_fill_urls'] ?? '' );
+
+		if ( '' === $value ) {
+			return array();
+		}
+
+		return array_values( array_filter( array_map( 'trim', explode( "\n", $value ) ) ) );
 	}
 
 	/**

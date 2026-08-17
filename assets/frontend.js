@@ -13,7 +13,10 @@
 
 	var cfg = window.lmpctFront || {};
 
-	if ( ! cfg.formTracking ) {
+	// Zwei unabhängige Features teilen sich diese Datei (siehe unten): der
+	// Formular-Auto-Grabber (cfg.formTracking) und der UTM-Form-Fill
+	// (cfg.utmFormFill). Ist keines von beiden aktiv, gibt es nichts zu tun.
+	if ( ! cfg.formTracking && ! cfg.utmFormFill ) {
 		return;
 	}
 
@@ -251,7 +254,10 @@
 		var browserFired = false;
 
 		if ( 'function' === typeof window.fbq ) {
-			window.fbq( 'track', EVENT_NAME, {}, { eventID: eventId } );
+			// Meta's Test-Events-Tool matcht Browser-Events nur, wenn der Test-Code
+			// auch im fbq()-Aufruf selbst steckt (nicht nur serverseitig via CAPI).
+			var pixelParams = cfg.testEventCode ? { test_event_code: cfg.testEventCode } : {};
+			window.fbq( 'track', EVENT_NAME, pixelParams, { eventID: eventId } );
 			browserFired = true;
 		}
 
@@ -313,6 +319,10 @@
 	 * @param {Object|null}          data        Bereits gelesene Kontaktdaten.
 	 */
 	function handleFormSubmit( form, sourceLabel, data ) {
+		if ( ! cfg.formTracking ) {
+			return; // Nur UTM-Form-Fill aktiv – der Auto-Grabber selbst ist aus.
+		}
+
 		if ( isLocked( form ) ) {
 			return; // Bereits gefeuert -> Abbruch.
 		}
@@ -414,5 +424,164 @@
 		$( window ).on( 'elementor/popup/show', function () {
 			/* Nur zur Kompatibilität registriert – Popups selbst sind kein Lead. */
 		} );
+	}
+
+	/* -----------------------------------------------------------------
+	 * UTM-/Attribution-Form-Fill: unabhängig vom Formular-Auto-Grabber
+	 * oben. Schreibt erkannte Kampagnen-Parameter in passende Formularfelder,
+	 * bevor der Besucher absendet – rein clientseitig, kein Netzwerk-Call.
+	 * ------------------------------------------------------------------- */
+	if ( cfg.utmFormFill ) {
+		var ATTRIBUTION_KEYS = [ 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid' ];
+		var UTM_MODE = cfg.utmFormFillMode || 'all';
+		var UTM_URLS = Array.isArray( cfg.utmFormFillUrls ) ? cfg.utmFormFillUrls : [];
+
+		/**
+		 * Läuft der Form-Fill auf dieser Seite? Der Server prüft dieselben Regeln
+		 * bereits vor dem Ausliefern des Skripts – diese Prüfung ist die
+		 * Absicherung für Seitenwechsel ohne Reload (siehe urlAllowed() oben).
+		 */
+		function utmFormFillAllowed() {
+			if ( 'all' === UTM_MODE ) {
+				return true;
+			}
+
+			var path = ( window.location.pathname || '' ).toLowerCase();
+			var matched = false;
+
+			for ( var i = 0; i < UTM_URLS.length; i++ ) {
+				// Ein abschließendes "*" ist ein einfacher Prefix-Platzhalter
+				// (z. B. "/lp/*"); für den Teilstring-Vergleich wird es entfernt.
+				var needle = String( UTM_URLS[ i ] || '' ).toLowerCase().replace( /\*+$/, '' );
+				if ( needle && path.indexOf( needle ) > -1 ) {
+					matched = true;
+					break;
+				}
+			}
+
+			return 'exclude' === UTM_MODE ? ! matched : matched;
+		}
+
+		function readQueryAttribution() {
+			var params = new URLSearchParams( window.location.search );
+			var data = {};
+			ATTRIBUTION_KEYS.forEach( function ( key ) {
+				var value = params.get( key );
+				if ( value ) {
+					data[ key ] = value;
+				}
+			} );
+			return data;
+		}
+
+		/**
+		 * Fallback auf das First-Touch-Cookie (class-lmpct-attribution.php),
+		 * falls der Besucher bereits über Unterseiten navigiert ist und die
+		 * Kampagnen-Parameter nicht mehr in der aktuellen URL stehen. Existiert
+		 * nur, wenn "First-touch & UTM passthrough" aktiviert ist – sonst liefert
+		 * dies einfach ein leeres Objekt (kein Fehler).
+		 */
+		function readCookieAttribution() {
+			var match = document.cookie.match( /(?:^|;\s*)lmpct_attribution=([^;]*)/ );
+			if ( ! match ) {
+				return {};
+			}
+			try {
+				var decoded = JSON.parse( decodeURIComponent( match[ 1 ] ) );
+				return ( decoded && 'object' === typeof decoded ) ? decoded : {};
+			} catch ( e ) {
+				return {};
+			}
+		}
+
+		function referrerSource() {
+			var ref = ( document.referrer || '' ).toLowerCase();
+			if ( ref.indexOf( 'facebook.com' ) > -1 || ref.indexOf( 'instagram.com' ) > -1 ) {
+				return 'facebook';
+			}
+			if ( ref.indexOf( 'google.' ) > -1 ) {
+				return 'google';
+			}
+			return 'direct';
+		}
+
+		/**
+		 * Werte-Ermittlung: URL-Parameter zuerst, dann Attribution-Cookie, zuletzt
+		 * eine Quellen-Vermutung aus fbclid/gclid/Referrer für utm_source allein
+		 * (die übrigen Parameter lassen sich aus dem Referrer nicht ableiten).
+		 */
+		function resolveAttribution() {
+			var fromQuery = readQueryAttribution();
+			var fromCookie = readCookieAttribution();
+			var data = {};
+
+			ATTRIBUTION_KEYS.forEach( function ( key ) {
+				data[ key ] = fromQuery[ key ] || fromCookie[ key ] || '';
+			} );
+
+			if ( ! data.utm_source ) {
+				if ( fromQuery.fbclid ) {
+					data.utm_source = 'facebook';
+				} else if ( fromQuery.gclid ) {
+					data.utm_source = 'google';
+				} else {
+					data.utm_source = referrerSource();
+				}
+			}
+
+			return data;
+		}
+
+		/**
+		 * Feld für einen Parameter suchen: zuerst per name-Attribut (z. B.
+		 * [name="utm_source"]), dann per CSS-Klasse (z. B. "utm-source" oder
+		 * "lmpct-utm-source"). Trägt die Klasse ein Wrapper-Element statt des
+		 * Feldes selbst, wird dessen erstes Eingabefeld genutzt.
+		 */
+		function findAttributionField( key ) {
+			var field = document.querySelector( '[name="' + key + '"]' );
+			if ( field ) {
+				return field;
+			}
+
+			var dashed = key.replace( /_/g, '-' );
+			var classNames = [ dashed, 'lmpct-' + dashed ];
+
+			for ( var i = 0; i < classNames.length; i++ ) {
+				var el = document.querySelector( '.' + classNames[ i ] );
+				if ( ! el ) {
+					continue;
+				}
+				if ( 'INPUT' === el.nodeName || 'TEXTAREA' === el.nodeName || 'SELECT' === el.nodeName ) {
+					return el;
+				}
+				var inner = el.querySelector( 'input, textarea, select' );
+				if ( inner ) {
+					return inner;
+				}
+			}
+
+			return null;
+		}
+
+		/**
+		 * Wert setzen und input+change feuern, damit auch Form-Builder mit
+		 * eigenem State (z. B. SureForms) den neuen Wert übernehmen.
+		 */
+		function fillAttributionField( field, value ) {
+			if ( ! field || ! value || field.disabled ) {
+				return;
+			}
+			field.value = value;
+			field.dispatchEvent( new Event( 'input', { bubbles: true } ) );
+			field.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+		}
+
+		if ( utmFormFillAllowed() ) {
+			var attribution = resolveAttribution();
+			ATTRIBUTION_KEYS.forEach( function ( key ) {
+				fillAttributionField( findAttributionField( key ), attribution[ key ] );
+			} );
+		}
 	}
 }() );

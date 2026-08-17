@@ -138,6 +138,7 @@ class LMPCT_Admin {
 			'form_tracking',
 			'form_exclude_system',
 			'utm_passthrough',
+			'enable_utm_form_fill',
 			'debug_bar',
 		);
 
@@ -359,7 +360,23 @@ class LMPCT_Admin {
 			<?php
 			self::preserve_hidden_settings(
 				$s,
-				array( 'form_tracking', 'form_event_type', 'form_url_filter', 'form_exclude_system', 'utm_passthrough', 'debug_bar' )
+				array(
+					'form_tracking',
+					'form_event_type',
+					'form_url_filter',
+					'form_exclude_system',
+					'utm_passthrough',
+					'enable_utm_form_fill',
+					'utm_form_fill_mode',
+					'utm_form_fill_urls',
+					'debug_bar',
+					// Bewusst NICHT über ein verstecktes Feld auf diesem (oder jedem
+					// anderen) Tab mitgeschickt: Der CAPI-Token soll ausschließlich
+					// im Tab "Allgemein" im Seitenquelltext auftauchen. Fehlt der
+					// Schlüssel im POST, behält LMPCT_Settings::sanitize_settings()
+					// den bisherigen Wert bei, statt ihn zu leeren.
+					'capi_token',
+				)
 			);
 			?>
 
@@ -419,10 +436,44 @@ class LMPCT_Admin {
 				! empty( $s['utm_passthrough'] ),
 				__( 'Enable UTM passthrough', 'lightweight-meta-pixel-capi-tracker' ),
 				'utm_passthrough',
-				__( 'Stores utm_source, utm_medium, utm_campaign, utm_content, utm_term and fbclid in a first-party cookie for 30 days.', 'lightweight-meta-pixel-capi-tracker' )
+				__( 'Stores utm_source, utm_medium, utm_campaign, utm_content, utm_term, fbclid and gclid in a first-party cookie for 30 days.', 'lightweight-meta-pixel-capi-tracker' )
 			);
 			?>
 			<p class="description"><?php esc_html_e( 'Saves campaign parameters on the first visit and sends them along with every server-side event as custom_data. A stored fbclid is converted into the fbc format so conversions stay attributed even days after the ad click.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<?php self::accordion_close(); ?>
+
+			<?php
+			self::accordion_open(
+				__( 'Automatic UTM form fill', 'lightweight-meta-pixel-capi-tracker' ),
+				'lmpct_settings[enable_utm_form_fill]',
+				! empty( $s['enable_utm_form_fill'] ),
+				__( 'Enable automatic UTM form fill', 'lightweight-meta-pixel-capi-tracker' ),
+				'enable_utm_form_fill',
+				__( 'Writes utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid and gclid into matching form fields before the visitor submits.', 'lightweight-meta-pixel-capi-tracker' )
+			);
+			?>
+			<p class="description"><?php esc_html_e( 'Fills hidden or visible form fields with the visitor’s campaign parameters so they land in your CRM or notification email together with the lead. Values are read from the current URL first, then – if “First-touch & UTM passthrough” above is enabled – from the attribution cookie for visitors who already navigated to a subpage, and finally guessed from the referrer.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Matches fields by name attribute (e.g. utm_source, utm_campaign, fbclid, gclid) or by CSS class (utm-source or lmpct-utm-source, also on a wrapper element around the input).', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="lmpct-utm-form-fill-mode"><?php esc_html_e( 'Run on', 'lightweight-meta-pixel-capi-tracker' ); ?></label></th>
+					<td>
+						<select id="lmpct-utm-form-fill-mode" name="lmpct_settings[utm_form_fill_mode]">
+							<option value="all" <?php selected( $s['utm_form_fill_mode'], 'all' ); ?>><?php esc_html_e( 'On all pages', 'lightweight-meta-pixel-capi-tracker' ); ?></option>
+							<option value="include" <?php selected( $s['utm_form_fill_mode'], 'include' ); ?>><?php esc_html_e( 'Only on specific URLs', 'lightweight-meta-pixel-capi-tracker' ); ?></option>
+							<option value="exclude" <?php selected( $s['utm_form_fill_mode'], 'exclude' ); ?>><?php esc_html_e( 'Exclude specific URLs', 'lightweight-meta-pixel-capi-tracker' ); ?></option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="lmpct-utm-form-fill-urls"><?php esc_html_e( 'URL patterns (one per line)', 'lightweight-meta-pixel-capi-tracker' ); ?></label></th>
+					<td>
+						<textarea id="lmpct-utm-form-fill-urls" class="large-text code" rows="4" spellcheck="false" autocomplete="off"
+							name="lmpct_settings[utm_form_fill_urls]" placeholder="/kontakt&#10;/lp/*"><?php echo esc_textarea( $s['utm_form_fill_urls'] ); ?></textarea>
+						<p class="description"><?php esc_html_e( 'One path pattern per line, e.g. /kontakt or /lp/* for everything below /lp/. Only used for “Only on specific URLs” and “Exclude specific URLs”.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+					</td>
+				</tr>
+			</table>
 			<?php self::accordion_close(); ?>
 
 			<?php

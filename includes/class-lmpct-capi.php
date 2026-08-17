@@ -196,10 +196,14 @@ class LMPCT_CAPI {
 	 * ignoriert und direkt aus der Datenbank entfernt, damit kein versehentliches
 	 * Test-Tracking im Live-Betrieb passiert.
 	 *
+	 * Public, da LMPCT_Frontend::prepare() denselben Expiry-Check braucht, um den
+	 * Test-Code auch dem Browser-Pixel (fbq-Aufrufe) korrekt vorzuenthalten,
+	 * sobald er abgelaufen ist – einzige Quelle der Wahrheit für diese Regel.
+	 *
 	 * @param array $settings Plugin-Einstellungen.
 	 * @return string Aktiver Test-Code oder leerer String.
 	 */
-	private static function active_test_event_code( array $settings ) {
+	public static function active_test_event_code( array $settings ) {
 		$code = (string) ( $settings['test_event_code'] ?? '' );
 		if ( '' === $code ) {
 			return '';
