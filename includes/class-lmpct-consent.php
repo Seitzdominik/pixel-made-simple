@@ -73,22 +73,24 @@ class LMPCT_Consent {
 		}
 
 		// 2) Must Have Plugins Cookie Bar: Base64-kodiertes JSON-Cookie "mhcookie".
-		//    Zustimmung, wenn die Marketing-/Advertisement-Gruppe enthalten und
-		//    nicht explizit abgelehnt ist. Vorhandenes Cookie ohne Marketing-
-		//    Gruppe = Entscheidung ohne Einwilligung -> blockieren.
+		//    Reales Format (aus Live-Test verifiziert):
+		//    {"groups":["all"],"services":{...},"iab_vendors":["all"],...}
+		//    "groups" ist ein Array von Kategorie-Slugs, KEIN Key-Value-Objekt.
+		//    "Alle akzeptieren" setzt groups:["all"]. Zustimmung liegt vor, wenn
+		//    "all", "marketing" oder "advertisement" im groups-Array steht.
 		if ( ! empty( $_COOKIE['mhcookie'] ) ) {
 			$decoded = base64_decode( sanitize_text_field( wp_unslash( $_COOKIE['mhcookie'] ) ), true );
 			if ( false !== $decoded && '' !== $decoded ) {
 				$data = json_decode( $decoded, true );
-				if ( is_array( $data ) ) {
-					// Explizit abgelehnte Kategorie zählt NICHT als Zustimmung.
-					if ( preg_match( '/"(marketing|advertisement)"\s*:\s*(false|0|"(?:no|denied|false|0)")/i', $decoded ) ) {
-						return false;
-					}
-					return ( false !== stripos( $decoded, 'marketing' ) || false !== stripos( $decoded, 'advertisement' ) );
+				if ( is_array( $data ) && ! empty( $data['groups'] ) && is_array( $data['groups'] ) ) {
+					return in_array( 'all', $data['groups'], true )
+						|| in_array( 'marketing', $data['groups'], true )
+						|| in_array( 'advertisement', $data['groups'], true );
 				}
 			}
-			return false; // mhcookie existiert, enthält aber kein Marketing -> blockieren.
+			// mhcookie existiert, aber ohne zustimmende Gruppe (z. B. nur
+			// "essential" oder leeres Array bei "Nur erforderliche") -> blockieren.
+			return false;
 		}
 
 		// 3) GDPR Cookie Consent (Cookie Law Info).
@@ -202,9 +204,9 @@ class LMPCT_Consent {
 		// bloßes viewed_cookie_policy (= Banner bedient) blockiert.
 		return 'function lmpctHasConsent(){var c=document.cookie,m;'
 			. 'm=c.match(/(?:^|;\\s*)mhcookie=([^;]*)/);'
-			. 'if(m){try{var mh=atob(decodeURIComponent(m[1]));'
-			. 'if(/"(marketing|advertisement)"\\s*:\\s*(false|0|"(?:no|denied|false|0)")/i.test(mh))return false;'
-			. 'return /marketing|advertisement/i.test(mh);}catch(e){return false;}}'
+			. 'if(m){try{var mh=JSON.parse(atob(decodeURIComponent(m[1])));'
+			. 'if(mh&&Array.isArray(mh.groups)){return mh.groups.indexOf("all")>-1||mh.groups.indexOf("marketing")>-1||mh.groups.indexOf("advertisement")>-1;}'
+			. 'return false;}catch(e){return false;}}'
 			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=yes')>-1||c.indexOf('cookielawinfo-checkbox-marketing=yes')>-1)return true;"
 			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=')>-1||c.indexOf('cookielawinfo-checkbox-marketing=')>-1)return false;"
 			. "m=c.match(/cookieyes-consent=([^;]*)/);if(m)return m[1].indexOf('advertisement:yes')>-1||m[1].indexOf('marketing:yes')>-1;"

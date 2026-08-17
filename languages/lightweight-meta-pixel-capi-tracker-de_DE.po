@@ -2,10 +2,10 @@
 # Copyright (C) 2026 Dominik Seitz
 msgid ""
 msgstr ""
-"Project-Id-Version: Lightweight Meta Pixel & CAPI Tracker 0.4.2\n"
+"Project-Id-Version: Lightweight Meta Pixel & CAPI Tracker 0.4.3\n"
 "Report-Msgid-Bugs-To: https://sdv.design\n"
-"POT-Creation-Date: 2026-08-17 05:50+0000\n"
-"PO-Revision-Date: 2026-08-17 05:50+0000\n"
+"POT-Creation-Date: 2026-08-17 06:01+0000\n"
+"PO-Revision-Date: 2026-08-17 06:01+0000\n"
 "Last-Translator: Dominik Seitz <seitz.entertainment@gmail.com>\n"
 "Language-Team: German\n"
 "Language: de_DE\n"
