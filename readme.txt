@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.5.1
+Stable tag: 0.5.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,6 +85,10 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja. `uninstall.php` löscht alle Plugin-Optionen inklusive des gespeicherten Access Tokens.
 
 == Changelog ==
+
+= 0.5.2 =
+* Bugfix (kritisch): Doppelte Formular-Events bei AJAX-Formularen (z. B. SureForms). Nativer Submit und AJAX-Completion-Handler erzeugten zwei Server-Events mit unterschiedlichen Event-IDs, sobald der Serverlauf länger als das bisherige 2-Sekunden-Fenster dauerte. Jetzt sperrt ein Lock pro Formular (`data-lmpct-submitted`, 5 Sekunden) jede weitere Auslösung – eine Formularinteraktion erzeugt garantiert genau eine Event-ID.
+* Ergänzt: Erfolgs-Events von SureForms werden zusätzlich direkt ausgewertet; Erfolgs-Handler übergeben nun ihre Formular-Referenz, damit der Lock auch bei jQuery-basierten Plugins greift.
 
 = 0.5.1 =
 * Neu: Event-Typ für den Formular-Auto-Grabber wählbar („Lead" oder „Contact") – Support- und Kontaktanfragen lassen sich so sauber von echten Leads trennen.

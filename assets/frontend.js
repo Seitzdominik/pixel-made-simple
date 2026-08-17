@@ -17,9 +17,40 @@
 		return;
 	}
 
-	var COOLDOWN = 2000; // Duplicate-Guard-Fenster in ms.
+	// Duplicate-Guard: Eine Formularinteraktion darf exakt EIN Event erzeugen.
+	// AJAX-Formulare (z. B. SureForms) feuern den nativen submit UND später
+	// einen Completion-Handler – je nach Serverlaufzeit mehrere Sekunden
+	// auseinander. Deshalb 5 s statt der früheren 2 s.
+	var LOCK_MS = 5000;
 	var lastFired = 0;
-	var lastSubmit = null; // { data, time } der letzten Absendung.
+	var lastSubmit = null; // { data, time, form } der letzten Absendung.
+
+	/**
+	 * Ist für dieses Formular bereits ein Event erzeugt worden?
+	 */
+	function isLocked( form ) {
+		return !! ( form && form.dataset && 'true' === form.dataset.lmpctSubmitted );
+	}
+
+	/**
+	 * Formular für LOCK_MS sperren, damit Submit und AJAX-Completion zusammen
+	 * nur ein einziges Event mit einer einzigen Event-ID erzeugen.
+	 */
+	function lockForm( form ) {
+		if ( ! form || ! form.dataset ) {
+			return;
+		}
+
+		form.dataset.lmpctSubmitted = 'true';
+
+		setTimeout( function () {
+			try {
+				delete form.dataset.lmpctSubmitted;
+			} catch ( e ) {
+				form.removeAttribute( 'data-lmpct-submitted' );
+			}
+		}, LOCK_MS );
+	}
 
 	// Konfigurierter Meta-Event-Typ (Lead oder Contact).
 	var EVENT_NAME = ( 'Contact' === cfg.eventType ) ? 'Contact' : 'Lead';
@@ -196,8 +227,8 @@
 	function fireLead( data, sourceLabel ) {
 		var now = Date.now();
 
-		if ( now - lastFired < COOLDOWN ) {
-			return; // Duplicate-Guard (z. B. Submit + Erfolgs-Event des Plugins).
+		if ( now - lastFired < LOCK_MS ) {
+			return; // Globaler Guard für Erfolgs-Events ohne Formular-Referenz.
 		}
 
 		if ( ! urlAllowed() ) {
@@ -275,16 +306,40 @@
 	}
 
 	/**
-	 * Erfolgs-Event eines Formular-Plugins: zwischengespeicherte Werte nutzen.
+	 * Zentrale Einsprungstelle: sperrt das Formular und löst genau ein Event aus.
+	 *
+	 * @param {HTMLFormElement|null} form        Formular (falls bekannt).
+	 * @param {string}               sourceLabel Auslöser für die Debug-Leiste.
+	 * @param {Object|null}          data        Bereits gelesene Kontaktdaten.
 	 */
-	function handleSuccess( label, fallbackData ) {
+	function handleFormSubmit( form, sourceLabel, data ) {
+		if ( isLocked( form ) ) {
+			return; // Bereits gefeuert -> Abbruch.
+		}
+
+		lockForm( form );
+
+		fireLead( data || readForm( form ), sourceLabel );
+	}
+
+	/**
+	 * Erfolgs-Event eines Formular-Plugins: zwischengespeicherte Werte nutzen.
+	 * Ohne Formular-Referenz greifen wir auf die letzte Absendung zurück –
+	 * so wirkt der Lock auch für Plugins, die ihre Events über jQuery auf
+	 * document auslösen.
+	 */
+	function handleSuccess( label, fallbackData, form ) {
 		var data = fallbackData;
+		var target = form;
 
 		if ( ( ! data || ( ! data.email && ! data.phone ) ) && lastSubmit && Date.now() - lastSubmit.time < 60000 ) {
 			data = lastSubmit.data;
+			if ( ! target ) {
+				target = lastSubmit.form;
+			}
 		}
 
-		fireLead( data || { email: '', phone: '' }, label );
+		handleFormSubmit( target || null, label, data || { email: '', phone: '' } );
 	}
 
 	// 1. Native Formular-Absendungen (Capture-Phase, damit auch Plugins erfasst
@@ -301,26 +356,35 @@
 		}
 
 		var data = readForm( form );
-		lastSubmit = { data: data, time: Date.now() };
+		lastSubmit = { data: data, time: Date.now(), form: form };
 
-		// AJAX-Formulare: Erst beim Erfolgs-Event des Plugins zählen.
+		// Bekannte AJAX-Formulare: erst beim Erfolgs-Event des Plugins zählen.
+		// Hier bewusst KEIN Lock setzen, sonst würde das Erfolgs-Event blockiert.
 		if ( isAjaxForm( form ) ) {
 			return;
 		}
 
-		fireLead( data, 'form-submit' );
+		handleFormSubmit( form, 'form-submit', data );
 	}, true );
 
 	// 2. Contact Form 7 (natives CustomEvent inkl. Feldwerten).
 	document.addEventListener( 'wpcf7mailsent', function ( event ) {
 		var detail = event.detail || {};
-		handleSuccess( 'cf7', readCf7Inputs( detail.inputs ) );
+		var form = event.target && event.target.querySelector ? event.target.querySelector( 'form' ) : null;
+		handleSuccess( 'cf7', readCf7Inputs( detail.inputs ), form );
 	} );
 
-	// 3. Weitere native Erfolgs-Events.
-	[ 'fluentform_submission_success', 'wpformsAjaxSubmitSuccess', 'gform_confirmation_loaded' ].forEach( function ( name ) {
-		document.addEventListener( name, function () {
-			handleSuccess( name, null );
+	// 3. Weitere native Erfolgs-Events (u. a. SureForms und Block-Formulare).
+	[
+		'fluentform_submission_success',
+		'wpformsAjaxSubmitSuccess',
+		'gform_confirmation_loaded',
+		'srfm_form_submission_success',
+		'sureforms_form_submission_success'
+	].forEach( function ( name ) {
+		document.addEventListener( name, function ( event ) {
+			var form = event && event.target && 'FORM' === event.target.nodeName ? event.target : null;
+			handleSuccess( name, null, form );
 		} );
 	} );
 
@@ -329,20 +393,22 @@
 		var $ = window.jQuery;
 
 		$( document ).on( 'fluentform_submission_success', function () {
-			handleSuccess( 'fluentforms', null );
+			handleSuccess( 'fluentforms', null, null );
 		} );
 
 		$( document ).on( 'wpformsAjaxSubmitSuccess', function ( event ) {
-			handleSuccess( 'wpforms', readForm( event.target ) );
+			var form = event.target && 'FORM' === event.target.nodeName ? event.target : null;
+			handleSuccess( 'wpforms', readForm( event.target ), form );
 		} );
 
 		$( document ).on( 'gform_confirmation_loaded', function () {
-			handleSuccess( 'gravityforms', null );
+			handleSuccess( 'gravityforms', null, null );
 		} );
 
 		// Elementor Pro Formulare.
 		$( document ).on( 'submit_success', function ( event ) {
-			handleSuccess( 'elementor', readForm( event.target ) );
+			var form = event.target && 'FORM' === event.target.nodeName ? event.target : null;
+			handleSuccess( 'elementor', readForm( event.target ), form );
 		} );
 
 		$( window ).on( 'elementor/popup/show', function () {

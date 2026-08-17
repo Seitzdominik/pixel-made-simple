@@ -3,7 +3,7 @@
  * Plugin Name:       Lightweight Meta Pixel & CAPI Tracker
  * Plugin URI:        https://sdv.design
  * Description:       Lightweight, high-performance tracking for Meta Pixel & Conversions API, Google Ads (Consent Mode v2) and TikTok Pixel – with URL-based multi-platform events and clean event deduplication.
- * Version:           0.5.1
+ * Version:           0.5.2
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LMPCT_VERSION', '0.5.1' );
+define( 'LMPCT_VERSION', '0.5.2' );
 define( 'LMPCT_PLUGIN_FILE', __FILE__ );
 define( 'LMPCT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LMPCT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
