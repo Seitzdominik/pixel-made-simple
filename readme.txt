@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.5.3
+Stable tag: 0.5.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,6 +85,9 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja. `uninstall.php` löscht alle Plugin-Optionen inklusive des gespeicherten Access Tokens.
 
 == Changelog ==
+
+= 0.5.4 =
+* UI-Refactoring: Tab „Erweitertes Tracking" nutzt jetzt dieselben aufklappbaren, blau akzentuierten Boxen wie die Plattformen im Tab „Allgemein". Formular-Auto-Grabber (Event-Typ, URL-Filter, Ausschluss-Filter) ist zu einer Box gebündelt, First-Touch/UTM-Weitergabe und Live-Debug-Leiste erhalten je eine eigene Box mit Master-Toggle.
 
 = 0.5.3 =
 * UX: Hinweis-Box im Tab „URL-Events" erklärt die Aufgabenteilung – URL-Events für Danke-/Bestätigungsseiten, Formular-Tracking für Formulare ohne Weiterleitung.

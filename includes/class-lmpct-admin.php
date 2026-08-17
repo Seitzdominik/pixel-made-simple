@@ -245,9 +245,11 @@ class LMPCT_Admin {
 	 * @param string $toggle_name    name-Attribut des Master-Toggles.
 	 * @param bool   $toggle_checked Zustand des Master-Toggles.
 	 * @param string $toggle_label   Screenreader-Label des Master-Toggles.
+	 * @param string $autosave_key   Einstellungs-Schlüssel für sofortiges AJAX-Speichern.
+	 * @param string $tip_text       Optionaler Hilfetext neben dem Box-Titel.
 	 * @return void
 	 */
-	private static function accordion_open( $title, $toggle_name, $toggle_checked, $toggle_label, $autosave_key = '' ) {
+	private static function accordion_open( $title, $toggle_name, $toggle_checked, $toggle_label, $autosave_key = '', $tip_text = '' ) {
 		$classes = 'postbox lmpct-accordion';
 		if ( $toggle_checked ) {
 			$classes .= ' lmpct-on';
@@ -257,7 +259,14 @@ class LMPCT_Admin {
 		?>
 		<div class="<?php echo esc_attr( $classes ); ?>">
 			<div class="postbox-header lmpct-accordion-header">
-				<h2 class="hndle"><?php echo esc_html( $title ); ?></h2>
+				<h2 class="hndle">
+					<?php echo esc_html( $title ); ?>
+					<?php
+					if ( '' !== $tip_text ) {
+						self::tip( $tip_text );
+					}
+					?>
+				</h2>
 				<div class="lmpct-accordion-controls">
 					<?php self::toggle( $toggle_name, $toggle_checked, $toggle_label, false, $autosave_key ); ?>
 					<button type="button" class="lmpct-accordion-button" aria-expanded="<?php echo $toggle_checked ? 'true' : 'false'; ?>">
@@ -358,18 +367,19 @@ class LMPCT_Admin {
 
 			<?php self::render_conflict_notice(); ?>
 
+			<?php
+			self::accordion_open(
+				__( 'Automatic form lead tracking', 'lightweight-meta-pixel-capi-tracker' ),
+				'lmpct_settings[form_tracking]',
+				! empty( $s['form_tracking'] ),
+				__( 'Enable automatic form lead tracking', 'lightweight-meta-pixel-capi-tracker' ),
+				'form_tracking',
+				__( 'Supports Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms and plain HTML forms.', 'lightweight-meta-pixel-capi-tracker' )
+			);
+			?>
+			<p class="description"><?php esc_html_e( 'Detects form submissions automatically and fires the configured event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<p class="description"><?php esc_html_e( 'The event fires the moment the submit button is clicked. If your page redirects to a separate thank-you page after submitting, set up tracking via the “URL Events” tab instead.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row">
-						<?php esc_html_e( 'Automatic form lead tracking', 'lightweight-meta-pixel-capi-tracker' ); ?>
-						<?php self::tip( __( 'Supports Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms and plain HTML forms.', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
-					</th>
-					<td>
-						<?php self::toggle( 'lmpct_settings[form_tracking]', ! empty( $s['form_tracking'] ), __( 'Enable automatic form lead tracking', 'lightweight-meta-pixel-capi-tracker' ), false, 'form_tracking' ); ?>
-						<p class="description"><?php esc_html_e( 'Detects form submissions automatically and fires the configured event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
-						<p class="description"><?php esc_html_e( 'The event fires the moment the submit button is clicked. If your page redirects to a separate thank-you page after submitting, set up tracking via the “URL Events” tab instead.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
-					</td>
-				</tr>
 				<tr>
 					<th scope="row"><label for="lmpct-form-event-type"><?php esc_html_e( 'Event type', 'lightweight-meta-pixel-capi-tracker' ); ?></label></th>
 					<td>
@@ -399,24 +409,33 @@ class LMPCT_Admin {
 						<p class="description"><?php esc_html_e( 'Prevents accidental tracking of search bars, blog comments and login fields. Forms containing a password field are always ignored, regardless of this setting.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
-				<tr>
-					<th scope="row">
-						<?php esc_html_e( 'First-touch & UTM passthrough', 'lightweight-meta-pixel-capi-tracker' ); ?>
-						<?php self::tip( __( 'Stores utm_source, utm_medium, utm_campaign, utm_content, utm_term and fbclid in a first-party cookie for 30 days.', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
-					</th>
-					<td>
-						<?php self::toggle( 'lmpct_settings[utm_passthrough]', ! empty( $s['utm_passthrough'] ), __( 'Enable UTM passthrough', 'lightweight-meta-pixel-capi-tracker' ), false, 'utm_passthrough' ); ?>
-						<p class="description"><?php esc_html_e( 'Saves campaign parameters on the first visit and sends them along with every server-side event as custom_data. A stored fbclid is converted into the fbc format so conversions stay attributed even days after the ad click.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><?php esc_html_e( 'Admin live debug bar', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
-					<td>
-						<?php self::toggle( 'lmpct_settings[debug_bar]', ! empty( $s['debug_bar'] ), __( 'Show live debug bar in the frontend', 'lightweight-meta-pixel-capi-tracker' ), false, 'debug_bar' ); ?>
-						<p class="description"><?php esc_html_e( 'Shows a small bar at the bottom of the frontend with consent status, fired events, event IDs, CAPI response and match keys. Rendered exclusively for logged-in administrators – regular visitors get zero additional bytes.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
-					</td>
-				</tr>
 			</table>
+			<?php self::accordion_close(); ?>
+
+			<?php
+			self::accordion_open(
+				__( 'First-touch & UTM passthrough', 'lightweight-meta-pixel-capi-tracker' ),
+				'lmpct_settings[utm_passthrough]',
+				! empty( $s['utm_passthrough'] ),
+				__( 'Enable UTM passthrough', 'lightweight-meta-pixel-capi-tracker' ),
+				'utm_passthrough',
+				__( 'Stores utm_source, utm_medium, utm_campaign, utm_content, utm_term and fbclid in a first-party cookie for 30 days.', 'lightweight-meta-pixel-capi-tracker' )
+			);
+			?>
+			<p class="description"><?php esc_html_e( 'Saves campaign parameters on the first visit and sends them along with every server-side event as custom_data. A stored fbclid is converted into the fbc format so conversions stay attributed even days after the ad click.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<?php self::accordion_close(); ?>
+
+			<?php
+			self::accordion_open(
+				__( 'Admin live debug bar', 'lightweight-meta-pixel-capi-tracker' ),
+				'lmpct_settings[debug_bar]',
+				! empty( $s['debug_bar'] ),
+				__( 'Show live debug bar in the frontend', 'lightweight-meta-pixel-capi-tracker' ),
+				'debug_bar'
+			);
+			?>
+			<p class="description"><?php esc_html_e( 'Shows a small bar at the bottom of the frontend with consent status, fired events, event IDs, CAPI response and match keys. Rendered exclusively for logged-in administrators – regular visitors get zero additional bytes.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<?php self::accordion_close(); ?>
 
 			<?php submit_button( __( 'Save Settings', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
 		</form>
