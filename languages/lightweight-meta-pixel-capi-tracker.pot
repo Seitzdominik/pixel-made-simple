@@ -2,9 +2,9 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Lightweight Meta Pixel & CAPI Tracker 0.5.0\n"
+"Project-Id-Version: Lightweight Meta Pixel & CAPI Tracker 0.5.1\n"
 "Report-Msgid-Bugs-To: https://sdv.design\n"
-"POT-Creation-Date: 2026-08-17 06:26+0000\n"
+"POT-Creation-Date: 2026-08-17 06:47+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,8 +15,8 @@ msgstr ""
 
 #. Plugin Name of the plugin
 #: lightweight-meta-pixel-capi-tracker.php
-#: includes/class-lmpct-admin.php:308
-#: includes/class-lmpct-admin.php:483
+#: includes/class-lmpct-admin.php:309
+#: includes/class-lmpct-admin.php:518
 msgid "Lightweight Meta Pixel & CAPI Tracker"
 msgstr ""
 
@@ -52,7 +52,7 @@ msgstr ""
 
 #: includes/class-lmpct-admin.php:73
 #: includes/class-lmpct-admin.php:74
-#: includes/class-lmpct-admin.php:476
+#: includes/class-lmpct-admin.php:511
 msgid "Info & Help"
 msgstr ""
 
@@ -60,475 +60,503 @@ msgstr ""
 msgid "Saved."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:168
+#: includes/class-lmpct-admin.php:169
 msgid "Event saved."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:169
+#: includes/class-lmpct-admin.php:170
 msgid "Event deleted."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:170
+#: includes/class-lmpct-admin.php:171
 msgid "Event status updated."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:171
+#: includes/class-lmpct-admin.php:172
 msgid "Setting saved."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:172
+#: includes/class-lmpct-admin.php:173
 msgid "The event could not be saved. Please fill in all required fields correctly."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:173
+#: includes/class-lmpct-admin.php:174
 msgid "Please enable at least one platform for this event."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:174
+#: includes/class-lmpct-admin.php:175
 msgid "Google Ads is enabled for this event but the conversion label is missing."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:175
+#: includes/class-lmpct-admin.php:176
 msgid "The event could not be found."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:176
+#: includes/class-lmpct-admin.php:177
 msgid "Configuration imported successfully."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:177
+#: includes/class-lmpct-admin.php:178
 msgid "The file could not be imported. Please upload a valid export of this plugin."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:178
+#: includes/class-lmpct-admin.php:179
 msgid "Please choose a JSON file to import."
 msgstr ""
 
 #. translators: %s: platform box title
-#: includes/class-lmpct-admin.php:266
+#: includes/class-lmpct-admin.php:267
 msgid "Toggle panel: %s"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:287
-#: includes/class-lmpct-admin.php:469
+#: includes/class-lmpct-admin.php:288
+#: includes/class-lmpct-admin.php:504
 msgid "You do not have permission to access this page."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:291
+#: includes/class-lmpct-admin.php:292
 msgid "General"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:292
+#: includes/class-lmpct-admin.php:293
 msgid "URL Events"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:293
+#: includes/class-lmpct-admin.php:294
 msgid "Advanced Tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:294
+#: includes/class-lmpct-admin.php:295
 msgid "Tools"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:311
+#: includes/class-lmpct-admin.php:312
 msgid "Plugin tabs"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:351
+#: includes/class-lmpct-admin.php:357
 msgid "Advanced Tracking Features"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:356
+#: includes/class-lmpct-admin.php:362
 msgid "Automatic form lead tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:357
+#: includes/class-lmpct-admin.php:363
 msgid "Supports Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms and plain HTML forms."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:360
+#: includes/class-lmpct-admin.php:366
 msgid "Enable automatic form lead tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:361
-msgid "Detects form submissions automatically and fires the “Lead” event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored."
-msgstr ""
-
-#: includes/class-lmpct-admin.php:366
-msgid "First-touch & UTM passthrough"
-msgstr ""
-
 #: includes/class-lmpct-admin.php:367
-msgid "Stores utm_source, utm_medium, utm_campaign, utm_content, utm_term and fbclid in a first-party cookie for 30 days."
-msgstr ""
-
-#: includes/class-lmpct-admin.php:370
-msgid "Enable UTM passthrough"
+msgid "Detects form submissions automatically and fires the configured event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored."
 msgstr ""
 
 #: includes/class-lmpct-admin.php:371
-msgid "Saves campaign parameters on the first visit and sends them along with every server-side event as custom_data. A stored fbclid is converted into the fbc format so conversions stay attributed even days after the ad click."
+msgid "Event type"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:375
-msgid "Admin live debug bar"
+#: includes/class-lmpct-admin.php:380
+msgid "Meta event fired on form submission. Use “Contact” for general enquiries and “Lead” for genuine acquisition forms."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:377
-msgid "Show live debug bar in the frontend"
+#: includes/class-lmpct-admin.php:384
+msgid "Run on specific pages only (optional)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:378
-msgid "Shows a small bar at the bottom of the frontend with consent status, fired events, event IDs, CAPI response and match keys. Rendered exclusively for logged-in administrators – regular visitors get zero additional bytes."
+#: includes/class-lmpct-admin.php:389
+msgid "Enter paths separated by commas (e.g. /kontakt, /angebot, /anfrage). Leave empty to track on the entire website. On pages that do not match, the script is not loaded at all."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:383
-#: includes/class-lmpct-admin.php:668
-msgid "Save Settings"
+#: includes/class-lmpct-admin.php:393
+msgid "Ignore search, comments & logins"
+msgstr ""
+
+#: includes/class-lmpct-admin.php:395
+msgid "Ignore search, comments and logins"
 msgstr ""
 
 #: includes/class-lmpct-admin.php:396
-msgid "Export & Import"
-msgstr ""
-
-#: includes/class-lmpct-admin.php:399
-#: includes/class-lmpct-admin.php:409
-msgid "Export configuration"
+msgid "Prevents accidental tracking of search bars, blog comments and login fields. Forms containing a password field are always ignored, regardless of this setting."
 msgstr ""
 
 #: includes/class-lmpct-admin.php:401
+msgid "First-touch & UTM passthrough"
+msgstr ""
+
+#: includes/class-lmpct-admin.php:402
+msgid "Stores utm_source, utm_medium, utm_campaign, utm_content, utm_term and fbclid in a first-party cookie for 30 days."
+msgstr ""
+
+#: includes/class-lmpct-admin.php:405
+msgid "Enable UTM passthrough"
+msgstr ""
+
+#: includes/class-lmpct-admin.php:406
+msgid "Saves campaign parameters on the first visit and sends them along with every server-side event as custom_data. A stored fbclid is converted into the fbc format so conversions stay attributed even days after the ad click."
+msgstr ""
+
+#: includes/class-lmpct-admin.php:410
+msgid "Admin live debug bar"
+msgstr ""
+
+#: includes/class-lmpct-admin.php:412
+msgid "Show live debug bar in the frontend"
+msgstr ""
+
+#: includes/class-lmpct-admin.php:413
+msgid "Shows a small bar at the bottom of the frontend with consent status, fired events, event IDs, CAPI response and match keys. Rendered exclusively for logged-in administrators – regular visitors get zero additional bytes."
+msgstr ""
+
+#: includes/class-lmpct-admin.php:418
+#: includes/class-lmpct-admin.php:703
+msgid "Save Settings"
+msgstr ""
+
+#: includes/class-lmpct-admin.php:431
+msgid "Export & Import"
+msgstr ""
+
+#: includes/class-lmpct-admin.php:434
+#: includes/class-lmpct-admin.php:444
+msgid "Export configuration"
+msgstr ""
+
+#: includes/class-lmpct-admin.php:436
 msgid "Downloads all settings, platform IDs and event rules as a JSON file – ideal for rolling out a proven setup to another site."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:402
-#: includes/class-lmpct-admin.php:420
+#: includes/class-lmpct-admin.php:437
+#: includes/class-lmpct-admin.php:455
 msgid "Note:"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:402
+#: includes/class-lmpct-admin.php:437
 msgid "The export contains your CAPI access token in plain text. Store the file securely and never share it publicly."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:417
-#: includes/class-lmpct-admin.php:431
+#: includes/class-lmpct-admin.php:452
+#: includes/class-lmpct-admin.php:466
 msgid "Import configuration"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:419
+#: includes/class-lmpct-admin.php:454
 msgid "Upload a previously exported JSON file. All values are validated and sanitised before they are saved."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:420
+#: includes/class-lmpct-admin.php:455
 msgid "The import overwrites the current settings and all event rules."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:429
+#: includes/class-lmpct-admin.php:464
 msgid "Really import? The current settings and event rules will be overwritten."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:480
+#: includes/class-lmpct-admin.php:515
 msgid "Plugin Information"
 msgstr ""
 
 #. translators: %s: support email address
-#: includes/class-lmpct-admin.php:490
+#: includes/class-lmpct-admin.php:525
 msgid "If you have questions or found a bug, please email %s."
 msgstr ""
 
 #. translators: %s: developer website link
-#: includes/class-lmpct-admin.php:499
+#: includes/class-lmpct-admin.php:534
 msgid "Developed by %s."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:508
+#: includes/class-lmpct-admin.php:543
 msgid "Video Tutorial"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:513
+#: includes/class-lmpct-admin.php:548
 msgid "A step-by-step video tutorial on setting up the plugin is coming soon:"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:516
+#: includes/class-lmpct-admin.php:551
 msgid "Watch the tutorial on YouTube"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:556
+#: includes/class-lmpct-admin.php:591
 msgid "Global Options"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:559
-#: includes/class-lmpct-admin.php:561
+#: includes/class-lmpct-admin.php:594
+#: includes/class-lmpct-admin.php:596
 msgid "Do not track administrators"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:562
+#: includes/class-lmpct-admin.php:597
 msgid "Recommended: logged-in administrators trigger neither pixel nor server events."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:566
+#: includes/class-lmpct-admin.php:601
 msgid "Automatic cookie banner detection (GDPR)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:568
+#: includes/class-lmpct-admin.php:603
 msgid "Enable automatic cookie banner detection"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:569
+#: includes/class-lmpct-admin.php:604
 msgid "Automatically detects installed cookie banners and blocks browser and CAPI events until consent is given. Supports Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies and any banner using the WP Consent API. Automatic blocking cannot be guaranteed for unlisted third-party banners. Sites without a cookie banner are never blocked."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:574
-#: includes/class-lmpct-admin.php:709
-#: includes/class-lmpct-admin.php:854
+#: includes/class-lmpct-admin.php:609
+#: includes/class-lmpct-admin.php:744
+#: includes/class-lmpct-admin.php:889
 msgid "Platforms"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:576
+#: includes/class-lmpct-admin.php:611
 msgid "Meta (Facebook)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:576
+#: includes/class-lmpct-admin.php:611
 msgid "Enable Meta tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:580
+#: includes/class-lmpct-admin.php:615
 msgid "Meta Pixel ID"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:581
+#: includes/class-lmpct-admin.php:616
 msgid "Meta Events Manager → Data sources → your pixel → copy the ID shown below its name."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:590
-#: includes/class-lmpct-admin.php:592
+#: includes/class-lmpct-admin.php:625
+#: includes/class-lmpct-admin.php:627
 msgid "Enable Conversions API"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:593
+#: includes/class-lmpct-admin.php:628
 msgid "Additionally sends matched events to Meta server-side – deduplicated via the same event ID as in the browser."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:598
+#: includes/class-lmpct-admin.php:633
 msgid "CAPI Access Token"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:599
+#: includes/class-lmpct-admin.php:634
 msgid "Meta Events Manager → Data sources → Settings → Conversions API → “Generate access token”."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:604
+#: includes/class-lmpct-admin.php:639
 msgid "Secret key. Used exclusively server-side and never rendered in the frontend."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:609
+#: includes/class-lmpct-admin.php:644
 msgid "Test Event Code"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:610
+#: includes/class-lmpct-admin.php:645
 msgid "Meta Events Manager → Test events → copy the “Server events code”. Clear it again after testing!"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:616
+#: includes/class-lmpct-admin.php:651
 msgid "The test code is automatically deactivated after 12 hours to prevent accidental test tracking on a live site."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:620
+#: includes/class-lmpct-admin.php:655
 msgid "Advanced Matching (email)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:622
+#: includes/class-lmpct-admin.php:657
 msgid "Enable Advanced Matching"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:623
+#: includes/class-lmpct-admin.php:658
 msgid "Sends the email address of logged-in users to the Conversions API as a SHA-256 hash (better match quality). Mind data privacy."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:629
+#: includes/class-lmpct-admin.php:664
 msgid "Google Ads"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:629
+#: includes/class-lmpct-admin.php:664
 msgid "Enable Google Ads tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:633
+#: includes/class-lmpct-admin.php:668
 msgid "Google Tag ID"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:634
+#: includes/class-lmpct-admin.php:669
 msgid "Google Ads → Tools & Settings → Google Tag → copy the ID (AW-XXXXX)."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:643
+#: includes/class-lmpct-admin.php:678
 msgid "Google Consent Mode v2 (default)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:645
+#: includes/class-lmpct-admin.php:680
 msgid "Enable Google Consent Mode v2 defaults"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:646
+#: includes/class-lmpct-admin.php:681
 msgid "Sets ad_storage, ad_user_data, ad_personalization and analytics_storage to \"denied\" by default before the tag loads. Your consent banner then sends the consent update. Recommended for the EU."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:652
+#: includes/class-lmpct-admin.php:687
 msgid "TikTok"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:652
+#: includes/class-lmpct-admin.php:687
 msgid "Enable TikTok Pixel"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:656
+#: includes/class-lmpct-admin.php:691
 msgid "TikTok Pixel ID"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:657
+#: includes/class-lmpct-admin.php:692
 msgid "TikTok Ads Manager → Assets → Events → Web events → copy the pixel ID."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:688
+#: includes/class-lmpct-admin.php:723
 msgid "Custom Events"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:693
+#: includes/class-lmpct-admin.php:728
 msgid "Enable all custom events"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:695
+#: includes/class-lmpct-admin.php:730
 msgid "Enable/disable all custom events"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:697
+#: includes/class-lmpct-admin.php:732
 msgid "Apply"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:701
+#: includes/class-lmpct-admin.php:736
 msgid "Custom events are currently disabled globally. The rules below will not fire."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:707
-#: includes/class-lmpct-admin.php:896
+#: includes/class-lmpct-admin.php:742
+#: includes/class-lmpct-admin.php:931
 msgid "Status"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:708
+#: includes/class-lmpct-admin.php:743
 msgid "Name"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:710
+#: includes/class-lmpct-admin.php:745
 msgid "Trigger Condition (URL)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:711
+#: includes/class-lmpct-admin.php:746
 msgid "Actions"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:717
+#: includes/class-lmpct-admin.php:752
 msgid "No events yet. Create your first event below."
 msgstr ""
 
 #. translators: %s: event name
-#: includes/class-lmpct-admin.php:732
+#: includes/class-lmpct-admin.php:767
 msgid "Enable event “%s”"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:736
+#: includes/class-lmpct-admin.php:771
 msgid "Toggle"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:755
+#: includes/class-lmpct-admin.php:790
 msgid "Exact path:"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:756
+#: includes/class-lmpct-admin.php:791
 msgid "URL contains:"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:763
+#: includes/class-lmpct-admin.php:798
 msgid "Edit"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:770
+#: includes/class-lmpct-admin.php:805
 msgid "Really delete this event?"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:771
+#: includes/class-lmpct-admin.php:806
 msgid "Delete"
 msgstr ""
 
 #. translators: %s: event name
-#: includes/class-lmpct-admin.php:816
+#: includes/class-lmpct-admin.php:851
 msgid "Edit event “%s”"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:818
+#: includes/class-lmpct-admin.php:853
 msgid "Create New Event"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:830
+#: includes/class-lmpct-admin.php:865
 msgid "Event Name (internal)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:834
+#: includes/class-lmpct-admin.php:869
 msgid "e.g. Lead magnet confirmation"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:836
+#: includes/class-lmpct-admin.php:871
 msgid "With the “CustomEvent” type, this name is sent as the custom event name."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:841
+#: includes/class-lmpct-admin.php:876
 msgid "Trigger"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:844
+#: includes/class-lmpct-admin.php:879
 msgid "Exact path"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:845
+#: includes/class-lmpct-admin.php:880
 msgid "URL contains"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:850
+#: includes/class-lmpct-admin.php:885
 msgid "“Exact path” compares only the URL path (case and trailing slash are ignored). “URL contains” checks the path including the query string."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:861
+#: includes/class-lmpct-admin.php:896
 msgid "Meta event type"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:877
+#: includes/class-lmpct-admin.php:912
 msgid "Google Ads conversion label"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:878
+#: includes/class-lmpct-admin.php:913
 msgid "Google Ads → Conversion goals → click the action → Tag setup → snippet → copy the label after the slash (AW-XXX/LABEL)."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:885
+#: includes/class-lmpct-admin.php:920
 msgid "TikTok event type"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:898
-#: includes/class-lmpct-admin.php:899
+#: includes/class-lmpct-admin.php:933
+#: includes/class-lmpct-admin.php:934
 msgid "Event active"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:907
+#: includes/class-lmpct-admin.php:942
 msgid "Update Event"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:907
+#: includes/class-lmpct-admin.php:942
 msgid "Create Event"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:915
+#: includes/class-lmpct-admin.php:950
 msgid "Cancel"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:935
+#: includes/class-lmpct-admin.php:970
 #: includes/class-lmpct-tools.php:27
 #: includes/class-lmpct-tools.php:66
 msgid "You do not have permission to perform this action."

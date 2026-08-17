@@ -31,6 +31,45 @@ class LMPCT_Forms {
 	}
 
 	/**
+	 * Konfigurierter Meta-Event-Typ für Formular-Absendungen.
+	 *
+	 * @return string 'Lead' oder 'Contact'.
+	 */
+	public static function event_type() {
+		$settings = LMPCT_Settings::get();
+		$type     = (string) ( $settings['form_event_type'] ?? 'Lead' );
+
+		return in_array( $type, LMPCT_Settings::form_event_types(), true ) ? $type : 'Lead';
+	}
+
+	/**
+	 * Ist der Formular-Grabber auf diesem Pfad aktiv?
+	 *
+	 * Leerer Filter = gesamte Website. Andernfalls muss der Pfad einen der
+	 * hinterlegten Teilstrings enthalten.
+	 *
+	 * @param string $path Pfad (z. B. "/kontakt/").
+	 * @return bool
+	 */
+	public static function url_allowed( $path ) {
+		$filters = LMPCT_Settings::form_url_filters();
+
+		if ( empty( $filters ) ) {
+			return true;
+		}
+
+		$path = strtolower( (string) $path );
+
+		foreach ( $filters as $needle ) {
+			if ( '' !== $needle && false !== strpos( $path, $needle ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * AJAX: Lead-Event verarbeiten und serverseitig an die CAPI senden.
 	 *
 	 * @return void
@@ -68,10 +107,19 @@ class LMPCT_Forms {
 			wp_send_json_error( array( 'reason' => 'missing_event_id' ), 400 );
 		}
 
-		$event_name = sanitize_text_field( wp_unslash( $_POST['event_name'] ?? 'Lead' ) );
-		$event_name = preg_replace( '/[^A-Za-z0-9_ \-]/', '', $event_name );
-		if ( '' === $event_name ) {
-			$event_name = 'Lead';
+		// Event-Name gegen die Whitelist prüfen; alles andere fällt auf die
+		// konfigurierte Einstellung zurück (der Client bestimmt sie nicht frei).
+		$event_name = sanitize_text_field( wp_unslash( $_POST['event_name'] ?? '' ) );
+		if ( ! in_array( $event_name, LMPCT_Settings::form_event_types(), true ) ) {
+			$event_name = self::event_type();
+		}
+
+		$source_url = self::source_url();
+
+		// URL-Filter auch serverseitig durchsetzen, damit der Endpunkt nicht
+		// über manipulierte Requests umgangen werden kann.
+		if ( ! self::url_allowed( (string) wp_parse_url( $source_url, PHP_URL_PATH ) ) ) {
+			wp_send_json_error( array( 'reason' => 'url_filtered' ), 200 );
 		}
 
 		// Kontaktdaten ausschließlich gehasht weiterreichen.
@@ -90,7 +138,7 @@ class LMPCT_Forms {
 		$event = array(
 			'id'           => 'form-lead',
 			'name'         => $event_name,
-			'event_type'   => 'Lead',
+			'event_type'   => $event_name,
 			'event_id'     => $event_id,
 			'meta_enabled' => 1,
 		);
@@ -98,7 +146,7 @@ class LMPCT_Forms {
 		$status = LMPCT_CAPI::send_events(
 			array( $event ),
 			$settings,
-			self::source_url(),
+			$source_url,
 			$user_data
 		);
 

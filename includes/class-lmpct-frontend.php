@@ -90,15 +90,26 @@ class LMPCT_Frontend {
 			return;
 		}
 
+		// URL-Filter bereits serverseitig auswerten: Passt die Seite nicht,
+		// wird das Skript gar nicht erst ausgeliefert (0 Byte statt Leerlauf).
+		$path = (string) wp_parse_url( self::current_request_uri(), PHP_URL_PATH );
+
+		if ( ! LMPCT_Forms::url_allowed( $path ) ) {
+			return;
+		}
+
 		wp_enqueue_script( 'lmpct-frontend', LMPCT_PLUGIN_URL . 'assets/frontend.js', array(), LMPCT_VERSION, true );
 
 		wp_localize_script(
 			'lmpct-frontend',
 			'lmpctFront',
 			array(
-				'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
-				'nonce'        => wp_create_nonce( LMPCT_Forms::NONCE_ACTION ),
-				'formTracking' => true,
+				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+				'nonce'         => wp_create_nonce( LMPCT_Forms::NONCE_ACTION ),
+				'formTracking'  => true,
+				'eventType'     => LMPCT_Forms::event_type(),
+				'urlFilter'     => LMPCT_Settings::form_url_filters(),
+				'excludeSystem' => ! empty( self::$settings['form_exclude_system'] ),
 			)
 		);
 	}

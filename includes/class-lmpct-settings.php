@@ -104,9 +104,12 @@ class LMPCT_Settings {
 			'tiktok_enabled'      => 0,
 			'tiktok_pixel_id'     => '',
 			// Erweiterte Tracking-Features.
-			'form_tracking'       => 1,
-			'utm_passthrough'     => 1,
-			'debug_bar'           => 1,
+			'form_tracking'        => 1,
+			'form_event_type'      => 'Lead',
+			'form_url_filter'      => '',
+			'form_exclude_system'  => 1,
+			'utm_passthrough'      => 1,
+			'debug_bar'            => 1,
 		);
 
 		$settings = get_option( self::OPTION_SETTINGS, array() );
@@ -152,9 +155,61 @@ class LMPCT_Settings {
 			'tiktok_enabled'       => empty( $input['tiktok_enabled'] ) ? 0 : 1,
 			'tiktok_pixel_id'      => preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['tiktok_pixel_id'] ?? '' ) ),
 			'form_tracking'        => empty( $input['form_tracking'] ) ? 0 : 1,
+			'form_event_type'      => in_array( (string) ( $input['form_event_type'] ?? '' ), self::form_event_types(), true )
+				? (string) $input['form_event_type']
+				: 'Lead',
+			'form_url_filter'      => self::sanitize_url_filter( $input['form_url_filter'] ?? '' ),
+			'form_exclude_system'  => empty( $input['form_exclude_system'] ) ? 0 : 1,
 			'utm_passthrough'      => empty( $input['utm_passthrough'] ) ? 0 : 1,
 			'debug_bar'            => empty( $input['debug_bar'] ) ? 0 : 1,
 		);
+	}
+
+	/**
+	 * Erlaubte Meta-Event-Typen für den Formular-Auto-Grabber.
+	 *
+	 * @return string[]
+	 */
+	public static function form_event_types() {
+		return array( 'Lead', 'Contact' );
+	}
+
+	/**
+	 * URL-Filter säubern: kommagetrennte Pfade, kleingeschrieben.
+	 *
+	 * @param mixed $value Rohwert aus dem Formular.
+	 * @return string Normalisierte, kommagetrennte Liste.
+	 */
+	public static function sanitize_url_filter( $value ) {
+		$value = sanitize_text_field( (string) $value );
+		$parts = array();
+
+		foreach ( explode( ',', $value ) as $part ) {
+			$part = strtolower( trim( $part ) );
+			$part = preg_replace( '#[^a-z0-9/_\-.%]#', '', $part );
+
+			if ( '' !== $part ) {
+				$parts[] = substr( $part, 0, 200 );
+			}
+		}
+
+		return implode( ', ', array_slice( array_unique( $parts ), 0, 50 ) );
+	}
+
+	/**
+	 * URL-Filter als Array.
+	 *
+	 * @return string[] Leeres Array = auf der gesamten Website aktiv.
+	 */
+	public static function form_url_filters() {
+		$settings = self::get();
+		$filter   = self::sanitize_url_filter( $settings['form_url_filter'] ?? '' );
+
+		if ( '' === $filter ) {
+			return array();
+		}
+
+		return array_values( array_filter( array_map( 'trim', explode( ',', $filter ) ) ) );
 	}
 
 	/**

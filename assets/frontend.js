@@ -21,6 +21,55 @@
 	var lastFired = 0;
 	var lastSubmit = null; // { data, time } der letzten Absendung.
 
+	// Konfigurierter Meta-Event-Typ (Lead oder Contact).
+	var EVENT_NAME = ( 'Contact' === cfg.eventType ) ? 'Contact' : 'Lead';
+
+	// Optionaler URL-Filter: leer = gesamte Website.
+	var URL_FILTERS = Array.isArray( cfg.urlFilter ) ? cfg.urlFilter : [];
+
+	/**
+	 * Läuft der Grabber auf dieser Seite? (Der Server prüft das ebenfalls und
+	 * liefert das Skript dann gar nicht erst aus – dies ist die Absicherung
+	 * für Seitenwechsel ohne Reload.)
+	 */
+	function urlAllowed() {
+		if ( ! URL_FILTERS.length ) {
+			return true;
+		}
+
+		var path = ( window.location.pathname || '' ).toLowerCase();
+
+		for ( var i = 0; i < URL_FILTERS.length; i++ ) {
+			var needle = String( URL_FILTERS[ i ] || '' ).toLowerCase();
+			if ( needle && path.indexOf( needle ) > -1 ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Such-, Kommentar- und Login-Formulare aussortieren.
+	 * Passwortfelder werden immer ignoriert – Anmeldedaten sind niemals ein Lead.
+	 */
+	function isExcludedForm( form ) {
+		if ( form.querySelector( 'input[type="password"]' ) ) {
+			return true;
+		}
+
+		if ( false === cfg.excludeSystem ) {
+			return false;
+		}
+
+		if ( form.matches( '.search-form, #searchform, form[role="search"], .wp-block-search__button-inside, #commentform, .comment-form, .wp-block-post-comments-form form, #loginform' ) ) {
+			return true;
+		}
+
+		// WordPress-Suchfeld (name="s") und Kommentarfelder.
+		return !! form.querySelector( 'input[name="s"], textarea[name="comment"]' );
+	}
+
 	/**
 	 * Marketing-Consent. Ist der Inline-Bootstrap aktiv, nutzen wir dessen
 	 * Prüfung; andernfalls hat der Server bereits Consent festgestellt.
@@ -151,9 +200,13 @@
 			return; // Duplicate-Guard (z. B. Submit + Erfolgs-Event des Plugins).
 		}
 
+		if ( ! urlAllowed() ) {
+			return; // Seite steht nicht im URL-Filter.
+		}
+
 		if ( ! hasConsent() ) {
 			emit( 'lmpct:event', {
-				event: 'Lead',
+				event: EVENT_NAME,
 				browser: 'blocked',
 				capi: 'consent_blocked',
 				source: sourceLabel
@@ -167,12 +220,12 @@
 		var browserFired = false;
 
 		if ( 'function' === typeof window.fbq ) {
-			window.fbq( 'track', 'Lead', {}, { eventID: eventId } );
+			window.fbq( 'track', EVENT_NAME, {}, { eventID: eventId } );
 			browserFired = true;
 		}
 
 		emit( 'lmpct:event', {
-			event: 'Lead',
+			event: EVENT_NAME,
 			eventId: eventId,
 			browser: browserFired ? 'fired' : 'no_pixel',
 			capi: 'pending',
@@ -189,7 +242,7 @@
 		body.append( 'action', 'lmpct_form_lead' );
 		body.append( 'nonce', cfg.nonce || '' );
 		body.append( 'event_id', eventId );
-		body.append( 'event_name', 'Lead' );
+		body.append( 'event_name', EVENT_NAME );
 		body.append( 'source_url', window.location.href );
 
 		if ( data.email ) {
@@ -243,9 +296,7 @@
 			return;
 		}
 
-		// Suchformulare und Logins nicht als Lead werten.
-		if ( form.matches( '.search-form, #searchform, form[role="search"], .wp-block-search__button-inside' ) ||
-			form.querySelector( 'input[type="password"]' ) ) {
+		if ( isExcludedForm( form ) ) {
 			return;
 		}
 

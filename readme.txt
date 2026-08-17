@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.5.0
+Stable tag: 0.5.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,7 +23,7 @@ Ein bewusst minimalistischer Ersatz für überladene Tracking-Plugins wie PixelY
 * **Conversions API fire-and-forget:** Serverseitiger Versand via `wp_remote_post()` nicht-blockierend – kein Einfluss auf die Ladezeit. user_data mit Client-IP, User-Agent, `_fbp`/`_fbc` (Fallback aus `fbclid`), optional SHA-256-gehashte E-Mail eingeloggter Nutzer.
 * **Google Consent Mode v2:** Setzt auf Wunsch `ad_storage`, `ad_user_data`, `ad_personalization` und `analytics_storage` vor dem Tag-Laden auf `denied` – dein Consent-Banner sendet das Update.
 * **Intelligente Cookie-Consent-Erkennung (DSGVO):** Erkennt installierte Cookie-Banner automatisch (Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies, WP Consent API) und blockiert Browser- und CAPI-Events bis zur Marketing-Einwilligung. Nach dem Klick auf „Akzeptieren" startet das Tracking sofort ohne Seiten-Reload. Websites ohne Banner werden niemals blockiert.
-* **Formular-Auto-Grabber (Zero-Config Lead-Tracking):** Erkennt Formular-Absendungen automatisch (Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und native HTML-Formulare) und feuert „Lead" im Browser und via CAPI mit identischer Event-ID. E-Mail und Telefonnummer werden SHA-256-gehasht übergeben – für maximalen Match-Score ohne Klartext-Datenweitergabe.
+* **Formular-Auto-Grabber (Zero-Config Lead-Tracking):** Erkennt Formular-Absendungen automatisch (Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und native HTML-Formulare) und feuert „Lead" oder „Contact" im Browser und via CAPI mit identischer Event-ID. E-Mail und Telefonnummer werden SHA-256-gehasht übergeben – für maximalen Match-Score ohne Klartext-Datenweitergabe. Granular steuerbar: Event-Typ wählbar, optionaler URL-Filter (auf nicht passenden Seiten wird das Skript gar nicht geladen) und automatischer Ausschluss von Suche, Kommentaren und Logins.
 * **First-Touch- & UTM-Attribution:** Speichert utm_source, utm_medium, utm_campaign, utm_content, utm_term und fbclid beim Erstbesuch 30 Tage in einem First-Party-Cookie und sendet sie bei jedem Server-Event als `custom_data` mit. Die fbclid wird ins `fbc`-Format übersetzt – Conversions bleiben auch Tage nach dem Anzeigenklick zugeordnet.
 * **Live-Debug-Konsole für Admins:** Dezente Leiste am unteren Bildschirmrand mit Consent-Status (inkl. erkanntem Banner), gefeuerten Events, Event-IDs, CAPI-Antwort (⏳ → ✅ 200 OK) und verwendeten Match-Keys. Wird ausschließlich für eingeloggte Administratoren gerendert – reguläre Besucher erhalten kein einziges zusätzliches Byte.
 * **1-Klick Export & Import:** Komplette Konfiguration inkl. Event-Regeln als JSON exportieren und auf der nächsten Kundenwebsite importieren.
@@ -85,6 +85,12 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja. `uninstall.php` löscht alle Plugin-Optionen inklusive des gespeicherten Access Tokens.
 
 == Changelog ==
+
+= 0.5.1 =
+* Neu: Event-Typ für den Formular-Auto-Grabber wählbar („Lead" oder „Contact") – Support- und Kontaktanfragen lassen sich so sauber von echten Leads trennen.
+* Neu: Optionaler URL-Filter (kommagetrennte Pfade). Auf nicht passenden Seiten wird das Frontend-Skript gar nicht erst ausgeliefert; der Filter wird zusätzlich serverseitig am AJAX-Endpunkt durchgesetzt.
+* Neu: Ausschluss-Filter für Suche, Blog-Kommentare und Logins (Standard: aktiv). Formulare mit Passwortfeld werden grundsätzlich immer ignoriert.
+* Härtung: Der vom Browser gemeldete Event-Name wird serverseitig gegen eine Whitelist geprüft und fällt sonst auf die konfigurierte Einstellung zurück.
 
 = 0.5.0 =
 * Neu (Feature 1): Formular-Auto-Grabber – erkennt Absendungen von Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und nativen HTML-Formularen, feuert „Lead" im Browser und via CAPI mit identischer Event-ID und übergibt E-Mail/Telefon SHA-256-gehasht.

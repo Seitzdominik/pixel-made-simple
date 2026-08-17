@@ -136,6 +136,7 @@ class LMPCT_Admin {
 			'google_consent_mode',
 			'tiktok_enabled',
 			'form_tracking',
+			'form_exclude_system',
 			'utm_passthrough',
 			'debug_bar',
 		);
@@ -346,7 +347,12 @@ class LMPCT_Admin {
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>">
 			<?php settings_fields( 'lmpct_settings_group' ); ?>
-			<?php self::preserve_hidden_settings( $s, array( 'form_tracking', 'utm_passthrough', 'debug_bar' ) ); ?>
+			<?php
+			self::preserve_hidden_settings(
+				$s,
+				array( 'form_tracking', 'form_event_type', 'form_url_filter', 'form_exclude_system', 'utm_passthrough', 'debug_bar' )
+			);
+			?>
 
 			<h2 class="lmpct-section-title"><?php esc_html_e( 'Advanced Tracking Features', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
 
@@ -358,7 +364,36 @@ class LMPCT_Admin {
 					</th>
 					<td>
 						<?php self::toggle( 'lmpct_settings[form_tracking]', ! empty( $s['form_tracking'] ), __( 'Enable automatic form lead tracking', 'lightweight-meta-pixel-capi-tracker' ), false, 'form_tracking' ); ?>
-						<p class="description"><?php esc_html_e( 'Detects form submissions automatically and fires the “Lead” event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Detects form submissions automatically and fires the configured event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="lmpct-form-event-type"><?php esc_html_e( 'Event type', 'lightweight-meta-pixel-capi-tracker' ); ?></label></th>
+					<td>
+						<select id="lmpct-form-event-type" name="lmpct_settings[form_event_type]">
+							<?php foreach ( LMPCT_Settings::form_event_types() as $type ) : ?>
+								<option value="<?php echo esc_attr( $type ); ?>" <?php selected( $s['form_event_type'], $type ); ?>>
+									<?php echo esc_html( $type ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<p class="description"><?php esc_html_e( 'Meta event fired on form submission. Use “Contact” for general enquiries and “Lead” for genuine acquisition forms.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="lmpct-form-url-filter"><?php esc_html_e( 'Run on specific pages only (optional)', 'lightweight-meta-pixel-capi-tracker' ); ?></label></th>
+					<td>
+						<input type="text" id="lmpct-form-url-filter" class="large-text code"
+							name="lmpct_settings[form_url_filter]" value="<?php echo esc_attr( $s['form_url_filter'] ); ?>"
+							placeholder="/kontakt, /angebot, /anfrage" autocomplete="off" />
+						<p class="description"><?php esc_html_e( 'Enter paths separated by commas (e.g. /kontakt, /angebot, /anfrage). Leave empty to track on the entire website. On pages that do not match, the script is not loaded at all.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Ignore search, comments & logins', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
+					<td>
+						<?php self::toggle( 'lmpct_settings[form_exclude_system]', ! empty( $s['form_exclude_system'] ), __( 'Ignore search, comments and logins', 'lightweight-meta-pixel-capi-tracker' ), false, 'form_exclude_system' ); ?>
+						<p class="description"><?php esc_html_e( 'Prevents accidental tracking of search bars, blog comments and login fields. Forms containing a password field are always ignored, regardless of this setting.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
 				<tr>
