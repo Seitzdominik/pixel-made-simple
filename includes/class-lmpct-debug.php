@@ -154,7 +154,14 @@ class LMPCT_Debug {
 	 * @return void
 	 */
 	public static function render() {
-		$payload = wp_json_encode( self::payload() );
+		// JSON_HEX_TAG etc.: Das Log enthält u. a. rohen Antworttext der Meta-
+		// API (externe, nicht kontrollierte Quelle). Ohne diese Flags könnte
+		// eine Sequenz wie "</script>" darin das umgebende Inline-Skript vom
+		// HTML-Parser vorzeitig beenden lassen, bevor JS überhaupt läuft –
+		// die client-seitige textContent-Escaping in render() greift erst
+		// danach. Die Flags kodieren <, >, &, ' und " als \uXXXX und schließen
+		// diesen Bruch aus.
+		$payload = wp_json_encode( self::payload(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 
 		if ( ! is_string( $payload ) ) {
 			return;

@@ -15,6 +15,16 @@ class LMPCT_Forms {
 
 	const NONCE_ACTION = 'lmpct_form_lead';
 
+	/**
+	 * Harte Obergrenzen für POST-Parameter dieses (nopriv-)AJAX-Endpunkts.
+	 * Schützt vor überdimensionierten Payloads durch nicht-authentifizierte
+	 * Anfragen, bevor teurere Verarbeitung (Regex, Hashing, Graph-API-Call)
+	 * überhaupt beginnt.
+	 */
+	const MAX_LEN_EVENT_ID = 64;
+	const MAX_LEN_FIELD    = 255;
+	const MAX_LEN_URL      = 2000;
+
 	public static function init() {
 		add_action( 'wp_ajax_lmpct_form_lead', array( __CLASS__, 'handle_lead' ) );
 		add_action( 'wp_ajax_nopriv_lmpct_form_lead', array( __CLASS__, 'handle_lead' ) );
@@ -97,7 +107,11 @@ class LMPCT_Forms {
 			wp_send_json_error( array( 'reason' => 'capi_inactive' ), 200 );
 		}
 
-		$event_id = sanitize_text_field( wp_unslash( $_POST['event_id'] ?? '' ) );
+		// Längenbegrenzung VOR jeder weiteren Verarbeitung: dieser Endpunkt ist
+		// über wp_ajax_nopriv_ auch ohne Login erreichbar, daher werden alle
+		// Eingaben hart gekappt, bevor Regex/Hashing/API-Call anfallen.
+		$event_id = substr( (string) wp_unslash( $_POST['event_id'] ?? '' ), 0, self::MAX_LEN_EVENT_ID );
+		$event_id = sanitize_text_field( $event_id );
 		$event_id = preg_replace( '/[^A-Za-z0-9\-]/', '', $event_id );
 
 		if ( '' === $event_id ) {
@@ -106,7 +120,8 @@ class LMPCT_Forms {
 
 		// Event-Name gegen die Whitelist prüfen; alles andere fällt auf die
 		// konfigurierte Einstellung zurück (der Client bestimmt sie nicht frei).
-		$event_name = sanitize_text_field( wp_unslash( $_POST['event_name'] ?? '' ) );
+		$event_name = substr( (string) wp_unslash( $_POST['event_name'] ?? '' ), 0, self::MAX_LEN_FIELD );
+		$event_name = sanitize_text_field( $event_name );
 		if ( ! in_array( $event_name, LMPCT_Settings::form_event_types(), true ) ) {
 			$event_name = self::event_type();
 		}
@@ -119,18 +134,24 @@ class LMPCT_Forms {
 			wp_send_json_error( array( 'reason' => 'url_filtered' ), 200 );
 		}
 
-		// Kontaktdaten ausschließlich gehasht weiterreichen.
+		// Kontaktdaten ausschließlich gehasht weiterreichen. Rohwerte werden
+		// hier NUR im RAM verarbeitet (gekappt -> gehasht) und nie geloggt,
+		// gespeichert oder in der Response zurückgegeben.
 		$user_data = array();
 
-		$email_hash = LMPCT_CAPI::hash_email( wp_unslash( $_POST['email'] ?? '' ) );
+		$raw_email  = substr( (string) wp_unslash( $_POST['email'] ?? '' ), 0, self::MAX_LEN_FIELD );
+		$email_hash = LMPCT_CAPI::hash_email( $raw_email );
 		if ( '' !== $email_hash ) {
 			$user_data['em'] = array( $email_hash );
 		}
+		unset( $raw_email );
 
-		$phone_hash = LMPCT_CAPI::hash_phone( wp_unslash( $_POST['phone'] ?? '' ) );
+		$raw_phone  = substr( (string) wp_unslash( $_POST['phone'] ?? '' ), 0, self::MAX_LEN_FIELD );
+		$phone_hash = LMPCT_CAPI::hash_phone( $raw_phone );
 		if ( '' !== $phone_hash ) {
 			$user_data['ph'] = array( $phone_hash );
 		}
+		unset( $raw_phone );
 
 		$event = array(
 			'id'           => 'form-lead',
@@ -165,7 +186,8 @@ class LMPCT_Forms {
 	 * @return string
 	 */
 	private static function source_url() {
-		$url = esc_url_raw( wp_unslash( $_POST['source_url'] ?? '' ) );
+		$url = substr( (string) wp_unslash( $_POST['source_url'] ?? '' ), 0, self::MAX_LEN_URL );
+		$url = esc_url_raw( $url );
 
 		if ( '' === $url ) {
 			$url = (string) wp_get_referer();

@@ -103,12 +103,16 @@ class LMPCT_Settings {
 			// TikTok.
 			'tiktok_enabled'      => 0,
 			'tiktok_pixel_id'     => '',
-			// Erweiterte Tracking-Features.
-			'form_tracking'        => 1,
+			// Erweiterte Tracking-Features. Privacy-by-Default: Formular-Grabber
+			// und UTM-Attribution sind bei Neuinstallation bewusst DEAKTIVIERT,
+			// da sie zusätzliche personenbezogene Daten (Formularinhalte,
+			// Kampagnen-Cookie) verarbeiten. Die Live-Debug-Leiste betrifft nur
+			// eingeloggte Administratoren und bleibt daher aktiv.
+			'form_tracking'        => 0,
 			'form_event_type'      => 'Lead',
 			'form_url_filter'      => '',
 			'form_exclude_system'  => 1,
-			'utm_passthrough'      => 1,
+			'utm_passthrough'      => 0,
 			'debug_bar'            => 1,
 		);
 

@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.5.4
+Stable tag: 0.5.5
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,8 +23,8 @@ Ein bewusst minimalistischer Ersatz für überladene Tracking-Plugins wie PixelY
 * **Conversions API fire-and-forget:** Serverseitiger Versand via `wp_remote_post()` nicht-blockierend – kein Einfluss auf die Ladezeit. user_data mit Client-IP, User-Agent, `_fbp`/`_fbc` (Fallback aus `fbclid`), optional SHA-256-gehashte E-Mail eingeloggter Nutzer.
 * **Google Consent Mode v2:** Setzt auf Wunsch `ad_storage`, `ad_user_data`, `ad_personalization` und `analytics_storage` vor dem Tag-Laden auf `denied` – dein Consent-Banner sendet das Update.
 * **Intelligente Cookie-Consent-Erkennung (DSGVO):** Erkennt installierte Cookie-Banner automatisch (Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies, WP Consent API) und blockiert Browser- und CAPI-Events bis zur Marketing-Einwilligung. Nach dem Klick auf „Akzeptieren" startet das Tracking sofort ohne Seiten-Reload. Websites ohne Banner werden niemals blockiert.
-* **Formular-Auto-Grabber (Zero-Config Lead-Tracking):** Erkennt Formular-Absendungen automatisch (Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und native HTML-Formulare) und feuert „Lead" oder „Contact" im Browser und via CAPI mit identischer Event-ID. E-Mail und Telefonnummer werden SHA-256-gehasht übergeben – für maximalen Match-Score ohne Klartext-Datenweitergabe. Granular steuerbar: Event-Typ wählbar, optionaler URL-Filter (auf nicht passenden Seiten wird das Skript gar nicht geladen) und automatischer Ausschluss von Suche, Kommentaren und Logins.
-* **First-Touch- & UTM-Attribution:** Speichert utm_source, utm_medium, utm_campaign, utm_content, utm_term und fbclid beim Erstbesuch 30 Tage in einem First-Party-Cookie und sendet sie bei jedem Server-Event als `custom_data` mit. Die fbclid wird ins `fbc`-Format übersetzt – Conversions bleiben auch Tage nach dem Anzeigenklick zugeordnet.
+* **Formular-Auto-Grabber (Zero-Config Lead-Tracking, standardmäßig deaktiviert):** Erkennt Formular-Absendungen automatisch (Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und native HTML-Formulare) und feuert „Lead" oder „Contact" im Browser und via CAPI mit identischer Event-ID. E-Mail und Telefonnummer werden SHA-256-gehasht übergeben – für maximalen Match-Score ohne Klartext-Datenweitergabe. Granular steuerbar: Event-Typ wählbar, optionaler URL-Filter (auf nicht passenden Seiten wird das Skript gar nicht geladen) und automatischer Ausschluss von Suche, Kommentaren und Logins.
+* **First-Touch- & UTM-Attribution (standardmäßig deaktiviert):** Speichert utm_source, utm_medium, utm_campaign, utm_content, utm_term und fbclid beim Erstbesuch 30 Tage in einem First-Party-Cookie und sendet sie bei jedem Server-Event als `custom_data` mit. Die fbclid wird ins `fbc`-Format übersetzt – Conversions bleiben auch Tage nach dem Anzeigenklick zugeordnet.
 * **Live-Debug-Konsole für Admins:** Dezente Leiste am unteren Bildschirmrand mit Consent-Status (inkl. erkanntem Banner), gefeuerten Events, Event-IDs, CAPI-Antwort (⏳ → ✅ 200 OK) und verwendeten Match-Keys. Wird ausschließlich für eingeloggte Administratoren gerendert – reguläre Besucher erhalten kein einziges zusätzliches Byte.
 * **1-Klick Export & Import:** Komplette Konfiguration inkl. Event-Regeln als JSON exportieren und auf der nächsten Kundenwebsite importieren.
 * **Test-Code Auto-Expiry:** Der Meta Test Event Code deaktiviert sich nach 12 Stunden automatisch – kein versehentliches Test-Tracking im Live-Betrieb.
@@ -85,6 +85,15 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja. `uninstall.php` löscht alle Plugin-Optionen inklusive des gespeicherten Access Tokens.
 
 == Changelog ==
+
+= 0.5.5 =
+* Privacy-by-Default: Formular-Auto-Grabber und First-Touch-/UTM-Attribution sind bei Neuinstallation jetzt standardmäßig DEAKTIVIERT, da sie zusätzliche personenbezogene Daten verarbeiten (Formularinhalte bzw. Kampagnen-Cookie). Bestehende Installationen sind nicht betroffen, nur frische Installationen starten jetzt restriktiver. Die Live-Debug-Leiste bleibt aktiv (betrifft ausschließlich eingeloggte Administratoren).
+* Security-Audit über alle PHP-/JS-Dateien durchgeführt. Gehärtet:
+  * Explizite Längenbegrenzung aller POST-Felder im öffentlich erreichbaren Formular-Lead-Endpunkt (event_id, event_name, E-Mail, Telefon, source_url) sowie in LMPCT_CAPI::hash_email()/hash_phone() selbst – verhindert überdimensionierte Payloads, bevor Regex/Hashing/API-Call anfallen.
+  * Live-Debug-Leiste: JSON-Payload wird jetzt mit JSON_HEX_TAG kodiert, damit eine Sequenz wie "</script>" in einer (externen) Meta-Fehlermeldung das umgebende Inline-Skript nicht vom HTML-Parser vorzeitig beenden lassen kann.
+  * CAPI-Fehlermeldungen (rohe Antwort der Meta-API) werden vor der Protokollierung von HTML-Tags befreit.
+  * Cookie-Werte, die per base64_decode()/json_decode() geparst werden (mhcookie, Borlabs-Cookie, Attribution-Cookie), werden ab 8 KB ungeparst verworfen (fail-closed) statt beliebig groß dekodiert zu werden – serverseitig und im JS-Consent-Bootstrap.
+* Bestätigt (keine Änderung nötig): Alle Einstellungs-Speicherungen, AJAX-Endpunkte und der JSON-Import sind durchgehend mit Nonces und current_user_can('manage_options') abgesichert; der JSON-Import läuft bereits durch eine strikte Schlüssel-Whitelist (LMPCT_Settings::sanitize_settings()); alle Admin-Ausgaben sind mit esc_html/esc_attr/esc_url escaped; die Live-Debug-Leiste wird für nicht-eingeloggte Besucher serverseitig gar nicht erst registriert (0 Byte Overhead).
 
 = 0.5.4 =
 * UI-Refactoring: Tab „Erweitertes Tracking" nutzt jetzt dieselben aufklappbaren, blau akzentuierten Boxen wie die Plattformen im Tab „Allgemein". Formular-Auto-Grabber (Event-Typ, URL-Filter, Ausschluss-Filter) ist zu einer Box gebündelt, First-Touch/UTM-Weitergabe und Live-Debug-Leiste erhalten je eine eigene Box mit Master-Toggle.

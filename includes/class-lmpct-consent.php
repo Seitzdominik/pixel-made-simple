@@ -27,6 +27,15 @@ class LMPCT_Consent {
 	private static $cache = null;
 
 	/**
+	 * Obergrenze für Cookie-Werte, die per base64_decode()/json_decode()
+	 * geparst werden. Browser begrenzen einzelne Cookies auf ~4 KB; ein
+	 * nicht-Browser-Client kann aber beliebig lange Cookie-Header senden.
+	 * Alles darüber ist offensichtlich kein echtes Consent-Cookie und wird
+	 * ungeparst verworfen (fail-closed, siehe Aufrufer).
+	 */
+	const MAX_COOKIE_LEN = 8192;
+
+	/**
 	 * Ist die automatische Cookie-Banner-Erkennung aktiviert?
 	 *
 	 * @return bool
@@ -79,7 +88,8 @@ class LMPCT_Consent {
 		//    "Alle akzeptieren" setzt groups:["all"]. Zustimmung liegt vor, wenn
 		//    "all", "marketing" oder "advertisement" im groups-Array steht.
 		if ( ! empty( $_COOKIE['mhcookie'] ) ) {
-			$decoded = base64_decode( sanitize_text_field( wp_unslash( $_COOKIE['mhcookie'] ) ), true );
+			$raw     = sanitize_text_field( wp_unslash( $_COOKIE['mhcookie'] ) );
+			$decoded = strlen( $raw ) <= self::MAX_COOKIE_LEN ? base64_decode( $raw, true ) : false;
 			if ( false !== $decoded && '' !== $decoded ) {
 				$data = json_decode( $decoded, true );
 				if ( is_array( $data ) && ! empty( $data['groups'] ) && is_array( $data['groups'] ) ) {
@@ -119,7 +129,11 @@ class LMPCT_Consent {
 
 		// 6) Borlabs Cookie (JSON: consents -> marketing).
 		if ( isset( $_COOKIE['borlabs-cookie'] ) ) {
-			$data = json_decode( urldecode( self::cookie( 'borlabs-cookie' ) ), true );
+			$raw = self::cookie( 'borlabs-cookie' );
+			if ( strlen( $raw ) > self::MAX_COOKIE_LEN ) {
+				return false;
+			}
+			$data = json_decode( urldecode( $raw ), true );
 			return is_array( $data ) && ! empty( $data['consents']['marketing'] );
 		}
 
@@ -241,15 +255,17 @@ class LMPCT_Consent {
 		// STRIKT für CLI/Must Have Plugins: Nur advertisement/marketing=yes
 		// zählt; ein vorhandenes Kategorie-Cookie mit anderem Wert oder ein
 		// bloßes viewed_cookie_policy (= Banner bedient) blockiert.
-		return 'function lmpctHasConsent(){var c=document.cookie,m;'
+		// 8192 = derselbe Grenzwert wie serverseitig (self::MAX_COOKIE_LEN);
+		// verhindert unnötiges atob()/JSON.parse() auf überlangen Werten.
+		return 'function lmpctHasConsent(){var c=document.cookie,m,L=8192;'
 			. 'm=c.match(/(?:^|;\\s*)mhcookie=([^;]*)/);'
-			. 'if(m){try{var mh=JSON.parse(atob(decodeURIComponent(m[1])));'
+			. 'if(m){if(m[1].length>L)return false;try{var mh=JSON.parse(atob(decodeURIComponent(m[1])));'
 			. 'if(mh&&Array.isArray(mh.groups)){return mh.groups.indexOf("all")>-1||mh.groups.indexOf("marketing")>-1||mh.groups.indexOf("advertisement")>-1;}'
 			. 'return false;}catch(e){return false;}}'
 			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=yes')>-1||c.indexOf('cookielawinfo-checkbox-marketing=yes')>-1)return true;"
 			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=')>-1||c.indexOf('cookielawinfo-checkbox-marketing=')>-1)return false;"
 			. "m=c.match(/cookieyes-consent=([^;]*)/);if(m)return m[1].indexOf('advertisement:yes')>-1||m[1].indexOf('marketing:yes')>-1;"
-			. "m=c.match(/borlabs-cookie=([^;]*)/);if(m){try{var b=JSON.parse(decodeURIComponent(m[1]));return !!(b&&b.consents&&b.consents.marketing&&b.consents.marketing.length!==0);}catch(e){return false;}}"
+			. "m=c.match(/borlabs-cookie=([^;]*)/);if(m){if(m[1].length>L)return false;try{var b=JSON.parse(decodeURIComponent(m[1]));return !!(b&&b.consents&&b.consents.marketing&&b.consents.marketing.length!==0);}catch(e){return false;}}"
 			. "m=c.match(/cmplz_marketing=([^;]*)/);if(m)return m[1]==='allow';"
 			. "m=c.match(/complianz_consent_status=([^;]*)/);if(m)return m[1]==='allow';"
 			. "m=c.match(/CookieConsent=([^;]*)/);if(m)return decodeURIComponent(m[1]).indexOf('marketing:true')>-1;"

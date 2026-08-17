@@ -171,11 +171,18 @@ class LMPCT_CAPI {
 	 * @return array
 	 */
 	private static function log( array $events, $status, $code = 0, $message = '', array $match_keys = array() ) {
+		// $message stammt bei Fehlern aus der rohen HTTP-Antwort der Meta-API
+		// (externe, nicht kontrollierte Quelle) und wird u. a. serverseitig
+		// in der Live-Debug-Leiste sowie in der AJAX-Response an den Browser
+		// weitergereicht. Tags entfernen + kappen, bevor sie irgendwo landen.
+		$message = wp_strip_all_tags( (string) $message );
+		$message = substr( $message, 0, 300 );
+
 		$entry = array(
 			'events'     => $events,
 			'status'     => $status,
 			'code'       => $code,
-			'message'    => (string) substr( (string) $message, 0, 300 ),
+			'message'    => $message,
 			'match_keys' => $match_keys,
 		);
 
@@ -218,7 +225,10 @@ class LMPCT_CAPI {
 	 * @return string SHA-256-Hash oder leerer String.
 	 */
 	public static function hash_email( $email ) {
-		$email = strtolower( trim( (string) $email ) );
+		// Längenbegrenzung zuerst: diese Methode ist public und wird u. a. aus
+		// dem nopriv-AJAX-Endpunkt des Formular-Grabbers heraus mit Nutzereingaben
+		// aufgerufen. Gültige E-Mail-Adressen sind laut RFC ohnehin <= 254 Zeichen.
+		$email = strtolower( trim( substr( (string) $email, 0, 254 ) ) );
 
 		if ( '' === $email || ! is_email( $email ) ) {
 			return '';
@@ -235,7 +245,9 @@ class LMPCT_CAPI {
 	 * @return string SHA-256-Hash oder leerer String.
 	 */
 	public static function hash_phone( $phone ) {
-		$digits = preg_replace( '/\D+/', '', (string) $phone );
+		// Längenbegrenzung zuerst (siehe hash_email()); keine reale Telefonnummer
+		// ist länger als 32 Zeichen, selbst mit Formatierung.
+		$digits = preg_replace( '/\D+/', '', substr( (string) $phone, 0, 32 ) );
 
 		if ( '' === $digits ) {
 			return '';

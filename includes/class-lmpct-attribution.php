@@ -21,6 +21,13 @@ class LMPCT_Attribution {
 	const LIFETIME    = 2592000; // 30 Tage.
 
 	/**
+	 * Obergrenze für das Attribution-Cookie vor dem json_decode(). Das eigene
+	 * Cookie ist normalerweise <200 Bytes; alles jenseits von 8 KB kann kein
+	 * gültiger Inhalt sein (und stammt z. B. von einem manipulierten Client).
+	 */
+	const MAX_COOKIE_LEN = 8192;
+
+	/**
 	 * Unterstützte Parameter.
 	 *
 	 * @var string[]
@@ -206,7 +213,12 @@ class LMPCT_Attribution {
 			return array();
 		}
 
-		$raw  = (string) wp_unslash( $_COOKIE[ self::COOKIE_NAME ] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Wird direkt darunter validiert.
+		$raw = (string) wp_unslash( $_COOKIE[ self::COOKIE_NAME ] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Wird direkt darunter validiert.
+
+		if ( strlen( $raw ) > self::MAX_COOKIE_LEN ) {
+			return array();
+		}
+
 		$data = json_decode( $raw, true );
 
 		if ( ! is_array( $data ) ) {
