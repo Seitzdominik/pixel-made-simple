@@ -2,9 +2,9 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Lightweight Meta Pixel & CAPI Tracker 0.4.1\n"
+"Project-Id-Version: Lightweight Meta Pixel & CAPI Tracker 0.4.2\n"
 "Report-Msgid-Bugs-To: https://sdv.design\n"
-"POT-Creation-Date: 2026-08-17 05:14+0000\n"
+"POT-Creation-Date: 2026-08-17 05:50+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"

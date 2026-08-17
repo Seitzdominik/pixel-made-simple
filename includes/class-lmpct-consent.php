@@ -72,7 +72,26 @@ class LMPCT_Consent {
 			return (bool) wp_has_consent( 'marketing' );
 		}
 
-		// 2) Must Have Plugins Cookie Bar / GDPR Cookie Consent (Cookie Law Info).
+		// 2) Must Have Plugins Cookie Bar: Base64-kodiertes JSON-Cookie "mhcookie".
+		//    Zustimmung, wenn die Marketing-/Advertisement-Gruppe enthalten und
+		//    nicht explizit abgelehnt ist. Vorhandenes Cookie ohne Marketing-
+		//    Gruppe = Entscheidung ohne Einwilligung -> blockieren.
+		if ( ! empty( $_COOKIE['mhcookie'] ) ) {
+			$decoded = base64_decode( sanitize_text_field( wp_unslash( $_COOKIE['mhcookie'] ) ), true );
+			if ( false !== $decoded && '' !== $decoded ) {
+				$data = json_decode( $decoded, true );
+				if ( is_array( $data ) ) {
+					// Explizit abgelehnte Kategorie zählt NICHT als Zustimmung.
+					if ( preg_match( '/"(marketing|advertisement)"\s*:\s*(false|0|"(?:no|denied|false|0)")/i', $decoded ) ) {
+						return false;
+					}
+					return ( false !== stripos( $decoded, 'marketing' ) || false !== stripos( $decoded, 'advertisement' ) );
+				}
+			}
+			return false; // mhcookie existiert, enthält aber kein Marketing -> blockieren.
+		}
+
+		// 3) GDPR Cookie Consent (Cookie Law Info).
 		//    STRIKT: Nur die Advertisement-/Marketing-Kategorie zählt als
 		//    Zustimmung. viewed_cookie_policy wird bei JEDER Interaktion gesetzt
 		//    (auch bei "Nur erforderliche akzeptieren") und ist daher KEINE
@@ -84,25 +103,25 @@ class LMPCT_Consent {
 			return 'yes' === self::cookie( 'cookielawinfo-checkbox-marketing' );
 		}
 
-		// 3) CookieYes.
+		// 4) CookieYes.
 		if ( isset( $_COOKIE['cookieyes-consent'] ) ) {
 			$value = self::cookie( 'cookieyes-consent' );
 			return false !== strpos( $value, 'advertisement:yes' ) || false !== strpos( $value, 'marketing:yes' );
 		}
 
-		// 4) Cookie Law Info: Banner wurde bedient, aber es existiert keine
-		//    erteilte Marketing-Kategorie (siehe 2) -> blockieren.
+		// 5) Cookie Law Info: Banner wurde bedient, aber es existiert keine
+		//    erteilte Marketing-Kategorie (siehe 3) -> blockieren.
 		if ( isset( $_COOKIE['viewed_cookie_policy'] ) ) {
 			return false;
 		}
 
-		// 5) Borlabs Cookie (JSON: consents -> marketing).
+		// 6) Borlabs Cookie (JSON: consents -> marketing).
 		if ( isset( $_COOKIE['borlabs-cookie'] ) ) {
 			$data = json_decode( urldecode( self::cookie( 'borlabs-cookie' ) ), true );
 			return is_array( $data ) && ! empty( $data['consents']['marketing'] );
 		}
 
-		// 6) Complianz.
+		// 7) Complianz.
 		if ( isset( $_COOKIE['cmplz_marketing'] ) ) {
 			return 'allow' === self::cookie( 'cmplz_marketing' );
 		}
@@ -110,17 +129,17 @@ class LMPCT_Consent {
 			return 'allow' === self::cookie( 'complianz_consent_status' );
 		}
 
-		// 7) Cookiebot.
+		// 8) Cookiebot.
 		if ( isset( $_COOKIE['CookieConsent'] ) ) {
 			return false !== strpos( urldecode( self::cookie( 'CookieConsent' ) ), 'marketing:true' );
 		}
 
-		// 8) SureCookies.
+		// 9) SureCookies.
 		if ( isset( $_COOKIE['surecookies_consent'] ) ) {
 			return (bool) preg_match( '/marketing[^,;}]*?(true|yes|1)/i', urldecode( self::cookie( 'surecookies_consent' ) ) );
 		}
 
-		// 9) Real Cookie Banner (Cookie-Name trägt eine Blog-ID als Suffix).
+		// 10) Real Cookie Banner (Cookie-Name trägt eine Blog-ID als Suffix).
 		//    Vorhandenes Cookie = Besucher hat eine Entscheidung getroffen;
 		//    die Kategorie-Auswertung übernimmt RCB über die WP Consent API (Fall 1).
 		foreach ( array_keys( $_COOKIE ) as $name ) {
@@ -129,7 +148,7 @@ class LMPCT_Consent {
 			}
 		}
 
-		// 10) Kein Consent-Cookie vorhanden: Ist überhaupt ein bekanntes
+		// 11) Kein Consent-Cookie vorhanden: Ist überhaupt ein bekanntes
 		//     Banner-Plugin aktiv? Wenn ja, wurde noch nicht eingewilligt.
 		if ( self::banner_plugin_active() ) {
 			return false;
@@ -182,6 +201,10 @@ class LMPCT_Consent {
 		// zählt; ein vorhandenes Kategorie-Cookie mit anderem Wert oder ein
 		// bloßes viewed_cookie_policy (= Banner bedient) blockiert.
 		return 'function lmpctHasConsent(){var c=document.cookie,m;'
+			. 'm=c.match(/(?:^|;\\s*)mhcookie=([^;]*)/);'
+			. 'if(m){try{var mh=atob(decodeURIComponent(m[1]));'
+			. 'if(/"(marketing|advertisement)"\\s*:\\s*(false|0|"(?:no|denied|false|0)")/i.test(mh))return false;'
+			. 'return /marketing|advertisement/i.test(mh);}catch(e){return false;}}'
 			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=yes')>-1||c.indexOf('cookielawinfo-checkbox-marketing=yes')>-1)return true;"
 			. "if(c.indexOf('cookielawinfo-checkbox-advertisement=')>-1||c.indexOf('cookielawinfo-checkbox-marketing=')>-1)return false;"
 			. "m=c.match(/cookieyes-consent=([^;]*)/);if(m)return m[1].indexOf('advertisement:yes')>-1||m[1].indexOf('marketing:yes')>-1;"

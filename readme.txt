@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.4.1
+Stable tag: 0.4.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,9 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja. `uninstall.php` löscht alle Plugin-Optionen inklusive des gespeicherten Access Tokens.
 
 == Changelog ==
+
+= 0.4.2 =
+* Bugfix (kritisch): Must Have Plugins Cookie Bar / GDPR Cookie Consent speichert die Entscheidung tatsächlich in einem Base64-kodierten JSON-Cookie namens "mhcookie", nicht in cookielawinfo-checkbox-*. Die Erkennung liest jetzt korrekt aus mhcookie (serverseitig und im JS-Bootstrap); explizit abgelehnte Marketing-/Advertisement-Kategorien blockieren weiterhin zuverlässig.
 
 = 0.4.1 =
 * Bugfix (kritisch): Strikte Consent-Prüfung für Must Have Plugins / GDPR Cookie Consent – „Nur erforderliche akzeptieren" (viewed_cookie_policy ohne Marketing-Kategorie) blockiert jetzt korrekt, serverseitig und im JS-Bootstrap. Zusätzlich wird cookielawinfo-checkbox-marketing unterstützt.
