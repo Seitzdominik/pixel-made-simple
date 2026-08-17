@@ -3,7 +3,7 @@
  * Plugin Name:       Lightweight Meta Pixel & CAPI Tracker
  * Plugin URI:        https://sdv.design
  * Description:       Lightweight, high-performance tracking for Meta Pixel & Conversions API, Google Ads (Consent Mode v2) and TikTok Pixel – with URL-based multi-platform events and clean event deduplication.
- * Version:           0.4.3
+ * Version:           0.5.0
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LMPCT_VERSION', '0.4.3' );
+define( 'LMPCT_VERSION', '0.5.0' );
 define( 'LMPCT_PLUGIN_FILE', __FILE__ );
 define( 'LMPCT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LMPCT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -52,12 +52,25 @@ add_action( 'init', 'lmpct_load_textdomain' );
 
 require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-settings.php';
 require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-consent.php';
+require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-attribution.php';
 require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-capi.php';
 require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-frontend.php';
+require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-forms.php';
+require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-debug.php';
+require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-tools.php';
 
 if ( is_admin() ) {
 	require_once LMPCT_PLUGIN_DIR . 'includes/class-lmpct-admin.php';
 	LMPCT_Admin::init();
 }
 
+LMPCT_Attribution::init();
 LMPCT_Frontend::init();
+LMPCT_Forms::init();
+LMPCT_Tools::init();
+
+// Die Live-Debug-Leiste registriert sich erst, wenn ein Administrator im
+// Frontend unterwegs ist – reguläre Besucher erzeugen keinerlei Overhead.
+// Priorität 5: muss vor LMPCT_Frontend::prepare() (20) laufen, damit der
+// CAPI-Request für echte Statuscodes blockierend gesendet wird.
+add_action( 'wp', array( 'LMPCT_Debug', 'init' ), 5 );

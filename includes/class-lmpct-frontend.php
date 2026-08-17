@@ -40,9 +40,67 @@ class LMPCT_Frontend {
 	 */
 	private static $settings = array();
 
+	/**
+	 * Grund, warum auf diesem Request nicht getrackt wird (für die Debug-Leiste).
+	 *
+	 * @var string
+	 */
+	private static $skip_reason = '';
+
 	public static function init() {
 		add_action( 'wp', array( __CLASS__, 'prepare' ), 20 );
 		add_action( 'wp_head', array( __CLASS__, 'print_scripts' ), 4 );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_frontend' ) );
+	}
+
+	/**
+	 * Läuft auf diesem Request Tracking?
+	 *
+	 * @return bool
+	 */
+	public static function is_active() {
+		return self::$active;
+	}
+
+	/**
+	 * Auf dieser Seite gematchte Events inkl. Event-IDs.
+	 *
+	 * @return array[]
+	 */
+	public static function get_matched_events() {
+		return self::$matched_events;
+	}
+
+	/**
+	 * Grund für übersprungenes Tracking.
+	 *
+	 * @return string
+	 */
+	public static function get_skip_reason() {
+		return self::$skip_reason;
+	}
+
+	/**
+	 * Formular-Auto-Grabber im Footer laden (nur wenn aktiv und getrackt wird).
+	 *
+	 * @return void
+	 */
+	public static function enqueue_frontend() {
+		if ( ! self::$active || ! class_exists( 'LMPCT_Forms' ) || ! LMPCT_Forms::enabled() ) {
+			return;
+		}
+
+		wp_enqueue_script( 'lmpct-frontend', LMPCT_PLUGIN_URL . 'assets/frontend.js', array(), LMPCT_VERSION, true );
+
+		wp_localize_script(
+			'lmpct-frontend',
+			'lmpctFront',
+			array(
+				'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+				'nonce'        => wp_create_nonce( LMPCT_Forms::NONCE_ACTION ),
+				'formTracking' => true,
+			)
+		);
 	}
 
 	/**
@@ -88,15 +146,20 @@ class LMPCT_Frontend {
 	 * @return bool
 	 */
 	public static function should_track() {
+		self::$skip_reason = '';
+
 		if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
+			self::$skip_reason = 'context';
 			return false;
 		}
 
 		if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+			self::$skip_reason = 'context';
 			return false;
 		}
 
 		if ( is_feed() || is_robots() || is_preview() || is_customize_preview() || is_404() ) {
+			self::$skip_reason = 'context';
 			return false;
 		}
 
@@ -108,10 +171,12 @@ class LMPCT_Frontend {
 			( ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) );
 
 		if ( ! $any_platform ) {
+			self::$skip_reason = 'no_platform';
 			return false;
 		}
 
 		if ( ! empty( $settings['exclude_admins'] ) && current_user_can( 'manage_options' ) ) {
+			self::$skip_reason = 'admin_excluded';
 			return false;
 		}
 
@@ -122,7 +187,13 @@ class LMPCT_Frontend {
 		 *
 		 * @param bool $allow Ob getrackt werden darf.
 		 */
-		return (bool) apply_filters( 'lmpct_allow_tracking', true );
+		$allowed = (bool) apply_filters( 'lmpct_allow_tracking', true );
+
+		if ( ! $allowed ) {
+			self::$skip_reason = 'filtered';
+		}
+
+		return $allowed;
 	}
 
 	private static function meta_active() {
@@ -416,6 +487,8 @@ class LMPCT_Frontend {
 		// surecookies_consent_updated) kurz nach dem Laden erneut feuern.
 		return '(function(){window.lmpctInitialized=window.lmpctInitialized||false;'
 			. LMPCT_Consent::consent_check_js()
+			// Für den Formular-Auto-Grabber global verfügbar machen.
+			. 'window.lmpctHasConsent=lmpctHasConsent;'
 			. 'function lmpctInitTracking(){if(window.lmpctInitialized){return;}window.lmpctInitialized=true;' . "\n" . $deferred_js . '}'
 			. 'if(lmpctHasConsent()){lmpctInitTracking();}'
 			. 'var lmpctEvts=' . $events_json . ';'

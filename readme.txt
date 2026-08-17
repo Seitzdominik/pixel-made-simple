@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.4.3
+Stable tag: 0.5.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,10 @@ Ein bewusst minimalistischer Ersatz für überladene Tracking-Plugins wie PixelY
 * **Conversions API fire-and-forget:** Serverseitiger Versand via `wp_remote_post()` nicht-blockierend – kein Einfluss auf die Ladezeit. user_data mit Client-IP, User-Agent, `_fbp`/`_fbc` (Fallback aus `fbclid`), optional SHA-256-gehashte E-Mail eingeloggter Nutzer.
 * **Google Consent Mode v2:** Setzt auf Wunsch `ad_storage`, `ad_user_data`, `ad_personalization` und `analytics_storage` vor dem Tag-Laden auf `denied` – dein Consent-Banner sendet das Update.
 * **Intelligente Cookie-Consent-Erkennung (DSGVO):** Erkennt installierte Cookie-Banner automatisch (Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies, WP Consent API) und blockiert Browser- und CAPI-Events bis zur Marketing-Einwilligung. Nach dem Klick auf „Akzeptieren" startet das Tracking sofort ohne Seiten-Reload. Websites ohne Banner werden niemals blockiert.
+* **Formular-Auto-Grabber (Zero-Config Lead-Tracking):** Erkennt Formular-Absendungen automatisch (Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und native HTML-Formulare) und feuert „Lead" im Browser und via CAPI mit identischer Event-ID. E-Mail und Telefonnummer werden SHA-256-gehasht übergeben – für maximalen Match-Score ohne Klartext-Datenweitergabe.
+* **First-Touch- & UTM-Attribution:** Speichert utm_source, utm_medium, utm_campaign, utm_content, utm_term und fbclid beim Erstbesuch 30 Tage in einem First-Party-Cookie und sendet sie bei jedem Server-Event als `custom_data` mit. Die fbclid wird ins `fbc`-Format übersetzt – Conversions bleiben auch Tage nach dem Anzeigenklick zugeordnet.
+* **Live-Debug-Konsole für Admins:** Dezente Leiste am unteren Bildschirmrand mit Consent-Status (inkl. erkanntem Banner), gefeuerten Events, Event-IDs, CAPI-Antwort (⏳ → ✅ 200 OK) und verwendeten Match-Keys. Wird ausschließlich für eingeloggte Administratoren gerendert – reguläre Besucher erhalten kein einziges zusätzliches Byte.
+* **1-Klick Export & Import:** Komplette Konfiguration inkl. Event-Regeln als JSON exportieren und auf der nächsten Kundenwebsite importieren.
 * **Test-Code Auto-Expiry:** Der Meta Test Event Code deaktiviert sich nach 12 Stunden automatisch – kein versehentliches Test-Tracking im Live-Betrieb.
 * **Komfort:** Toggles speichern sofort per AJAX (nonce-gesichert, mit dezenter Bestätigung); das Einfügen eines CAPI-Tokens aktiviert die Conversions API automatisch.
 * **Sicherheit:** Nonces, Capability-Checks (`manage_options`), konsequente Sanitization/Escaping, CAPI-Token nur serverseitig.
@@ -81,6 +85,14 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja. `uninstall.php` löscht alle Plugin-Optionen inklusive des gespeicherten Access Tokens.
 
 == Changelog ==
+
+= 0.5.0 =
+* Neu (Feature 1): Formular-Auto-Grabber – erkennt Absendungen von Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und nativen HTML-Formularen, feuert „Lead" im Browser und via CAPI mit identischer Event-ID und übergibt E-Mail/Telefon SHA-256-gehasht.
+* Neu (Feature 2): First-Touch- & UTM-Attribution im First-Party-Cookie `lmpct_attribution` (30 Tage) – UTM-Werte landen als `custom_data` im CAPI-Payload, eine gespeicherte fbclid wird ins `fbc`-Format übersetzt.
+* Neu (Feature 3): Live-Debug-Konsole für Administratoren mit Consent-Status, Event-Stream, Event-IDs, CAPI-Statuscodes und Match-Keys – nur für `manage_options`, sonst 0 Byte Overhead.
+* Neu (Feature 4): 1-Klick-Export und -Import der kompletten Konfiguration als JSON (nonce- und rechtegesichert, vollständig sanitized).
+* Admin-Oberfläche in vier Tabs gegliedert: Allgemein, URL-Events, Erweitertes Tracking, Werkzeuge.
+* Neue Filter: `lmpct_normalize_phone` (Telefon-Normalisierung vor dem Hashing).
 
 = 0.4.3 =
 * Bugfix (kritisch): Reale Cookie-Struktur von Must Have Plugins berücksichtigt. Das mhcookie speichert die Kategorien als Array unter "groups" (z. B. {"groups":["all"]} bei „Alle akzeptieren"), nicht als Marketing-/Advertisement-Schlüssel. Dadurch wurde volle Zustimmung bisher fälschlich blockiert. Die Erkennung prüft jetzt korrekt, ob "all", "marketing" oder "advertisement" im groups-Array enthalten ist – serverseitig und im JS-Bootstrap, verifiziert mit einem echten Live-Cookie.

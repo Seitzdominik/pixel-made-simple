@@ -103,6 +103,10 @@ class LMPCT_Settings {
 			// TikTok.
 			'tiktok_enabled'      => 0,
 			'tiktok_pixel_id'     => '',
+			// Erweiterte Tracking-Features.
+			'form_tracking'       => 1,
+			'utm_passthrough'     => 1,
+			'debug_bar'           => 1,
 		);
 
 		$settings = get_option( self::OPTION_SETTINGS, array() );
@@ -147,6 +151,9 @@ class LMPCT_Settings {
 			'google_consent_mode'  => empty( $input['google_consent_mode'] ) ? 0 : 1,
 			'tiktok_enabled'       => empty( $input['tiktok_enabled'] ) ? 0 : 1,
 			'tiktok_pixel_id'      => preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['tiktok_pixel_id'] ?? '' ) ),
+			'form_tracking'        => empty( $input['form_tracking'] ) ? 0 : 1,
+			'utm_passthrough'      => empty( $input['utm_passthrough'] ) ? 0 : 1,
+			'debug_bar'            => empty( $input['debug_bar'] ) ? 0 : 1,
 		);
 	}
 

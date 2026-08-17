@@ -161,6 +161,45 @@ class LMPCT_Consent {
 	}
 
 	/**
+	 * Name des erkannten Cookie-Banners (für die Live-Debug-Leiste).
+	 *
+	 * @return string Leerer String, wenn keines erkannt wurde.
+	 */
+	public static function detected_banner() {
+		if ( isset( $_COOKIE['mhcookie'] ) || defined( 'CLI_VERSION' ) ) {
+			return 'Must Have Plugins / Cookie Law Info';
+		}
+		if ( isset( $_COOKIE['borlabs-cookie'] ) || defined( 'BORLABS_COOKIE_VERSION' ) ) {
+			return 'Borlabs Cookie';
+		}
+		if ( isset( $_COOKIE['cmplz_marketing'] ) || isset( $_COOKIE['complianz_consent_status'] ) || defined( 'cmplz_version' ) ) {
+			return 'Complianz';
+		}
+		if ( isset( $_COOKIE['cookieyes-consent'] ) || defined( 'CKY_VERSION' ) ) {
+			return 'CookieYes';
+		}
+		if ( isset( $_COOKIE['CookieConsent'] ) || class_exists( 'Cookiebot_WP' ) ) {
+			return 'Cookiebot';
+		}
+		if ( isset( $_COOKIE['surecookies_consent'] ) || defined( 'SURECOOKIES_VER' ) ) {
+			return 'SureCookies';
+		}
+		if ( defined( 'RCB_FILE' ) || class_exists( '\DevOwl\RealCookieBanner\Core' ) ) {
+			return 'Real Cookie Banner';
+		}
+		foreach ( array_keys( $_COOKIE ) as $name ) {
+			if ( 0 === strpos( (string) $name, 'real_cookie_banner' ) ) {
+				return 'Real Cookie Banner';
+			}
+		}
+		if ( function_exists( 'wp_has_consent' ) ) {
+			return 'WP Consent API';
+		}
+
+		return '';
+	}
+
+	/**
 	 * Prüft anhand von Plugin-Signaturen (Konstanten/Klassen), ob ein
 	 * bekanntes Cookie-Banner-Plugin aktiv ist.
 	 *

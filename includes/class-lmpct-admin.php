@@ -135,6 +135,9 @@ class LMPCT_Admin {
 			'google_enabled',
 			'google_consent_mode',
 			'tiktok_enabled',
+			'form_tracking',
+			'utm_passthrough',
+			'debug_bar',
 		);
 
 		$key = sanitize_key( wp_unslash( $_POST['key'] ?? '' ) );
@@ -170,6 +173,9 @@ class LMPCT_Admin {
 			'no_platform'    => array( 'error', __( 'Please enable at least one platform for this event.', 'lightweight-meta-pixel-capi-tracker' ) ),
 			'missing_label'  => array( 'error', __( 'Google Ads is enabled for this event but the conversion label is missing.', 'lightweight-meta-pixel-capi-tracker' ) ),
 			'not_found'      => array( 'error', __( 'The event could not be found.', 'lightweight-meta-pixel-capi-tracker' ) ),
+			'imported'       => array( 'success', __( 'Configuration imported successfully.', 'lightweight-meta-pixel-capi-tracker' ) ),
+			'import_invalid' => array( 'error', __( 'The file could not be imported. Please upload a valid export of this plugin.', 'lightweight-meta-pixel-capi-tracker' ) ),
+			'import_missing' => array( 'error', __( 'Please choose a JSON file to import.', 'lightweight-meta-pixel-capi-tracker' ) ),
 		);
 
 		$key = sanitize_key( wp_unslash( $_GET['lmpct_message'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -281,9 +287,19 @@ class LMPCT_Admin {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'lightweight-meta-pixel-capi-tracker' ) );
 		}
 
+		$tabs = array(
+			'general'  => __( 'General', 'lightweight-meta-pixel-capi-tracker' ),
+			'events'   => __( 'URL Events', 'lightweight-meta-pixel-capi-tracker' ),
+			'advanced' => __( 'Advanced Tracking', 'lightweight-meta-pixel-capi-tracker' ),
+			'tools'    => __( 'Tools', 'lightweight-meta-pixel-capi-tracker' ),
+		);
+
 		$active_tab = 'general';
-		if ( isset( $_GET['tab'] ) && 'events' === $_GET['tab'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nur Tab-Navigation.
-			$active_tab = 'events';
+		if ( isset( $_GET['tab'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nur Tab-Navigation.
+			$requested = sanitize_key( wp_unslash( $_GET['tab'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( isset( $tabs[ $requested ] ) ) {
+				$active_tab = $requested;
+			}
 		}
 
 		$base_url = admin_url( 'admin.php?page=' . self::PAGE_SLUG );
@@ -293,23 +309,154 @@ class LMPCT_Admin {
 			<hr class="wp-header-end" />
 
 			<nav class="nav-tab-wrapper" aria-label="<?php esc_attr_e( 'Plugin tabs', 'lightweight-meta-pixel-capi-tracker' ); ?>">
-				<a href="<?php echo esc_url( $base_url ); ?>" class="nav-tab <?php echo 'general' === $active_tab ? 'nav-tab-active' : ''; ?>">
-					<?php esc_html_e( 'General Settings & Platforms', 'lightweight-meta-pixel-capi-tracker' ); ?>
-				</a>
-				<a href="<?php echo esc_url( add_query_arg( 'tab', 'events', $base_url ) ); ?>" class="nav-tab <?php echo 'events' === $active_tab ? 'nav-tab-active' : ''; ?>">
-					<?php esc_html_e( 'Manage Events', 'lightweight-meta-pixel-capi-tracker' ); ?>
-				</a>
+				<?php foreach ( $tabs as $slug => $label ) : ?>
+					<a href="<?php echo esc_url( 'general' === $slug ? $base_url : add_query_arg( 'tab', $slug, $base_url ) ); ?>"
+						class="nav-tab <?php echo $slug === $active_tab ? 'nav-tab-active' : ''; ?>">
+						<?php echo esc_html( $label ); ?>
+					</a>
+				<?php endforeach; ?>
 			</nav>
 
 			<?php
-			if ( 'events' === $active_tab ) {
-				self::render_events_tab();
-			} else {
-				self::render_general_tab();
+			switch ( $active_tab ) {
+				case 'events':
+					self::render_events_tab();
+					break;
+				case 'advanced':
+					self::render_advanced_tab();
+					break;
+				case 'tools':
+					self::render_tools_tab();
+					break;
+				default:
+					self::render_general_tab();
 			}
 			?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Tab 3: Erweiterte Tracking-Features.
+	 *
+	 * @return void
+	 */
+	private static function render_advanced_tab() {
+		$s = LMPCT_Settings::get();
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>">
+			<?php settings_fields( 'lmpct_settings_group' ); ?>
+			<?php self::preserve_hidden_settings( $s, array( 'form_tracking', 'utm_passthrough', 'debug_bar' ) ); ?>
+
+			<h2 class="lmpct-section-title"><?php esc_html_e( 'Advanced Tracking Features', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
+
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row">
+						<?php esc_html_e( 'Automatic form lead tracking', 'lightweight-meta-pixel-capi-tracker' ); ?>
+						<?php self::tip( __( 'Supports Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms and plain HTML forms.', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+					</th>
+					<td>
+						<?php self::toggle( 'lmpct_settings[form_tracking]', ! empty( $s['form_tracking'] ), __( 'Enable automatic form lead tracking', 'lightweight-meta-pixel-capi-tracker' ), false, 'form_tracking' ); ?>
+						<p class="description"><?php esc_html_e( 'Detects form submissions automatically and fires the “Lead” event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">
+						<?php esc_html_e( 'First-touch & UTM passthrough', 'lightweight-meta-pixel-capi-tracker' ); ?>
+						<?php self::tip( __( 'Stores utm_source, utm_medium, utm_campaign, utm_content, utm_term and fbclid in a first-party cookie for 30 days.', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+					</th>
+					<td>
+						<?php self::toggle( 'lmpct_settings[utm_passthrough]', ! empty( $s['utm_passthrough'] ), __( 'Enable UTM passthrough', 'lightweight-meta-pixel-capi-tracker' ), false, 'utm_passthrough' ); ?>
+						<p class="description"><?php esc_html_e( 'Saves campaign parameters on the first visit and sends them along with every server-side event as custom_data. A stored fbclid is converted into the fbc format so conversions stay attributed even days after the ad click.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Admin live debug bar', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
+					<td>
+						<?php self::toggle( 'lmpct_settings[debug_bar]', ! empty( $s['debug_bar'] ), __( 'Show live debug bar in the frontend', 'lightweight-meta-pixel-capi-tracker' ), false, 'debug_bar' ); ?>
+						<p class="description"><?php esc_html_e( 'Shows a small bar at the bottom of the frontend with consent status, fired events, event IDs, CAPI response and match keys. Rendered exclusively for logged-in administrators – regular visitors get zero additional bytes.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+					</td>
+				</tr>
+			</table>
+
+			<?php submit_button( __( 'Save Settings', 'lightweight-meta-pixel-capi-tracker' ) ); ?>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Tab 4: Werkzeuge (Export/Import).
+	 *
+	 * @return void
+	 */
+	private static function render_tools_tab() {
+		$admin_post = admin_url( 'admin-post.php' );
+		?>
+		<h2 class="lmpct-section-title"><?php esc_html_e( 'Export & Import', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
+
+		<div class="lmpct-card">
+			<h2><?php esc_html_e( 'Export configuration', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
+			<div class="lmpct-card-body">
+				<p><?php esc_html_e( 'Downloads all settings, platform IDs and event rules as a JSON file – ideal for rolling out a proven setup to another site.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+				<p class="description"><strong><?php esc_html_e( 'Note:', 'lightweight-meta-pixel-capi-tracker' ); ?></strong> <?php esc_html_e( 'The export contains your CAPI access token in plain text. Store the file securely and never share it publicly.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+				<form method="post" action="<?php echo esc_url( $admin_post ); ?>">
+					<input type="hidden" name="action" value="lmpct_export_settings" />
+					<?php wp_nonce_field( 'lmpct_export_settings' ); ?>
+					<p>
+						<button type="submit" class="button button-primary">
+							<span class="dashicons dashicons-download" aria-hidden="true"></span>
+							<?php esc_html_e( 'Export configuration', 'lightweight-meta-pixel-capi-tracker' ); ?>
+						</button>
+					</p>
+				</form>
+			</div>
+		</div>
+
+		<div class="lmpct-card">
+			<h2><?php esc_html_e( 'Import configuration', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
+			<div class="lmpct-card-body">
+				<p><?php esc_html_e( 'Upload a previously exported JSON file. All values are validated and sanitised before they are saved.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+				<p class="description"><strong><?php esc_html_e( 'Note:', 'lightweight-meta-pixel-capi-tracker' ); ?></strong> <?php esc_html_e( 'The import overwrites the current settings and all event rules.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+				<form method="post" action="<?php echo esc_url( $admin_post ); ?>" enctype="multipart/form-data">
+					<input type="hidden" name="action" value="lmpct_import_settings" />
+					<?php wp_nonce_field( 'lmpct_import_settings' ); ?>
+					<p>
+						<input type="file" name="lmpct_import_file" accept="application/json,.json" required />
+					</p>
+					<p>
+						<button type="submit" class="button lmpct-delete-button"
+							data-lmpct-confirm="<?php esc_attr_e( 'Really import? The current settings and event rules will be overwritten.', 'lightweight-meta-pixel-capi-tracker' ); ?>">
+							<span class="dashicons dashicons-upload" aria-hidden="true"></span>
+							<?php esc_html_e( 'Import configuration', 'lightweight-meta-pixel-capi-tracker' ); ?>
+						</button>
+					</p>
+				</form>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Einstellungen, die auf dem aktuellen Tab kein Feld haben, als Hidden-Felder
+	 * mitschicken. Ohne das würde die Settings-API sie beim Speichern leeren,
+	 * weil sanitize_settings() immer den vollständigen Datensatz aufbaut.
+	 *
+	 * @param array    $settings Aktuelle Einstellungen.
+	 * @param string[] $skip     Schlüssel, die auf diesem Tab ein eigenes Feld haben.
+	 * @return void
+	 */
+	private static function preserve_hidden_settings( array $settings, array $skip ) {
+		foreach ( $settings as $key => $value ) {
+			if ( in_array( $key, $skip, true ) || is_array( $value ) ) {
+				continue;
+			}
+			printf(
+				'<input type="hidden" name="%1$s" value="%2$s" />',
+				esc_attr( LMPCT_Settings::OPTION_SETTINGS . '[' . $key . ']' ),
+				esc_attr( (string) $value )
+			);
+		}
 	}
 
 	/**
@@ -382,6 +529,29 @@ class LMPCT_Admin {
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>">
 			<?php settings_fields( 'lmpct_settings_group' ); ?>
+			<?php
+			// Einstellungen der anderen Tabs erhalten (sonst würden sie beim
+			// Speichern dieses Formulars zurückgesetzt).
+			self::preserve_hidden_settings(
+				$s,
+				array(
+					'exclude_admins',
+					'consent_detection',
+					'pixel_enabled',
+					'pixel_id',
+					'capi_enabled',
+					'capi_token',
+					'test_event_code',
+					'test_code_created_at',
+					'hash_email',
+					'google_enabled',
+					'google_tag_id',
+					'google_consent_mode',
+					'tiktok_enabled',
+					'tiktok_pixel_id',
+				)
+			);
+			?>
 
 			<h2 class="lmpct-section-title"><?php esc_html_e( 'Global Options', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
 			<table class="form-table" role="presentation">

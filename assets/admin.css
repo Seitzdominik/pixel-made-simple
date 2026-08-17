@@ -380,6 +380,18 @@
 	padding: 4px 20px 16px;
 }
 
+/* Buttons mit Dashicon (Tools-Tab) */
+.lmpct-card .button .dashicons {
+	margin: 3px 4px 0 -2px;
+	font-size: 17px;
+	width: 17px;
+	height: 17px;
+}
+
+.lmpct-card input[type="file"] {
+	max-width: 100%;
+}
+
 .lmpct-version-badge {
 	display: inline-block;
 	margin-left: 8px;
