@@ -356,6 +356,8 @@ class LMPCT_Admin {
 
 			<h2 class="lmpct-section-title"><?php esc_html_e( 'Advanced Tracking Features', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
 
+			<?php self::render_conflict_notice(); ?>
+
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row">
@@ -365,6 +367,7 @@ class LMPCT_Admin {
 					<td>
 						<?php self::toggle( 'lmpct_settings[form_tracking]', ! empty( $s['form_tracking'] ), __( 'Enable automatic form lead tracking', 'lightweight-meta-pixel-capi-tracker' ), false, 'form_tracking' ); ?>
 						<p class="description"><?php esc_html_e( 'Detects form submissions automatically and fires the configured event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+						<p class="description"><?php esc_html_e( 'The event fires the moment the submit button is clicked. If your page redirects to a separate thank-you page after submitting, set up tracking via the “URL Events” tab instead.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -470,6 +473,100 @@ class LMPCT_Admin {
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Sanity-Check: Läuft für denselben Pfad sowohl eine URL-Event-Regel als
+	 * auch das automatische Formular-Tracking mit demselben Event-Namen?
+	 *
+	 * Geprüft wird nur bei ausdrücklich gesetztem URL-Filter – ein leerer
+	 * Filter (websiteweit) ist kein Konflikt, solange das Formular nicht auf
+	 * eine Danke-Seite weiterleitet.
+	 *
+	 * @return string[] Betroffene Pfade.
+	 */
+	public static function detect_form_url_conflicts() {
+		$settings = LMPCT_Settings::get();
+
+		if ( empty( $settings['form_tracking'] ) || ! LMPCT_Settings::events_enabled() ) {
+			return array();
+		}
+
+		$filters = LMPCT_Settings::form_url_filters();
+
+		if ( empty( $filters ) ) {
+			return array();
+		}
+
+		$form_event = LMPCT_Settings::form_event_type();
+		$conflicts  = array();
+
+		foreach ( LMPCT_Settings::get_events() as $event ) {
+			if ( empty( $event['active'] ) || empty( $event['meta_enabled'] ) ) {
+				continue;
+			}
+
+			if ( LMPCT_Settings::resolved_event_name( $event ) !== $form_event ) {
+				continue;
+			}
+
+			$rule = self::normalize_for_compare( $event['match_value'] );
+
+			if ( '' === $rule ) {
+				continue;
+			}
+
+			foreach ( $filters as $filter ) {
+				$needle = self::normalize_for_compare( $filter );
+
+				if ( '' === $needle ) {
+					continue;
+				}
+
+				if ( $rule === $needle || false !== strpos( $rule, $needle ) || false !== strpos( $needle, $rule ) ) {
+					$conflicts[] = $event['match_value'];
+					break;
+				}
+			}
+		}
+
+		return array_values( array_unique( $conflicts ) );
+	}
+
+	/**
+	 * Pfad für den Vergleich vereinheitlichen (klein, ohne Slashes am Rand).
+	 *
+	 * @param string $path Pfad.
+	 * @return string
+	 */
+	private static function normalize_for_compare( $path ) {
+		return trim( strtolower( trim( (string) $path ) ), '/' );
+	}
+
+	/**
+	 * Warnhinweis bei erkannter Doppelzählung ausgeben.
+	 *
+	 * @return void
+	 */
+	private static function render_conflict_notice() {
+		$conflicts = self::detect_form_url_conflicts();
+
+		if ( empty( $conflicts ) ) {
+			return;
+		}
+
+		foreach ( $conflicts as $path ) {
+			printf(
+				'<div class="notice notice-warning inline"><p>%s</p></div>',
+				esc_html(
+					sprintf(
+						/* translators: %s: URL path that is covered by both a URL event and form tracking */
+						__( 'Caution: For URL %s both a URL event and automatic form tracking are active. This can lead to duplicate counting.', 'lightweight-meta-pixel-capi-tracker' ),
+						$path
+					)
+				)
+			);
+		}
 	}
 
 	/**
@@ -721,6 +818,12 @@ class LMPCT_Admin {
 		?>
 
 		<h2 class="lmpct-section-title"><?php esc_html_e( 'Custom Events', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
+
+		<div class="notice notice-info inline">
+			<p><?php esc_html_e( 'Note: Use URL events ideally for thank-you and confirmation pages (e.g. /danke/, /kauf-erfolgreich/). For regular forms without a redirect, please use the automatic form tracking in tab “Advanced Tracking” to avoid duplicate counting.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+		</div>
+
+		<?php self::render_conflict_notice(); ?>
 
 		<form method="post" action="<?php echo esc_url( $admin_post ); ?>" class="lmpct-global-toggle-form">
 			<input type="hidden" name="action" value="lmpct_toggle_all_events" />

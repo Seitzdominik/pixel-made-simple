@@ -36,10 +36,7 @@ class LMPCT_Forms {
 	 * @return string 'Lead' oder 'Contact'.
 	 */
 	public static function event_type() {
-		$settings = LMPCT_Settings::get();
-		$type     = (string) ( $settings['form_event_type'] ?? 'Lead' );
-
-		return in_array( $type, LMPCT_Settings::form_event_types(), true ) ? $type : 'Lead';
+		return LMPCT_Settings::form_event_type();
 	}
 
 	/**

@@ -197,6 +197,18 @@ class LMPCT_Settings {
 	}
 
 	/**
+	 * Konfigurierter Meta-Event-Typ für Formular-Absendungen.
+	 *
+	 * @return string 'Lead' oder 'Contact'.
+	 */
+	public static function form_event_type() {
+		$settings = self::get();
+		$type     = (string) ( $settings['form_event_type'] ?? 'Lead' );
+
+		return in_array( $type, self::form_event_types(), true ) ? $type : 'Lead';
+	}
+
+	/**
 	 * URL-Filter als Array.
 	 *
 	 * @return string[] Leeres Array = auf der gesamten Website aktiv.
