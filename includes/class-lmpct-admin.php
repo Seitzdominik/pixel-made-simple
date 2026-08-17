@@ -705,22 +705,30 @@ class LMPCT_Admin {
 			?>
 
 			<h2 class="lmpct-section-title"><?php esc_html_e( 'Global Options', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row"><?php esc_html_e( 'Do not track administrators', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
-					<td>
-						<?php self::toggle( 'lmpct_settings[exclude_admins]', ! empty( $s['exclude_admins'] ), __( 'Do not track administrators', 'lightweight-meta-pixel-capi-tracker' ), false, 'exclude_admins' ); ?>
-						<p class="description"><?php esc_html_e( 'Recommended: logged-in administrators trigger neither pixel nor server events.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><?php esc_html_e( 'Automatic cookie banner detection (GDPR)', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
-					<td>
-						<?php self::toggle( 'lmpct_settings[consent_detection]', ! empty( $s['consent_detection'] ), __( 'Enable automatic cookie banner detection', 'lightweight-meta-pixel-capi-tracker' ), false, 'consent_detection' ); ?>
-						<p class="description"><?php esc_html_e( 'Automatically detects installed cookie banners and blocks browser and CAPI events until consent is given. Supports Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies and any banner using the WP Consent API. Automatic blocking cannot be guaranteed for unlisted third-party banners. Sites without a cookie banner are never blocked.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
-					</td>
-				</tr>
-			</table>
+
+			<?php
+			self::accordion_open(
+				__( 'Do not track administrators', 'lightweight-meta-pixel-capi-tracker' ),
+				'lmpct_settings[exclude_admins]',
+				! empty( $s['exclude_admins'] ),
+				__( 'Do not track administrators', 'lightweight-meta-pixel-capi-tracker' ),
+				'exclude_admins'
+			);
+			?>
+			<p class="description"><?php esc_html_e( 'Recommended: logged-in administrators trigger neither pixel nor server events.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<?php self::accordion_close(); ?>
+
+			<?php
+			self::accordion_open(
+				__( 'Automatic cookie banner detection (GDPR)', 'lightweight-meta-pixel-capi-tracker' ),
+				'lmpct_settings[consent_detection]',
+				! empty( $s['consent_detection'] ),
+				__( 'Enable automatic cookie banner detection', 'lightweight-meta-pixel-capi-tracker' ),
+				'consent_detection'
+			);
+			?>
+			<p class="description"><?php esc_html_e( 'Automatically detects installed cookie banners and blocks browser and CAPI events until consent is given. Supports Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies and any banner using the WP Consent API. Automatic blocking cannot be guaranteed for unlisted third-party banners. Sites without a cookie banner are never blocked.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<?php self::accordion_close(); ?>
 
 			<h2 class="lmpct-section-title"><?php esc_html_e( 'Platforms', 'lightweight-meta-pixel-capi-tracker' ); ?></h2>
 

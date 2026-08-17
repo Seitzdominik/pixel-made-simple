@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Lightweight Meta Pixel & CAPI Tracker 0.5.5\n"
 "Report-Msgid-Bugs-To: https://sdv.design\n"
-"POT-Creation-Date: 2026-08-17 08:14+0000\n"
+"POT-Creation-Date: 2026-08-17 08:38+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,8 +15,8 @@ msgstr ""
 
 #. Plugin Name of the plugin
 #: lightweight-meta-pixel-capi-tracker.php
-#: includes/class-lmpct-admin.php:318
-#: includes/class-lmpct-admin.php:634
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:318
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:634
 msgid "Lightweight Meta Pixel & CAPI Tracker"
 msgstr ""
 
@@ -36,630 +36,630 @@ msgstr ""
 msgid "Dominik Seitz"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:47
-#: includes/class-lmpct-admin.php:66
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:47
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:66
 msgid "Settings"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:53
-#: includes/class-lmpct-admin.php:65
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:53
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:65
 msgid "Meta Pixel & CAPI Tracker"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:54
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:54
 msgid "Pixel Tracker"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:73
-#: includes/class-lmpct-admin.php:74
-#: includes/class-lmpct-admin.php:627
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:73
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:74
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:627
 msgid "Info & Help"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:112
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:112
 msgid "Saved."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:169
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:169
 msgid "Event saved."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:170
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:170
 msgid "Event deleted."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:171
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:171
 msgid "Event status updated."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:172
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:172
 msgid "Setting saved."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:173
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:173
 msgid "The event could not be saved. Please fill in all required fields correctly."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:174
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:174
 msgid "Please enable at least one platform for this event."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:175
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:175
 msgid "Google Ads is enabled for this event but the conversion label is missing."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:176
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:176
 msgid "The event could not be found."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:177
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:177
 msgid "Configuration imported successfully."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:178
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:178
 msgid "The file could not be imported. Please upload a valid export of this plugin."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:179
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:179
 msgid "Please choose a JSON file to import."
 msgstr ""
 
 #. translators: %s: platform box title
-#: includes/class-lmpct-admin.php:276
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:276
 msgid "Toggle panel: %s"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:297
-#: includes/class-lmpct-admin.php:620
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:297
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:620
 msgid "You do not have permission to access this page."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:301
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:301
 msgid "General"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:302
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:302
 msgid "URL Events"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:303
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:303
 msgid "Advanced Tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:304
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:304
 msgid "Tools"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:321
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:321
 msgid "Plugin tabs"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:366
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:366
 msgid "Advanced Tracking Features"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:372
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:372
 msgid "Automatic form lead tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:375
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:375
 msgid "Enable automatic form lead tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:377
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:377
 msgid "Supports Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms and plain HTML forms."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:380
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:380
 msgid "Detects form submissions automatically and fires the configured event in the browser and via the Conversions API using the same event ID. Email address and phone number are hashed with SHA-256 before they are sent – raw values never leave your server and are never stored."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:381
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:381
 msgid "The event fires the moment the submit button is clicked. If your page redirects to a separate thank-you page after submitting, set up tracking via the “URL Events” tab instead."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:384
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:384
 msgid "Event type"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:393
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:393
 msgid "Meta event fired on form submission. Use “Contact” for general enquiries and “Lead” for genuine acquisition forms."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:397
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:397
 msgid "Run on specific pages only (optional)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:402
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:402
 msgid "Enter paths separated by commas (e.g. /kontakt, /angebot, /anfrage). Leave empty to track on the entire website. On pages that do not match, the script is not loaded at all."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:406
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:406
 msgid "Ignore search, comments & logins"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:408
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:408
 msgid "Ignore search, comments and logins"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:409
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:409
 msgid "Prevents accidental tracking of search bars, blog comments and login fields. Forms containing a password field are always ignored, regardless of this setting."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:417
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:417
 msgid "First-touch & UTM passthrough"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:420
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:420
 msgid "Enable UTM passthrough"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:422
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:422
 msgid "Stores utm_source, utm_medium, utm_campaign, utm_content, utm_term and fbclid in a first-party cookie for 30 days."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:425
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:425
 msgid "Saves campaign parameters on the first visit and sends them along with every server-side event as custom_data. A stored fbclid is converted into the fbc format so conversions stay attributed even days after the ad click."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:430
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:430
 msgid "Admin live debug bar"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:433
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:433
 msgid "Show live debug bar in the frontend"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:437
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:437
 msgid "Shows a small bar at the bottom of the frontend with consent status, fired events, event IDs, CAPI response and match keys. Rendered exclusively for logged-in administrators – regular visitors get zero additional bytes."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:440
-#: includes/class-lmpct-admin.php:819
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:440
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:827
 msgid "Save Settings"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:453
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:453
 msgid "Export & Import"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:456
-#: includes/class-lmpct-admin.php:466
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:456
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:466
 msgid "Export configuration"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:458
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:458
 msgid "Downloads all settings, platform IDs and event rules as a JSON file – ideal for rolling out a proven setup to another site."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:459
-#: includes/class-lmpct-admin.php:477
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:459
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:477
 msgid "Note:"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:459
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:459
 msgid "The export contains your CAPI access token in plain text. Store the file securely and never share it publicly."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:474
-#: includes/class-lmpct-admin.php:488
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:474
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:488
 msgid "Import configuration"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:476
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:476
 msgid "Upload a previously exported JSON file. All values are validated and sanitised before they are saved."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:477
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:477
 msgid "The import overwrites the current settings and all event rules."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:486
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:486
 msgid "Really import? The current settings and event rules will be overwritten."
 msgstr ""
 
 #. translators: %s: URL path that is covered by both a URL event and form tracking
-#: includes/class-lmpct-admin.php:583
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:583
 msgid "Caution: For URL %s both a URL event and automatic form tracking are active. This can lead to duplicate counting."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:631
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:631
 msgid "Plugin Information"
 msgstr ""
 
 #. translators: %s: support email address
-#: includes/class-lmpct-admin.php:641
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:641
 msgid "If you have questions or found a bug, please email %s."
 msgstr ""
 
 #. translators: %s: developer website link
-#: includes/class-lmpct-admin.php:650
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:650
 msgid "Developed by %s."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:659
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:659
 msgid "Video Tutorial"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:664
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:664
 msgid "A step-by-step video tutorial on setting up the plugin is coming soon:"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:667
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:667
 msgid "Watch the tutorial on YouTube"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:707
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:707
 msgid "Global Options"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:710
-#: includes/class-lmpct-admin.php:712
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:711
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:714
 msgid "Do not track administrators"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:713
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:718
 msgid "Recommended: logged-in administrators trigger neither pixel nor server events."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:717
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:723
 msgid "Automatic cookie banner detection (GDPR)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:719
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:726
 msgid "Enable automatic cookie banner detection"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:720
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:730
 msgid "Automatically detects installed cookie banners and blocks browser and CAPI events until consent is given. Supports Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies and any banner using the WP Consent API. Automatic blocking cannot be guaranteed for unlisted third-party banners. Sites without a cookie banner are never blocked."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:725
-#: includes/class-lmpct-admin.php:866
-#: includes/class-lmpct-admin.php:1011
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:733
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:874
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1019
 msgid "Platforms"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:727
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:735
 msgid "Meta (Facebook)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:727
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:735
 msgid "Enable Meta tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:731
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:739
 msgid "Meta Pixel ID"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:732
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:740
 msgid "Meta Events Manager → Data sources → your pixel → copy the ID shown below its name."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:741
-#: includes/class-lmpct-admin.php:743
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:749
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:751
 msgid "Enable Conversions API"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:744
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:752
 msgid "Additionally sends matched events to Meta server-side – deduplicated via the same event ID as in the browser."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:749
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:757
 msgid "CAPI Access Token"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:750
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:758
 msgid "Meta Events Manager → Data sources → Settings → Conversions API → “Generate access token”."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:755
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:763
 msgid "Secret key. Used exclusively server-side and never rendered in the frontend."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:760
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:768
 msgid "Test Event Code"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:761
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:769
 msgid "Meta Events Manager → Test events → copy the “Server events code”. Clear it again after testing!"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:767
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:775
 msgid "The test code is automatically deactivated after 12 hours to prevent accidental test tracking on a live site."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:771
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:779
 msgid "Advanced Matching (email)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:773
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:781
 msgid "Enable Advanced Matching"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:774
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:782
 msgid "Sends the email address of logged-in users to the Conversions API as a SHA-256 hash (better match quality). Mind data privacy."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:780
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:788
 msgid "Google Ads"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:780
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:788
 msgid "Enable Google Ads tracking"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:784
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:792
 msgid "Google Tag ID"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:785
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:793
 msgid "Google Ads → Tools & Settings → Google Tag → copy the ID (AW-XXXXX)."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:794
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:802
 msgid "Google Consent Mode v2 (default)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:796
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:804
 msgid "Enable Google Consent Mode v2 defaults"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:797
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:805
 msgid "Sets ad_storage, ad_user_data, ad_personalization and analytics_storage to \"denied\" by default before the tag loads. Your consent banner then sends the consent update. Recommended for the EU."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:803
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:811
 msgid "TikTok"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:803
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:811
 msgid "Enable TikTok Pixel"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:807
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:815
 msgid "TikTok Pixel ID"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:808
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:816
 msgid "TikTok Ads Manager → Assets → Events → Web events → copy the pixel ID."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:839
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:847
 msgid "Custom Events"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:842
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:850
 msgid "Note: Use URL events ideally for thank-you and confirmation pages (e.g. /danke/, /kauf-erfolgreich/). For regular forms without a redirect, please use the automatic form tracking in tab “Advanced Tracking” to avoid duplicate counting."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:850
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:858
 msgid "Enable all custom events"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:852
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:860
 msgid "Enable/disable all custom events"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:854
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:862
 msgid "Apply"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:858
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:866
 msgid "Custom events are currently disabled globally. The rules below will not fire."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:864
-#: includes/class-lmpct-admin.php:1053
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:872
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1061
 msgid "Status"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:865
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:873
 msgid "Name"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:867
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:875
 msgid "Trigger Condition (URL)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:868
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:876
 msgid "Actions"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:874
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:882
 msgid "No events yet. Create your first event below."
 msgstr ""
 
 #. translators: %s: event name
-#: includes/class-lmpct-admin.php:889
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:897
 msgid "Enable event “%s”"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:893
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:901
 msgid "Toggle"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:912
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:920
 msgid "Exact path:"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:913
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:921
 msgid "URL contains:"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:920
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:928
 msgid "Edit"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:927
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:935
 msgid "Really delete this event?"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:928
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:936
 msgid "Delete"
 msgstr ""
 
 #. translators: %s: event name
-#: includes/class-lmpct-admin.php:973
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:981
 msgid "Edit event “%s”"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:975
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:983
 msgid "Create New Event"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:987
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:995
 msgid "Event Name (internal)"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:991
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:999
 msgid "e.g. Lead magnet confirmation"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:993
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1001
 msgid "With the “CustomEvent” type, this name is sent as the custom event name."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:998
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1006
 msgid "Trigger"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1001
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1009
 msgid "Exact path"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1002
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1010
 msgid "URL contains"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1007
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1015
 msgid "“Exact path” compares only the URL path (case and trailing slash are ignored). “URL contains” checks the path including the query string."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1018
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1026
 msgid "Meta event type"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1034
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1042
 msgid "Google Ads conversion label"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1035
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1043
 msgid "Google Ads → Conversion goals → click the action → Tag setup → snippet → copy the label after the slash (AW-XXX/LABEL)."
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1042
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1050
 msgid "TikTok event type"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1055
-#: includes/class-lmpct-admin.php:1056
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1063
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1064
 msgid "Event active"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1064
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1072
 msgid "Update Event"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1064
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1072
 msgid "Create Event"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1072
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1080
 msgid "Cancel"
 msgstr ""
 
-#: includes/class-lmpct-admin.php:1092
-#: includes/class-lmpct-tools.php:27
-#: includes/class-lmpct-tools.php:66
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-admin.php:1100
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-tools.php:27
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-tools.php:66
 msgid "You do not have permission to perform this action."
 msgstr ""
 
-#: includes/class-lmpct-capi.php:52
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-capi.php:52
 msgid "No marketing consent"
 msgstr ""
 
-#: includes/class-lmpct-capi.php:59
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-capi.php:59
 msgid "Pixel ID or access token missing"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:58
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:58
 msgid "Detection disabled"
 msgstr ""
 
 #. translators: %s: name of the detected cookie banner
-#: includes/class-lmpct-debug.php:65
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:65
 msgid "Granted (%s)"
 msgstr ""
 
 #. translators: %s: name of the detected cookie banner
-#: includes/class-lmpct-debug.php:66
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:66
 msgid "Granted (no banner detected)"
 msgstr ""
 
 #. translators: %s: name of the detected cookie banner
-#: includes/class-lmpct-debug.php:73
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:73
 msgid "Pending / denied (%s)"
 msgstr ""
 
 #. translators: %s: name of the detected cookie banner
-#: includes/class-lmpct-debug.php:74
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:74
 msgid "Pending / denied"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:120
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:120
 msgid "Pixel Tracker – Live Debug"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:121
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:121
 msgid "Consent"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:122
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:122
 msgid "Browser"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:123
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:123
 msgid "CAPI"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:124
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:124
 msgid "Match keys"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:125
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:125
 msgid "Attribution"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:126
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:126
 msgid "No events on this page yet."
 msgstr ""
 
-#: includes/class-lmpct-debug.php:127
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:127
 msgid "Only visible to administrators."
 msgstr ""
 
-#: includes/class-lmpct-debug.php:128
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:128
 msgid "Minimise"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:142
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:142
 msgid "Tracking skipped: administrators are excluded"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:143
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:143
 msgid "Tracking skipped: no platform enabled or ID missing"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:144
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:144
 msgid "Tracking skipped: disabled via lmpct_allow_tracking filter"
 msgstr ""
 
-#: includes/class-lmpct-debug.php:145
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-debug.php:145
 msgid "Tracking skipped: not a trackable page (feed, preview, 404 …)"
 msgstr ""
 
-#: includes/class-lmpct-tools.php:45
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../lightweight-meta-pixel-capi-tracker/includes/class-lmpct-tools.php:45
 msgid "The configuration could not be exported."
 msgstr ""
 
