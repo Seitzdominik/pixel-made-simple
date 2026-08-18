@@ -449,11 +449,37 @@ class LMPCT_Admin {
 				! empty( $s['enable_utm_form_fill'] ),
 				__( 'Enable automatic UTM form fill', 'lightweight-meta-pixel-capi-tracker' ),
 				'enable_utm_form_fill',
-				__( 'Writes utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid and gclid into matching form fields before the visitor submits.', 'lightweight-meta-pixel-capi-tracker' )
+				__( 'Writes Source, Campaign and Medium into matching form fields before the visitor submits.', 'lightweight-meta-pixel-capi-tracker' )
 			);
 			?>
-			<p class="description"><?php esc_html_e( 'Fills hidden or visible form fields with the visitor’s campaign parameters so they land in your CRM or notification email together with the lead. Values are read from the current URL first, then – if “First-touch & UTM passthrough” above is enabled – from the attribution cookie for visitors who already navigated to a subpage, and finally guessed from the referrer.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
-			<p class="description"><?php esc_html_e( 'Matches fields by name attribute (e.g. utm_source, utm_campaign, fbclid, gclid) or by CSS class (utm-source or lmpct-utm-source, also on a wrapper element around the input).', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Fills hidden or visible form fields with the visitor’s campaign values so they land in your CRM or notification email together with the lead. Source is read from the current URL first, then – if “First-touch & UTM passthrough” above is enabled – from the attribution cookie for visitors who already navigated to a subpage, and finally guessed from a Facebook/Google click ID or the referrer. Campaign and Medium are only filled when an explicit value is found (URL or cookie).', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
+			<table class="widefat striped lmpct-utm-fields-table">
+				<thead>
+					<tr>
+						<th scope="col"><?php esc_html_e( 'Value', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
+						<th scope="col"><?php esc_html_e( 'Field name', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
+						<th scope="col"><?php esc_html_e( 'CSS class', 'lightweight-meta-pixel-capi-tracker' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><?php esc_html_e( 'UTM Source', 'lightweight-meta-pixel-capi-tracker' ); ?></td>
+						<td><code>utm_source</code> / <code>source</code></td>
+						<td><code>utm-source</code> / <code>lmpct-utm-source</code></td>
+					</tr>
+					<tr>
+						<td><?php esc_html_e( 'UTM Campaign', 'lightweight-meta-pixel-capi-tracker' ); ?></td>
+						<td><code>utm_campaign</code> / <code>campaign</code></td>
+						<td><code>utm-campaign</code> / <code>lmpct-utm-campaign</code></td>
+					</tr>
+					<tr>
+						<td><?php esc_html_e( 'UTM Medium', 'lightweight-meta-pixel-capi-tracker' ); ?></td>
+						<td><code>utm_medium</code> / <code>medium</code></td>
+						<td><code>utm-medium</code> / <code>lmpct-utm-medium</code></td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="description"><?php esc_html_e( 'Field name takes priority over CSS class. Works both on the input field itself and on a surrounding form block/wrapper element carrying the class. If no UTM Source is found this way, it falls back to facebook, google or direct.', 'lightweight-meta-pixel-capi-tracker' ); ?></p>
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><label for="lmpct-utm-form-fill-mode"><?php esc_html_e( 'Run on', 'lightweight-meta-pixel-capi-tracker' ); ?></label></th>

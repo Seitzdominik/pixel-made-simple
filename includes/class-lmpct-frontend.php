@@ -83,7 +83,19 @@ class LMPCT_Frontend {
 	/**
 	 * Frontend-Skript im Footer laden – trägt zwei unabhängige Features:
 	 * den Formular-Auto-Grabber und den UTM-Form-Fill. Beide haben eigene
-	 * Master-Toggles und eigene URL-Regeln, teilen sich aber dieselbe Datei.
+	 * Master-Toggles, teilen sich aber dieselbe Datei.
+	 *
+	 * Bugfix v0.5.7: Das Skript (und `window.lmpct_settings`) wird geladen,
+	 * sobald Tracking auf der Seite aktiv ist UND mindestens eines der beiden
+	 * Features per Master-Toggle aktiviert ist – OHNE die URL-Include/Exclude-
+	 * Regeln serverseitig vorzuprüfen. Der Browser kennt seinen eigenen,
+	 * bereits aufgelösten `window.location.pathname` zuverlässiger als der
+	 * Server ihn aus `REQUEST_URI` rekonstruieren kann (Trailing Slashes,
+	 * Proxies/CDNs, mehrsprachige URL-Präfixe …) – ein serverseitiger
+	 * Mismatch führte dazu, dass das Skript auf manchen Seiten gar nicht erst
+	 * geladen wurde, obwohl es hätte laufen sollen. Die URL-Auswertung
+	 * (all/include/exclude, Wildcards) übernimmt jetzt ausschließlich
+	 * frontend.js selbst (`urlAllowed()` bzw. `utmFormFillAllowed()`).
 	 *
 	 * @return void
 	 */
@@ -92,13 +104,8 @@ class LMPCT_Frontend {
 			return;
 		}
 
-		// URL-Filter bereits serverseitig auswerten: Passt die Seite für KEINES
-		// der beiden Features, wird das Skript gar nicht erst ausgeliefert
-		// (0 Byte statt Leerlauf).
-		$path = (string) wp_parse_url( self::current_request_uri(), PHP_URL_PATH );
-
-		$form_tracking_active = class_exists( 'LMPCT_Forms' ) && LMPCT_Forms::enabled() && LMPCT_Forms::url_allowed( $path );
-		$utm_form_fill_active = class_exists( 'LMPCT_Attribution' ) && LMPCT_Attribution::form_fill_enabled() && LMPCT_Attribution::form_fill_url_allowed( $path );
+		$form_tracking_active = class_exists( 'LMPCT_Forms' ) && LMPCT_Forms::enabled();
+		$utm_form_fill_active = class_exists( 'LMPCT_Attribution' ) && LMPCT_Attribution::form_fill_enabled();
 
 		if ( ! $form_tracking_active && ! $utm_form_fill_active ) {
 			return;
@@ -108,7 +115,7 @@ class LMPCT_Frontend {
 
 		wp_localize_script(
 			'lmpct-frontend',
-			'lmpctFront',
+			'lmpct_settings',
 			array(
 				'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
 				'nonce'           => wp_create_nonce( LMPCT_Forms::NONCE_ACTION ),
@@ -116,7 +123,6 @@ class LMPCT_Frontend {
 				'eventType'       => LMPCT_Forms::event_type(),
 				'urlFilter'       => LMPCT_Settings::form_url_filters(),
 				'excludeSystem'   => ! empty( self::$settings['form_exclude_system'] ),
-				'testEventCode'   => ! empty( self::$settings['test_event_code'] ) ? (string) self::$settings['test_event_code'] : '',
 				'utmFormFill'     => $utm_form_fill_active,
 				'utmFormFillMode' => (string) ( self::$settings['utm_form_fill_mode'] ?? 'all' ),
 				'utmFormFillUrls' => LMPCT_Settings::utm_form_fill_url_patterns(),
@@ -135,12 +141,7 @@ class LMPCT_Frontend {
 		}
 
 		self::$settings = LMPCT_Settings::get();
-
-		// Denselben 12h-Expiry-Check wie die CAPI anwenden, damit ein abgelaufener
-		// Test-Code auch dem Browser-Pixel (build_meta_js()) vorenthalten wird.
-		self::$settings['test_event_code'] = LMPCT_CAPI::active_test_event_code( self::$settings );
-
-		self::$active = true;
+		self::$active   = true;
 
 		if ( LMPCT_Settings::events_enabled() ) {
 			self::$matched_events = self::match_events( self::current_request_uri() );
@@ -422,16 +423,14 @@ class LMPCT_Frontend {
 			return '';
 		}
 
-		// Meta's Test-Events-Tool matcht Browser- (Pixel-) Events nur, wenn der
-		// Test-Code auch im fbq()-Aufruf selbst steckt – ein rein serverseitig
-		// gesendeter test_event_code (CAPI) reicht nicht aus, damit das
-		// Browser-Event dort ebenfalls auftaucht.
-		$test_code    = (string) ( self::$settings['test_event_code'] ?? '' );
-		$test_code_js = '' !== $test_code ? "{test_event_code:'" . esc_js( $test_code ) . "'}" : '{}';
-
+		// Bugfix v0.5.7: KEIN test_event_code im Browser-Pixel-Aufruf. Anders als
+		// zunächst angenommen akzeptiert Meta's Pixel-SDK test_event_code nicht
+		// als custom_data-Feld – ein so markiertes Event wird im Test-Events-
+		// Stream schlicht ignoriert. Der Test-Code bleibt ausschließlich in der
+		// serverseitigen CAPI-Payload (siehe LMPCT_CAPI::send_events()).
 		$js  = "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');\n";
 		$js .= "fbq('init','" . esc_js( $pixel_id ) . "');\n";
-		$js .= "fbq('track','PageView'," . $test_code_js . ");\n";
+		$js .= "fbq('track','PageView');\n";
 
 		foreach ( self::$matched_events as $event ) {
 			if ( empty( $event['meta_enabled'] ) ) {
@@ -439,7 +438,7 @@ class LMPCT_Frontend {
 			}
 			$method = ( 'CustomEvent' === $event['event_type'] ) ? 'trackCustom' : 'track';
 			$name   = LMPCT_Settings::resolved_event_name( $event );
-			$js    .= "fbq('" . $method . "','" . esc_js( $name ) . "'," . $test_code_js . ",{eventID:'" . esc_js( $event['event_id'] ) . "'});\n";
+			$js    .= "fbq('" . $method . "','" . esc_js( $name ) . "',{},{eventID:'" . esc_js( $event['event_id'] ) . "'});\n";
 		}
 
 		return $js;

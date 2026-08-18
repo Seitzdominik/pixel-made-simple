@@ -1,9 +1,13 @@
 /**
- * Lightweight Meta Pixel & CAPI Tracker – Formular-Auto-Grabber.
+ * Lightweight Meta Pixel & CAPI Tracker – Formular-Auto-Grabber & UTM-Form-Fill.
  *
- * Erkennt Formular-Absendungen (native und AJAX-basierte Formular-Plugins),
- * feuert das Browser-Event "Lead" mit Event-ID und meldet dieselbe ID plus
- * Kontaktdaten an das Plugin-Backend, das den Server-Event via CAPI sendet.
+ * Zwei unabhängige Features (eigene Master-Toggles, siehe class-lmpct-frontend.php):
+ * 1. Formular-Auto-Grabber: erkennt Formular-Absendungen (native und
+ *    AJAX-basierte Formular-Plugins), feuert das Browser-Event "Lead" mit
+ *    Event-ID und meldet dieselbe ID plus Kontaktdaten an das Plugin-Backend,
+ *    das den Server-Event via CAPI sendet.
+ * 2. UTM-Form-Fill: schreibt Source/Campaign/Medium in passende Formularfelder,
+ *    rein clientseitig, kein Netzwerk-Call.
  *
  * Vanilla JS, keine Abhängigkeiten (jQuery wird nur genutzt, wenn ohnehin
  * vorhanden – manche Formular-Plugins senden ihre Erfolgs-Events darüber).
@@ -11,7 +15,7 @@
 ( function () {
 	'use strict';
 
-	var cfg = window.lmpctFront || {};
+	var cfg = window.lmpct_settings || {};
 
 	// Zwei unabhängige Features teilen sich diese Datei (siehe unten): der
 	// Formular-Auto-Grabber (cfg.formTracking) und der UTM-Form-Fill
@@ -254,10 +258,10 @@
 		var browserFired = false;
 
 		if ( 'function' === typeof window.fbq ) {
-			// Meta's Test-Events-Tool matcht Browser-Events nur, wenn der Test-Code
-			// auch im fbq()-Aufruf selbst steckt (nicht nur serverseitig via CAPI).
-			var pixelParams = cfg.testEventCode ? { test_event_code: cfg.testEventCode } : {};
-			window.fbq( 'track', EVENT_NAME, pixelParams, { eventID: eventId } );
+			// KEIN test_event_code hier (Bugfix v0.5.7): Meta's Pixel-SDK
+			// akzeptiert es nicht als custom_data-Feld und ignoriert das Event
+			// im Test-Stream. Der Test-Code bleibt CAPI-only (class-lmpct-capi.php).
+			window.fbq( 'track', EVENT_NAME, {}, { eventID: eventId } );
 			browserFired = true;
 		}
 
@@ -428,18 +432,29 @@
 
 	/* -----------------------------------------------------------------
 	 * UTM-/Attribution-Form-Fill: unabhängig vom Formular-Auto-Grabber
-	 * oben. Schreibt erkannte Kampagnen-Parameter in passende Formularfelder,
-	 * bevor der Besucher absendet – rein clientseitig, kein Netzwerk-Call.
+	 * oben. Schreibt die 3 Kernfelder – Source, Campaign, Medium – in
+	 * passende Formularfelder, bevor der Besucher absendet – rein
+	 * clientseitig, kein Netzwerk-Call. Dieselbe Doku (Feldnamen/-klassen)
+	 * steht im Admin unter Tab "Erweitertes Tracking".
 	 * ------------------------------------------------------------------- */
 	if ( cfg.utmFormFill ) {
-		var ATTRIBUTION_KEYS = [ 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid' ];
 		var UTM_MODE = cfg.utmFormFillMode || 'all';
 		var UTM_URLS = Array.isArray( cfg.utmFormFillUrls ) ? cfg.utmFormFillUrls : [];
 
+		// Pro Kernfeld: name-Attribute (der Reihe nach geprüft) und CSS-Klassen
+		// (direkt auf dem Feld oder auf einem Wrapper-Element darum).
+		var FIELD_CONFIG = {
+			source: { names: [ 'utm_source', 'source' ], classes: [ 'utm-source', 'lmpct-utm-source' ] },
+			campaign: { names: [ 'utm_campaign', 'campaign' ], classes: [ 'utm-campaign', 'lmpct-utm-campaign' ] },
+			medium: { names: [ 'utm_medium', 'medium' ], classes: [ 'utm-medium', 'lmpct-utm-medium' ] }
+		};
+
 		/**
-		 * Läuft der Form-Fill auf dieser Seite? Der Server prüft dieselben Regeln
-		 * bereits vor dem Ausliefern des Skripts – diese Prüfung ist die
-		 * Absicherung für Seitenwechsel ohne Reload (siehe urlAllowed() oben).
+		 * Läuft der Form-Fill auf dieser Seite? Der Server (Bugfix v0.5.7,
+		 * class-lmpct-frontend.php) prüft nur noch, ob das Feature überhaupt
+		 * aktiviert ist – die URL-Regeln (all/include/exclude, Wildcards)
+		 * wertet ausschließlich der Browser anhand seines eigenen, zuverlässig
+		 * aufgelösten window.location.pathname aus.
 		 */
 		function utmFormFillAllowed() {
 			if ( 'all' === UTM_MODE ) {
@@ -460,18 +475,6 @@
 			}
 
 			return 'exclude' === UTM_MODE ? ! matched : matched;
-		}
-
-		function readQueryAttribution() {
-			var params = new URLSearchParams( window.location.search );
-			var data = {};
-			ATTRIBUTION_KEYS.forEach( function ( key ) {
-				var value = params.get( key );
-				if ( value ) {
-					data[ key ] = value;
-				}
-			} );
-			return data;
 		}
 
 		/**
@@ -506,49 +509,57 @@
 		}
 
 		/**
-		 * Werte-Ermittlung: URL-Parameter zuerst, dann Attribution-Cookie, zuletzt
-		 * eine Quellen-Vermutung aus fbclid/gclid/Referrer für utm_source allein
-		 * (die übrigen Parameter lassen sich aus dem Referrer nicht ableiten).
+		 * Werte-Ermittlung für die 3 Kernfelder: URL-Parameter zuerst, dann
+		 * Attribution-Cookie. Fehlt utm_source in beiden, wird die Quelle aus
+		 * einer vorhandenen Klick-ID (fbclid -> facebook, gclid -> google) und
+		 * zuletzt aus dem Referrer geschätzt, sonst "direct". fbclid/gclid
+		 * sind hier nur Signale für Source, keine eigenen Ausgabefelder.
+		 * Campaign/Medium haben keinen Rate-Fallback.
 		 */
 		function resolveAttribution() {
-			var fromQuery = readQueryAttribution();
-			var fromCookie = readCookieAttribution();
-			var data = {};
+			var params = new URLSearchParams( window.location.search );
+			var cookie = readCookieAttribution();
 
-			ATTRIBUTION_KEYS.forEach( function ( key ) {
-				data[ key ] = fromQuery[ key ] || fromCookie[ key ] || '';
-			} );
+			var source = params.get( 'utm_source' ) || cookie.utm_source || '';
 
-			if ( ! data.utm_source ) {
-				if ( fromQuery.fbclid ) {
-					data.utm_source = 'facebook';
-				} else if ( fromQuery.gclid ) {
-					data.utm_source = 'google';
+			if ( ! source ) {
+				if ( params.get( 'fbclid' ) || cookie.fbclid ) {
+					source = 'facebook';
+				} else if ( params.get( 'gclid' ) || cookie.gclid ) {
+					source = 'google';
 				} else {
-					data.utm_source = referrerSource();
+					source = referrerSource();
 				}
 			}
 
-			return data;
+			return {
+				source: source,
+				campaign: params.get( 'utm_campaign' ) || cookie.utm_campaign || '',
+				medium: params.get( 'utm_medium' ) || cookie.utm_medium || ''
+			};
 		}
 
 		/**
-		 * Feld für einen Parameter suchen: zuerst per name-Attribut (z. B.
-		 * [name="utm_source"]), dann per CSS-Klasse (z. B. "utm-source" oder
-		 * "lmpct-utm-source"). Trägt die Klasse ein Wrapper-Element statt des
-		 * Feldes selbst, wird dessen erstes Eingabefeld genutzt.
+		 * Feld für eines der 3 Kernfelder suchen: zuerst alle konfigurierten
+		 * name-Attribute der Reihe nach, dann alle konfigurierten CSS-Klassen.
+		 * Trägt die Klasse ein Wrapper-Element statt des Feldes selbst, wird
+		 * dessen erstes Eingabefeld genutzt.
 		 */
 		function findAttributionField( key ) {
-			var field = document.querySelector( '[name="' + key + '"]' );
-			if ( field ) {
-				return field;
+			var config = FIELD_CONFIG[ key ];
+			if ( ! config ) {
+				return null;
 			}
 
-			var dashed = key.replace( /_/g, '-' );
-			var classNames = [ dashed, 'lmpct-' + dashed ];
+			for ( var i = 0; i < config.names.length; i++ ) {
+				var byName = document.querySelector( '[name="' + config.names[ i ] + '"]' );
+				if ( byName ) {
+					return byName;
+				}
+			}
 
-			for ( var i = 0; i < classNames.length; i++ ) {
-				var el = document.querySelector( '.' + classNames[ i ] );
+			for ( var j = 0; j < config.classes.length; j++ ) {
+				var el = document.querySelector( '.' + config.classes[ j ] );
 				if ( ! el ) {
 					continue;
 				}
@@ -579,7 +590,7 @@
 
 		if ( utmFormFillAllowed() ) {
 			var attribution = resolveAttribution();
-			ATTRIBUTION_KEYS.forEach( function ( key ) {
+			Object.keys( FIELD_CONFIG ).forEach( function ( key ) {
 				fillAttributionField( findAttributionField( key ), attribution[ key ] );
 			} );
 		}

@@ -247,6 +247,15 @@
 	vertical-align: middle;
 }
 
+.lmpct-utm-fields-table {
+	max-width: 640px;
+	margin: 8px 0 12px;
+}
+
+.lmpct-utm-fields-table code {
+	white-space: nowrap;
+}
+
 .lmpct-events-table .lmpct-col-status {
 	width: 70px;
 }
