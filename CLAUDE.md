@@ -9,7 +9,7 @@ bis v0.5.7, damals als „Lightweight Meta Pixel & CAPI Tracker") steht in
 Diese Datei hier verdoppelt das nicht, sondern beschreibt den **Ist-Zustand**
 und **wie man produktiv weiterarbeitet**.
 
-**Stand:** Version 0.6.2 (Rebrand-Relaunch als „Pixel Made Simple", vormals
+**Stand:** Version 0.6.3 (Rebrand-Relaunch als „Pixel Made Simple", vormals
 „Lightweight Meta Pixel & CAPI Tracker" — die Session, die den Rebrand baute,
 hatte die Version versehentlich auf 1.0.0 gesetzt; Dominik hat das im
 Folgeauftrag auf 0.6.0 korrigiert, die Versionszählung der Vor-Rebrand-Ära
@@ -33,9 +33,15 @@ Custom-Events-Limit von „2 gleichzeitig aktiv" auf „2 insgesamt" umgestellt
 (siehe „Bekannte Trade-offs" für die Begründung dieser Interpretation) und
 den JSON-Import zusätzlich zum Export hinter das Pro-Gate gesetzt, dazu
 `composer.json`/`package.json` als dünne Wrapper um die bestehenden
-`dev-tools/`-Skripte ergänzt (siehe „Build/Test/Package" weiter unten). Es
+`dev-tools/`-Skripte ergänzt (siehe „Build/Test/Package" weiter unten). Eine
+fünfte Session hat in 0.6.3 auf einen von Dominik gemeldeten Fatal Error
+(„Cannot redeclare pms_load_textdomain()") reagiert: `pms_load_textdomain()`
+ist in beiden Hauptdateien jetzt zusätzlich mit `function_exists()`
+abgesichert (siehe „Free/Pro-Kollisionsschutz" weiter unten für die Analyse,
+warum der bestehende Kollisionsguard diesen Fall eigentlich schon strukturell
+abdeckt und was der neue Guard zusätzlich absichert). Es
 wurde bewusst **kein `git init` ausgeführt** und **kein GitHub-Repo
-angelegt/gepusht** – das war nie Teil eines der vier Aufträge. Der alte Plugin-Ordner liegt unangetastet
+angelegt/gepusht** – das war nie Teil eines der fünf Aufträge. Der alte Plugin-Ordner liegt unangetastet
 als `_pre-migration-backup_lightweight-meta-pixel-capi-tracker/` neben `src/`
 (zusammen mit der alten `lightweight-meta-pixel-capi-tracker.zip`) und kann
 gelöscht werden, sobald Dominik den neuen Stand verifiziert hat. Die
@@ -217,6 +223,29 @@ and has been deactivated automatically.") – bewusst wortgleich in beiden
 Dateien, damit der Text nicht zweimal separat gepflegt werden muss und immer
 konsistent bleibt, unabhängig davon, welche der beiden Dateien ihn gerade
 ausgibt.
+
+**Zusätzlicher `function_exists()`-Guard um `pms_load_textdomain()` seit
+v0.6.3.** Dominik meldete einen Fatal Error „Cannot redeclare
+pms_load_textdomain()" aus einem Live-Test mit gleichzeitig geladenem
+Free+Pro. Analyse dieser Session: Der oben beschriebene Kollisionsguard
+steht in BEIDEN Dateien bereits vor jeder `define()`/`function`/
+`require_once`-Zeile (verifiziert per direktem Dateivergleich) – die zweite
+Datei, die in einem Request lädt, bricht also strukturell per `return` ab,
+BEVOR sie `pms_load_textdomain()` überhaupt deklariert. Der gemeldete Fehler
+ließ sich anhand des aktuellen Codes nicht rekonstruieren; naheliegendste
+Erklärung ist, dass der getestete Stand nicht exakt diesem `src/` entsprach
+(kein automatisiertes Deployment vorhanden, siehe „Releases bauen" –
+Dominik kopiert vermutlich manuell). Trotzdem wurde `pms_load_textdomain()`
+in BEIDEN Hauptdateien zusätzlich mit `if ( ! function_exists(
+'pms_load_textdomain' ) ) { ... }` umschlossen – dasselbe Muster, das im
+selben Guard-Block bereits für `deactivate_plugins()`/`is_plugin_active()`
+verwendet wird. Reiner Zusatznutzen (kostet nichts, schließt die Fehlerklasse
+auch für den Fall ab, dass eine künftige Änderung versehentlich Code vor den
+Kollisionsguard verschiebt), keine funktionale Notwendigkeit nach aktuellem
+Kenntnisstand. **Für den nächsten Chat, falls der Fehler erneut gemeldet
+wird:** zuerst prüfen, ob der getestete Plugin-Ordner wirklich 1:1 dem
+aktuellen `src/` entspricht (Timestamp/Diff), bevor an der Guard-Logik selbst
+weitergesucht wird.
 
 ### Geteilter Options-Key & Text-Domain (Freemium-Datenmodell)
 

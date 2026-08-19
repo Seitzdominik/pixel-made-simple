@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.2
+Stable tag: 0.6.3
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -90,6 +90,10 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.3 =
+* Fix: Zusätzliche `function_exists()`-Absicherung um `pms_load_textdomain()` in beiden Hauptdateien, um einen Fatal Error „Cannot redeclare pms_load_textdomain()" beim gleichzeitigen Laden von Free und Pro sicher auszuschließen. Der bestehende Kollisionsschutz (siehe 0.6.2) verhindert diesen Fall bereits strukturell, da er per `return` abbricht, bevor die Funktion je deklariert wird – dieser zusätzliche Guard ist bewusste Doppelabsicherung nach demselben Muster, das an anderen Stellen der beiden Hauptdateien schon für `deactivate_plugins()`/`is_plugin_active()` verwendet wird.
+* Kollisionsguard-Reihenfolge verifiziert: Der Guard steht in beiden Hauptdateien unmittelbar nach `defined('ABSPATH') || exit;` und vor jeder Konstanten-Definition, Funktionsdeklaration und jedem `require_once`.
 
 = 0.6.2 =
 * Härtung des Free/Pro-Kollisionsschutzes: Die Admin-Notice bei gleichzeitiger Aktivierung ist jetzt in beiden Versionen identisch formuliert und der automatische Deaktivierungs-Mechanismus bewusst asymmetrisch – im Kollisionsfall bleibt immer Pro aktiv, nie Free (spätestens ab dem nächsten Seitenaufruf, siehe Code-Kommentar in `pixel-made-simple.php`/`pixel-made-simple-pro.php` für den Bulk-Aktivieren-Sonderfall).

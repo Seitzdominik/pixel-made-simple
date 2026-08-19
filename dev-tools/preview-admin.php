@@ -17,7 +17,7 @@ define( 'ABSPATH', __DIR__ . '/' );
 // false = Free-Ansicht (Pro-Teaser für UTM/Export, Event-Limit greift);
 // auf true setzen, um die Pro-Ansicht zu generieren.
 define( 'PMS_IS_PRO', false );
-define( 'PMS_VERSION', '0.6.2' );
+define( 'PMS_VERSION', '0.6.3' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_URL', './' );
 define( 'ARRAY_A', 'ARRAY_A' );

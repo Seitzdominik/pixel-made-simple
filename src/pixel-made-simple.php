@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Lightweight, high-performance tracking for Meta Pixel & Conversions API, Google Ads (Consent Mode v2) and TikTok Pixel – with URL-based multi-platform events and clean event deduplication.
- * Version:           0.6.2
+ * Version:           0.6.3
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -55,7 +55,7 @@ if ( defined( 'PMS_IS_PRO' ) && true === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', false );
-define( 'PMS_VERSION', '0.6.2' );
+define( 'PMS_VERSION', '0.6.3' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -89,13 +89,21 @@ register_activation_hook( __FILE__, array( 'PMS_Logger', 'activate' ) );
  * Übersetzungen aus /languages laden (z. B. von Loco Translate generierte
  * pixel-made-simple-de_DE.mo). Domain und Sprachordner sind mit der Pro-
  * Version identisch, damit beide dieselbe Übersetzungsdatei nutzen.
+ *
+ * function_exists()-Guard: Der Kollisionsguard oben deckt diesen Fall
+ * bereits ab (er kehrt per return zurück, bevor diese Zeile je erreicht
+ * wird) – der zusätzliche Guard hier ist bewusste Doppelabsicherung, falls
+ * eine künftige Änderung versehentlich Code vor den Kollisionsguard
+ * verschiebt oder eine dritte Stelle diese Datei erneut einbindet.
  */
-function pms_load_textdomain() {
-	load_plugin_textdomain(
-		'pixel-made-simple',
-		false,
-		dirname( plugin_basename( __FILE__ ) ) . '/languages'
-	);
+if ( ! function_exists( 'pms_load_textdomain' ) ) {
+	function pms_load_textdomain() {
+		load_plugin_textdomain(
+			'pixel-made-simple',
+			false,
+			dirname( plugin_basename( __FILE__ ) ) . '/languages'
+		);
+	}
 }
 add_action( 'init', 'pms_load_textdomain' );
 

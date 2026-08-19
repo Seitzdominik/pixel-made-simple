@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple Pro
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Pro add-on for Pixel Made Simple: everything in the free version plus [Pro-only features go here].
- * Version:           0.6.2
+ * Version:           0.6.3
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -49,7 +49,7 @@ if ( defined( 'PMS_IS_PRO' ) && false === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', true );
-define( 'PMS_VERSION', '0.6.2' );
+define( 'PMS_VERSION', '0.6.3' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -103,13 +103,21 @@ if ( file_exists( PMS_PLUGIN_DIR . 'plugin-update-checker/plugin-update-checker.
 /**
  * Übersetzungen aus /languages laden (identisch mit der Free-Version, siehe
  * Hinweis im Datei-Header oben).
+ *
+ * function_exists()-Guard: Der Kollisionsguard oben deckt diesen Fall
+ * bereits ab (er kehrt per return zurück, bevor diese Zeile je erreicht
+ * wird) – der zusätzliche Guard hier ist bewusste Doppelabsicherung, falls
+ * eine künftige Änderung versehentlich Code vor den Kollisionsguard
+ * verschiebt oder eine dritte Stelle diese Datei erneut einbindet.
  */
-function pms_load_textdomain() {
-	load_plugin_textdomain(
-		'pixel-made-simple',
-		false,
-		dirname( plugin_basename( __FILE__ ) ) . '/languages'
-	);
+if ( ! function_exists( 'pms_load_textdomain' ) ) {
+	function pms_load_textdomain() {
+		load_plugin_textdomain(
+			'pixel-made-simple',
+			false,
+			dirname( plugin_basename( __FILE__ ) ) . '/languages'
+		);
+	}
 }
 add_action( 'init', 'pms_load_textdomain' );
 
