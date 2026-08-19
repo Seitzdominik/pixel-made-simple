@@ -90,26 +90,14 @@ class PMS_Forms {
 
 		$settings = PMS_Settings::get();
 
-		if ( ! empty( $settings['exclude_admins'] ) && current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( array( 'reason' => 'admin_excluded' ), 200 );
-		}
-
-		/** Dokumentiert in class-pms-frontend.php */
-		if ( ! apply_filters( 'pms_allow_tracking', true ) ) {
-			wp_send_json_error( array( 'reason' => 'tracking_disabled' ), 200 );
-		}
-
-		if ( ! PMS_Consent::has_marketing_consent() ) {
-			wp_send_json_error( array( 'reason' => 'no_consent' ), 200 );
-		}
-
-		if ( empty( $settings['capi_enabled'] ) || empty( $settings['pixel_id'] ) || empty( $settings['capi_token'] ) ) {
-			wp_send_json_error( array( 'reason' => 'capi_inactive' ), 200 );
-		}
-
 		// Längenbegrenzung VOR jeder weiteren Verarbeitung: dieser Endpunkt ist
 		// über wp_ajax_nopriv_ auch ohne Login erreichbar, daher werden alle
-		// Eingaben hart gekappt, bevor Regex/Hashing/API-Call anfallen.
+		// Eingaben hart gekappt, bevor Regex/Hashing/API-Call anfallen. Vorab
+		// geparst (reine Eingabe-Normalisierung, kein Seiteneffekt), damit auch
+		// die frühen Bail-outs unten (insbesondere capi_inactive) bei
+		// bestätigtem Browser-Dispatch noch einen Event-Log-Eintrag schreiben
+		// können, statt ein rein browserseitig getracktes Event stillschweigend
+		// gar nicht zu protokollieren.
 		$event_id = substr( (string) wp_unslash( $_POST['event_id'] ?? '' ), 0, self::MAX_LEN_EVENT_ID );
 		$event_id = sanitize_text_field( $event_id );
 		$event_id = preg_replace( '/[^A-Za-z0-9\-]/', '', $event_id );
@@ -124,6 +112,35 @@ class PMS_Forms {
 		$event_name = sanitize_text_field( $event_name );
 		if ( ! in_array( $event_name, PMS_Settings::form_event_types(), true ) ) {
 			$event_name = self::event_type();
+		}
+
+		// Einziges Signal, ob der Browser-Pixel tatsächlich gefeuert hat (siehe
+		// frontend.js#fireLead) -- window.fbq kann z. B. fehlen, wenn die
+		// Meta-Plattform selbst deaktiviert ist.
+		$browser_fired = ! empty( $_POST['browser_fired'] );
+
+		if ( ! empty( $settings['exclude_admins'] ) && current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'reason' => 'admin_excluded' ), 200 );
+		}
+
+		/** Dokumentiert in class-pms-frontend.php */
+		if ( ! apply_filters( 'pms_allow_tracking', true ) ) {
+			wp_send_json_error( array( 'reason' => 'tracking_disabled' ), 200 );
+		}
+
+		if ( ! PMS_Consent::has_marketing_consent() ) {
+			wp_send_json_error( array( 'reason' => 'no_consent' ), 200 );
+		}
+
+		if ( empty( $settings['capi_enabled'] ) || empty( $settings['pixel_id'] ) || empty( $settings['capi_token'] ) ) {
+			// CAPI ist aus/nicht konfiguriert, der Browser-Pixel lief aber ganz
+			// normal weiter (häufiges Setup, gerade bei kleineren Sites ohne
+			// CAPI-Token) -- dafür trotzdem einen eigenständigen Event-Log-
+			// Eintrag schreiben, statt das Event komplett unsichtbar zu machen.
+			if ( $browser_fired && class_exists( 'PMS_Logger' ) ) {
+				PMS_Logger::record( $event_name, $event_id, 'browser', 0, array() );
+			}
+			wp_send_json_error( array( 'reason' => 'capi_inactive' ), 200 );
 		}
 
 		$source_url = self::source_url();
@@ -165,7 +182,8 @@ class PMS_Forms {
 			array( $event ),
 			$settings,
 			$source_url,
-			$user_data
+			$user_data,
+			$browser_fired
 		);
 
 		wp_send_json_success(

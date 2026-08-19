@@ -566,7 +566,63 @@
 	color: #8c8f94;
 }
 
+/* Event-Log-Tab */
+.pms-log-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	max-width: 960px;
+	margin: 12px 0 16px;
+}
+
+.pms-log-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.pms-log-retention {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: auto;
+}
+
+.pms-log-table {
+	max-width: 960px;
+}
+
+.pms-log-table code {
+	word-break: break-all;
+}
+
+.pms-badge-log-ok {
+	border-color: #00a32a;
+	background: #eafbea;
+	color: #005a1e;
+}
+
+.pms-badge-log-error {
+	border-color: #d63638;
+	background: #fcebea;
+	color: #8a1f1f;
+	cursor: help;
+}
+
+.pms-badge-log-neutral {
+	border-color: #8c8f94;
+	background: #f0f0f1;
+	color: #50575e;
+}
+
 @media screen and (max-width: 782px) {
+	.pms-log-retention {
+		margin-left: 0;
+	}
+
+
 	#pms-match-value {
 		margin-left: 0;
 		margin-top: 8px;

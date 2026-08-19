@@ -38,4 +38,10 @@ if ( ! $pms_sibling_still_present ) {
 	delete_option( 'pms_settings' );
 	delete_option( 'pms_events' );
 	delete_option( 'pms_events_enabled' );
+	delete_option( 'pms_log_db_version' );
+
+	wp_clear_scheduled_hook( 'pms_cleanup_event_log_cron' );
+
+	global $wpdb;
+	$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'pms_event_log' );
 }

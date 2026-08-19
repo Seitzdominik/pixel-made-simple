@@ -22,6 +22,18 @@ class PMS_Settings {
 	const FREE_ACTIVE_EVENT_LIMIT = 2;
 
 	/**
+	 * Event-Log-Aufbewahrung (Tab "Event Log", siehe PMS_Logger). Free ist
+	 * fest auf FREE_LOG_RETENTION_DAYS gesetzt und nicht konfigurierbar; Pro
+	 * wählt aus ALLOWED_LOG_RETENTION_DAYS. Bewusst hier statt in PMS_Logger
+	 * definiert: PMS_Settings ist die "Schaltzentrale" für alles, was ein
+	 * gültiger Einstellungswert ist -- PMS_Logger konsumiert diese Konstanten
+	 * nur, damit die Abhängigkeitsrichtung dieselbe bleibt wie überall sonst.
+	 */
+	const FREE_LOG_RETENTION_DAYS    = 3;
+	const DEFAULT_LOG_RETENTION_DAYS = 7;
+	const ALLOWED_LOG_RETENTION_DAYS = array( 3, 7, 14, 30 );
+
+	/**
 	 * Läuft gerade die Pro-Version?
 	 *
 	 * Defensiv per defined()-Check statt eines nackten PMS_IS_PRO-Zugriffs:
@@ -139,6 +151,9 @@ class PMS_Settings {
 			'utm_form_fill_mode'   => 'all',
 			'utm_form_fill_urls'   => '',
 			'debug_bar'            => 1,
+			// Event Log (Tab "Event Log"). Nur in Pro tatsächlich wählbar --
+			// siehe PMS_Logger::retention_days() für den Free/Pro-Unterschied.
+			'log_retention_days'   => 7,
 		);
 
 		$settings = get_option( self::OPTION_SETTINGS, array() );
@@ -207,6 +222,9 @@ class PMS_Settings {
 				: 'all',
 			'utm_form_fill_urls'   => self::sanitize_url_patterns( $input['utm_form_fill_urls'] ?? '' ),
 			'debug_bar'            => empty( $input['debug_bar'] ) ? 0 : 1,
+			'log_retention_days'   => in_array( (int) ( $input['log_retention_days'] ?? 0 ), self::ALLOWED_LOG_RETENTION_DAYS, true )
+				? (int) $input['log_retention_days']
+				: self::DEFAULT_LOG_RETENTION_DAYS,
 		);
 	}
 

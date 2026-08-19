@@ -41,22 +41,19 @@ class PMS_CAPI {
 	 *                                  z. B. em/ph aus dem Formular-Auto-Grabber.
 	 * @return array Status-Eintrag (auch im Log hinterlegt).
 	 */
-	public static function send_events( array $events, array $settings, $source_url, array $extra_user_data = array() ) {
-		$names = array();
-		foreach ( $events as $event ) {
-			$names[] = PMS_Settings::resolved_event_name( $event );
-		}
+	public static function send_events( array $events, array $settings, $source_url, array $extra_user_data = array(), $browser_confirmed = false ) {
+		$source = $browser_confirmed ? 'both' : 'capi';
 
 		// DSGVO: Ohne Marketing-Einwilligung wird kein Request abgesetzt.
 		if ( class_exists( 'PMS_Consent' ) && ! PMS_Consent::has_marketing_consent() ) {
-			return self::log( $names, 'consent_blocked', 0, __( 'No marketing consent', 'pixel-made-simple' ), array() );
+			return self::log( $events, 'consent_blocked', 0, __( 'No marketing consent', 'pixel-made-simple' ), array(), $source );
 		}
 
 		$pixel_id = preg_replace( '/\D+/', '', (string) ( $settings['pixel_id'] ?? '' ) );
 		$token    = (string) ( $settings['capi_token'] ?? '' );
 
 		if ( '' === $pixel_id || '' === $token || empty( $events ) ) {
-			return self::log( $names, 'skipped', 0, __( 'Pixel ID or access token missing', 'pixel-made-simple' ), array() );
+			return self::log( $events, 'skipped', 0, __( 'Pixel ID or access token missing', 'pixel-made-simple' ), array(), $source );
 		}
 
 		$user_data = array_merge( self::build_user_data( $settings ), $extra_user_data );
@@ -129,7 +126,7 @@ class PMS_CAPI {
 		$keys = array_keys( $user_data );
 
 		if ( ! $blocking ) {
-			return self::log( $names, 'sent', 0, '', $keys );
+			return self::log( $events, 'sent', 0, '', $keys, $source );
 		}
 
 		if ( is_wp_error( $response ) ) {
@@ -137,7 +134,7 @@ class PMS_CAPI {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				error_log( '[PMS] CAPI-Fehler: ' . $message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			}
-			return self::log( $names, 'error', 0, $message, $keys );
+			return self::log( $events, 'error', 0, $message, $keys, $source );
 		}
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
@@ -148,7 +145,7 @@ class PMS_CAPI {
 		}
 
 		if ( $code >= 200 && $code < 300 ) {
-			return self::log( $names, 'ok', $code, '', $keys );
+			return self::log( $events, 'ok', $code, '', $keys, $source );
 		}
 
 		$message = $raw;
@@ -157,20 +154,35 @@ class PMS_CAPI {
 			$message = (string) $decoded['error']['message'];
 		}
 
-		return self::log( $names, 'error', $code, $message, $keys );
+		return self::log( $events, 'error', $code, $message, $keys, $source );
 	}
 
 	/**
-	 * Status-Eintrag protokollieren.
+	 * Status-Eintrag protokollieren: request-lokal für die Live-Debug-Leiste
+	 * (self::$log, unverändertes Verhalten) UND -- für tatsächliche
+	 * Sende-Versuche -- persistent im Event Log (PMS_Logger).
 	 *
-	 * @param string[] $events    Event-Namen.
+	 * Persistiert wird NUR bei sent/ok/error (ein echter wp_remote_post()-
+	 * Versuch fand statt). consent_blocked/skipped landen bewusst NICHT in
+	 * der Tabelle -- das sind Gründe, WARUM nicht getrackt wurde, keine
+	 * Events, die ein Nutzer im Event Log nachvollziehen möchte.
+	 *
+	 * http_status bleibt bei 'sent' auf 0 (Fire-and-Forget, siehe
+	 * pms_capi_blocking-Filter -- die tatsächliche Antwort wird bewusst nicht
+	 * abgewartet, um die Ladezeit nicht zu beeinflussen). Ein
+	 * PMS_Logger-Eintrag mit http_status=0 UND leerer error_message bedeutet
+	 * also "gesendet, Ergebnis unbekannt", NICHT zwingend "nur Browser" --
+	 * die source-Spalte trägt diese Unterscheidung.
+	 *
+	 * @param array    $events    Events inkl. 'event_id' (nicht nur Namen).
 	 * @param string   $status    sent|ok|error|consent_blocked|skipped.
 	 * @param int      $code      HTTP-Statuscode.
 	 * @param string   $message   Fehlermeldung.
 	 * @param string[] $match_keys Verwendete user_data-Schlüssel.
+	 * @param string   $source     'capi' oder 'both' (Browser-Dispatch bestätigt).
 	 * @return array
 	 */
-	private static function log( array $events, $status, $code = 0, $message = '', array $match_keys = array() ) {
+	private static function log( array $events, $status, $code = 0, $message = '', array $match_keys = array(), $source = 'capi' ) {
 		// $message stammt bei Fehlern aus der rohen HTTP-Antwort der Meta-API
 		// (externe, nicht kontrollierte Quelle) und wird u. a. serverseitig
 		// in der Live-Debug-Leiste sowie in der AJAX-Response an den Browser
@@ -178,8 +190,13 @@ class PMS_CAPI {
 		$message = wp_strip_all_tags( (string) $message );
 		$message = substr( $message, 0, 300 );
 
+		$names = array();
+		foreach ( $events as $event ) {
+			$names[] = PMS_Settings::resolved_event_name( $event );
+		}
+
 		$entry = array(
-			'events'     => $events,
+			'events'     => $names,
 			'status'     => $status,
 			'code'       => $code,
 			'message'    => $message,
@@ -187,6 +204,19 @@ class PMS_CAPI {
 		);
 
 		self::$log[] = $entry;
+
+		if ( in_array( $status, array( 'sent', 'ok', 'error' ), true ) && class_exists( 'PMS_Logger' ) ) {
+			foreach ( $events as $event ) {
+				PMS_Logger::record(
+					PMS_Settings::resolved_event_name( $event ),
+					(string) ( $event['event_id'] ?? '' ),
+					$source,
+					$code,
+					$match_keys,
+					$message
+				);
+			}
+		}
 
 		return $entry;
 	}

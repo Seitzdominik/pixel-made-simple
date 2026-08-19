@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.0
+Stable tag: 0.6.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -90,6 +90,14 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.1 =
+* Neu: **Event Log** (Tab „Event Log") – protokolliert Browser- und Conversions-API-Events in einer eigenen Datenbanktabelle, damit du Conversions direkt im WordPress-Backend nachvollziehen kannst, ohne den Meta Events Manager zu öffnen. Zeigt Zeitpunkt, Event, Event-ID (für den Dedup-Abgleich mit dem Meta Events Manager), Quelle (Browser/CAPI/beides), Status (grün „200 OK", rot „Fehler" inkl. Tooltip mit der Fehlermeldung, neutral „Gesendet" für nicht-blockierende Fire-and-Forget-Sends ohne Rückmeldung) und die übergebenen Match-Keys (z. B. `em`, `fbc`) – niemals die Werte selbst.
+* Datenschutz: Es werden ausschließlich Feldnamen (`user_data_keys`), niemals Klartext-Werte oder Hashes gespeichert.
+* Automatisches Aufräumen: ein täglicher Cron löscht abgelaufene Einträge. Free: fest 3 Tage. Pro: 3/7/14/30 Tage wählbar (Tab „Event Log", Dropdown).
+* Pro-Funktionen im Event Log: Filter nach Status (alle/nur Fehler) und Event-Name, wählbare Aufbewahrungsdauer. In der Free-Version werden diese Controls sichtbar, aber deaktiviert angezeigt (mit Upgrade-Hinweis) statt komplett ausgeblendet zu werden.
+* „Log leeren"-Button (nonce-gesichert, mit Bestätigungsdialog) in beiden Versionen uneingeschränkt nutzbar.
+* Der Formular-Auto-Grabber meldet jetzt zusätzlich, ob der Browser-Pixel tatsächlich gefeuert hat (`browser_fired`) – ermöglicht einen eigenständigen Event-Log-Eintrag, wenn z. B. die Conversions API (noch) nicht konfiguriert ist, der Browser-Pixel aber ganz normal lief.
 
 = 0.6.0 =
 * Rebrand & Relaunch als **„Pixel Made Simple"** (vormals „Lightweight Meta Pixel & CAPI Tracker"). Gleicher Funktionskern, jetzt als Free/Pro-Aufteilung angelegt: Free bleibt vollständig eigenständig nutzbar und wird über WordPress.org vertrieben; **Pixel Made Simple Pro** ist ein separates Plugin für Zusatzfunktionen, verteilt über GitHub Releases mit automatischen Updates. Beide teilen sich denselben Options-Key (`pms_settings`), ein Upgrade übernimmt die bestehende Konfiguration nahtlos.

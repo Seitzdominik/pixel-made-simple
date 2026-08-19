@@ -115,6 +115,33 @@ class PMS_Admin {
 	}
 
 	/**
+	 * Whitelist der per AJAX autosavenden Einstellungs-Keys, getrennt von
+	 * sanitize_settings(). 'bool' -> 0/1-Toggle (der historische Normalfall).
+	 * 'log_retention_days' ist der erste nicht-boolesche Autosave-Key
+	 * (Dropdown im Event-Log-Tab) und zusätzlich Pro-only.
+	 *
+	 * @return array<string,string>
+	 */
+	private static function autosave_allowed_keys() {
+		return array(
+			'exclude_admins'       => 'bool',
+			'consent_detection'    => 'bool',
+			'pixel_enabled'        => 'bool',
+			'capi_enabled'         => 'bool',
+			'hash_email'           => 'bool',
+			'google_enabled'       => 'bool',
+			'google_consent_mode'  => 'bool',
+			'tiktok_enabled'       => 'bool',
+			'form_tracking'        => 'bool',
+			'form_exclude_system'  => 'bool',
+			'utm_passthrough'      => 'bool',
+			'enable_utm_form_fill' => 'bool',
+			'debug_bar'            => 'bool',
+			'log_retention_days'   => 'log_retention_days',
+		);
+	}
+
+	/**
 	 * AJAX: einzelnen Einstellungs-Toggle sofort speichern (nonce-gesichert).
 	 *
 	 * @return void
@@ -126,30 +153,27 @@ class PMS_Admin {
 			wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
 		}
 
-		$allowed = array(
-			'exclude_admins',
-			'consent_detection',
-			'pixel_enabled',
-			'capi_enabled',
-			'hash_email',
-			'google_enabled',
-			'google_consent_mode',
-			'tiktok_enabled',
-			'form_tracking',
-			'form_exclude_system',
-			'utm_passthrough',
-			'enable_utm_form_fill',
-			'debug_bar',
-		);
+		$allowed = self::autosave_allowed_keys();
+		$key     = sanitize_key( wp_unslash( $_POST['key'] ?? '' ) );
 
-		$key = sanitize_key( wp_unslash( $_POST['key'] ?? '' ) );
-
-		if ( ! in_array( $key, $allowed, true ) ) {
+		if ( ! isset( $allowed[ $key ] ) ) {
 			wp_send_json_error( array( 'message' => 'invalid_key' ), 400 );
 		}
 
-		$settings         = PMS_Settings::get();
-		$settings[ $key ] = empty( $_POST['value'] ) ? 0 : 1;
+		if ( 'log_retention_days' === $allowed[ $key ] && ! PMS_Settings::is_pro() ) {
+			wp_send_json_error( array( 'message' => 'pro_required' ), 403 );
+		}
+
+		$settings = PMS_Settings::get();
+
+		if ( 'log_retention_days' === $allowed[ $key ] ) {
+			$requested        = (int) wp_unslash( $_POST['value'] ?? 0 );
+			$settings[ $key ] = in_array( $requested, PMS_Settings::ALLOWED_LOG_RETENTION_DAYS, true )
+				? $requested
+				: PMS_Settings::DEFAULT_LOG_RETENTION_DAYS;
+		} else {
+			$settings[ $key ] = empty( $_POST['value'] ) ? 0 : 1;
+		}
 
 		update_option( PMS_Settings::OPTION_SETTINGS, PMS_Settings::sanitize_settings( $settings ) );
 
@@ -180,6 +204,7 @@ class PMS_Admin {
 			'import_missing' => array( 'error', __( 'Please choose a JSON file to import.', 'pixel-made-simple' ) ),
 			'free_limit_reached' => array( 'error', __( 'The free version allows a maximum of 2 active custom events. Deactivate another event first, or upgrade to Pro for unlimited events.', 'pixel-made-simple' ) ),
 			'free_limit_active'  => array( 'warning', __( 'Event saved, but not activated: the free version allows a maximum of 2 active custom events. Upgrade to Pro for unlimited events.', 'pixel-made-simple' ) ),
+			'log_cleared'        => array( 'success', __( 'Event log cleared.', 'pixel-made-simple' ) ),
 		);
 
 		$key = sanitize_key( wp_unslash( $_GET['pms_message'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -229,7 +254,7 @@ class PMS_Admin {
 	 * @param string $text Hilfetext.
 	 * @return void
 	 */
-	private static function tip( $text ) {
+	public static function tip( $text ) {
 		?>
 		<span class="pms-tip" tabindex="0">
 			<span class="dashicons dashicons-editor-help" aria-hidden="true"></span>
@@ -298,7 +323,7 @@ class PMS_Admin {
 	 * @param string $feature Kurzer Slug des Features, das den Klick auslöst.
 	 * @return string
 	 */
-	private static function upgrade_url( $feature ) {
+	public static function upgrade_url( $feature ) {
 		return add_query_arg(
 			array(
 				'utm_source'   => 'plugin',
@@ -318,7 +343,7 @@ class PMS_Admin {
 	 * @param string $feature     Slug für upgrade_url().
 	 * @return void
 	 */
-	private static function render_pro_teaser_box( $title, $description, $feature ) {
+	public static function render_pro_teaser_box( $title, $description, $feature ) {
 		?>
 		<div class="postbox pms-pro-teaser">
 			<div class="pms-pro-teaser-header">
@@ -383,6 +408,7 @@ class PMS_Admin {
 			'general'  => __( 'General', 'pixel-made-simple' ),
 			'events'   => __( 'URL Events', 'pixel-made-simple' ),
 			'advanced' => __( 'Advanced Tracking', 'pixel-made-simple' ),
+			'log'      => __( 'Event Log', 'pixel-made-simple' ),
 			'tools'    => __( 'Tools', 'pixel-made-simple' ),
 		);
 
@@ -416,6 +442,9 @@ class PMS_Admin {
 					break;
 				case 'advanced':
 					self::render_advanced_tab();
+					break;
+				case 'log':
+					PMS_Admin_Event_Log::render_tab();
 					break;
 				case 'tools':
 					self::render_tools_tab();

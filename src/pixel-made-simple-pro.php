@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple Pro
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Pro add-on for Pixel Made Simple: everything in the free version plus [Pro-only features go here].
- * Version:           0.6.0
+ * Version:           0.6.1
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -36,7 +36,7 @@ if ( defined( 'PMS_IS_PRO' ) && false === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', true );
-define( 'PMS_VERSION', '0.6.0' );
+define( 'PMS_VERSION', '0.6.1' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -60,6 +60,11 @@ function pms_pro_deactivate_free_on_activation() {
 	}
 }
 register_activation_hook( __FILE__, 'pms_pro_deactivate_free_on_activation' );
+// Eigene, unabhängige register_activation_hook()-Registrierung fürs Event-Log
+// (WordPress erlaubt mehrere pro Datei, sie feuern der Reihe nach) -- legt die
+// Log-Tabelle sofort an und plant den täglichen Retention-Cron ein, statt auf
+// den nächsten plugins_loaded-Request zu warten.
+register_activation_hook( __FILE__, array( 'PMS_Logger', 'activate' ) );
 
 /*
  * Automatische Updates via GitHub Releases (YahnisElsts/plugin-update-checker
@@ -96,6 +101,7 @@ function pms_load_textdomain() {
 add_action( 'init', 'pms_load_textdomain' );
 
 require_once PMS_PLUGIN_DIR . 'includes/class-pms-settings.php';
+require_once PMS_PLUGIN_DIR . 'includes/class-pms-logger.php';
 require_once PMS_PLUGIN_DIR . 'includes/class-pms-consent.php';
 require_once PMS_PLUGIN_DIR . 'includes/class-pms-capi.php';
 require_once PMS_PLUGIN_DIR . 'includes/class-pms-frontend.php';
@@ -107,9 +113,12 @@ require_once PMS_PLUGIN_DIR . 'pro/class-pro-utm.php';
 
 if ( is_admin() ) {
 	require_once PMS_PLUGIN_DIR . 'includes/class-pms-admin.php';
+	require_once PMS_PLUGIN_DIR . 'includes/admin/class-pms-admin-event-log.php';
 	PMS_Admin::init();
+	PMS_Admin_Event_Log::init();
 }
 
+PMS_Logger::init();
 PMS_Frontend::init();
 PMS_Forms::init();
 PMS_Tools::init();

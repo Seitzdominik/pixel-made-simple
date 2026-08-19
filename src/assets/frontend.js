@@ -285,6 +285,10 @@
 		body.append( 'event_id', eventId );
 		body.append( 'event_name', EVENT_NAME );
 		body.append( 'source_url', window.location.href );
+		// Event Log (v0.6.1): server-seitig gibt es sonst kein Signal, ob der
+		// Browser-Pixel tatsächlich gefeuert hat (window.fbq könnte fehlen,
+		// z. B. weil die Meta-Plattform selbst deaktiviert ist).
+		body.append( 'browser_fired', browserFired ? '1' : '0' );
 
 		if ( data.email ) {
 			body.append( 'email', data.email );
