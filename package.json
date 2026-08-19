@@ -1,0 +1,11 @@
+{
+    "name": "pixel-made-simple",
+    "version": "0.6.2",
+    "private": true,
+    "description": "Pixel Made Simple - lightweight Meta Pixel & Conversions API tracking for WordPress.",
+    "scripts": {
+        "test": "node dev-tools/test-frontend-js.js",
+        "build": "php dev-tools/build-translations.php"
+    },
+    "license": "GPL-2.0-or-later"
+}

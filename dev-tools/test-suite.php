@@ -1,0 +1,1367 @@
+<?php
+/**
+ * Funktionaler Test-Harness für Pixel Made Simple.
+ * Stubbt die benötigten WordPress-Funktionen und testet die echte Plugin-Logik
+ * per require – kein echtes WordPress nötig. Stand: v0.5.7, 205 Tests.
+ *
+ * Für die rein clientseitige Logik in assets/frontend.js (UTM-Form-Fill),
+ * die hier nicht erreichbar ist, siehe das analoge Node-Pendant
+ * dev-tools/test-frontend-js.js.
+ *
+ * Ausführen:  & "C:\php\php.exe" dev-tools\test-suite.php
+ *
+ * Hinweis zur Reihenfolge: PHP-Konstanten/Funktionen lassen sich nicht
+ * "un-definieren". Tests ohne Banner-Plugin laufen daher zuerst, danach wird
+ * CLI_VERSION definiert (Banner aktiv), ganz am Ende wp_has_consent().
+ */
+
+error_reporting( E_ALL );
+ini_set( 'display_errors', '1' );
+
+define( 'ABSPATH', __DIR__ . '/' );
+define( 'HOUR_IN_SECONDS', 3600 );
+define( 'PMS_VERSION', '0.5.6-test' );
+define( 'PMS_PLUGIN_URL', 'https://example.com/wp-content/plugins/pixel-made-simple/' );
+define( 'ARRAY_A', 'ARRAY_A' );
+
+$GLOBALS['t_pass'] = 0;
+$GLOBALS['t_fail'] = 0;
+
+function check( $label, $cond, $detail = '' ) {
+	if ( $cond ) {
+		$GLOBALS['t_pass']++;
+		echo "PASS  $label\n";
+	} else {
+		$GLOBALS['t_fail']++;
+		echo "FAIL  $label" . ( $detail !== '' ? "  ($detail)" : '' ) . "\n";
+	}
+}
+
+/* ---------------------------------------------------------------------
+ * WordPress-Stubs
+ * ------------------------------------------------------------------- */
+
+$GLOBALS['stub'] = array(
+	'options'           => array(),
+	'is_admin'          => false,
+	'current_user_can'  => false,
+	'is_user_logged_in' => false,
+	'user_email'        => '',
+	'is_ssl'            => true,
+	'filters'           => array(),
+	'captured_posts'    => array(),
+	'wp_consent'        => true,
+	'localized'         => array(),
+	'enqueued_scripts'  => array(),
+);
+
+function get_option( $name, $default = false ) {
+	return array_key_exists( $name, $GLOBALS['stub']['options'] ) ? $GLOBALS['stub']['options'][ $name ] : $default;
+}
+function update_option( $name, $value, $autoload = null ) {
+	$GLOBALS['stub']['options'][ $name ] = $value;
+	return true;
+}
+function wp_parse_args( $args, $defaults = array() ) {
+	return array_merge( $defaults, (array) $args );
+}
+function sanitize_key( $key ) {
+	return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) );
+}
+function sanitize_text_field( $str ) {
+	$str = (string) $str;
+	$str = strip_tags( $str );
+	$str = preg_replace( '/[\r\n\t ]+/', ' ', $str );
+	return trim( $str );
+}
+function sanitize_textarea_field( $str ) {
+	return trim( strip_tags( (string) $str ) );
+}
+function wp_unslash( $value ) {
+	return is_string( $value ) ? stripslashes( $value ) : $value;
+}
+function wp_parse_url( $url, $component = -1 ) {
+	return parse_url( (string) $url, $component );
+}
+function trailingslashit( $str ) {
+	return rtrim( (string) $str, '/\\' ) . '/';
+}
+function wp_generate_uuid4() {
+	return sprintf(
+		'%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+		mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
+		mt_rand( 0, 0xffff ),
+		mt_rand( 0, 0x0fff ) | 0x4000,
+		mt_rand( 0, 0x3fff ) | 0x8000,
+		mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff )
+	);
+}
+function apply_filters( $tag, $value ) {
+	if ( isset( $GLOBALS['stub']['filters'][ $tag ] ) ) {
+		return call_user_func( $GLOBALS['stub']['filters'][ $tag ], $value );
+	}
+	return $value;
+}
+function add_action( $tag, $cb, $prio = 10 ) {}
+function is_admin() { return $GLOBALS['stub']['is_admin']; }
+function wp_doing_ajax() { return false; }
+function wp_doing_cron() { return false; }
+function is_feed() { return false; }
+function is_robots() { return false; }
+function is_preview() { return false; }
+function is_customize_preview() { return false; }
+function is_404() { return false; }
+function current_user_can( $cap ) { return $GLOBALS['stub']['current_user_can']; }
+function is_user_logged_in() { return $GLOBALS['stub']['is_user_logged_in']; }
+function wp_get_current_user() {
+	return (object) array( 'user_email' => $GLOBALS['stub']['user_email'] );
+}
+function is_ssl() { return $GLOBALS['stub']['is_ssl']; }
+function home_url( $path = '' ) { return 'https://example.com' . $path; }
+function esc_url_raw( $url ) { return (string) $url; }
+function esc_url( $url ) { return (string) $url; }
+function esc_js( $text ) {
+	return str_replace( array( '\\', "'", '"', "\n", "\r", '<', '>' ), array( '\\\\', "\\'", '\\"', '', '', '\\x3c', '\\x3e' ), (string) $text );
+}
+function wp_print_inline_script_tag( $js, $attrs = array() ) {
+	$attr_str = '';
+	foreach ( $attrs as $k => $v ) {
+		$attr_str .= ' ' . $k . '="' . $v . '"';
+	}
+	echo '<script' . $attr_str . ">\n" . $js . "</script>\n";
+}
+// WICHTIG: Signatur muss die echte wp_json_encode()-Signatur inkl. $flags
+// nachbilden. Ein zu einfacher Stub ohne $flags hätte den JSON_HEX_TAG-
+// Security-Fix (v0.5.5) fälschlich als "getestet & bestanden" durchgewunken,
+// weil die Flags einfach verschluckt wurden. Bei jedem neuen Stub prüfen,
+// ob er auch wirklich alle Parameter durchreicht, die der Code nutzt.
+function wp_json_encode( $data, $flags = 0, $depth = 512 ) { return json_encode( $data, $flags, $depth ); }
+function is_wp_error( $thing ) { return false; }
+function wp_remote_retrieve_body( $response ) { return ''; }
+function wp_remote_post( $url, $args = array() ) {
+	$GLOBALS['stub']['captured_posts'][] = array( 'url' => $url, 'args' => $args );
+	return array( 'response' => array( 'code' => 200 ) );
+}
+function is_email( $email ) { return (bool) filter_var( (string) $email, FILTER_VALIDATE_EMAIL ); }
+function wp_strip_all_tags( $s, $breaks = false ) { return trim( strip_tags( (string) $s ) ); }
+function absint( $v ) { return abs( (int) $v ); }
+function wp_remote_retrieve_response_code( $r ) { return isset( $r['response']['code'] ) ? (int) $r['response']['code'] : 200; }
+function wp_get_referer() { return 'https://example.com/referer/'; }
+function add_filter( $tag, $cb, $prio = 10, $args = 1 ) { $GLOBALS['stub']['filters'][ $tag ] = $cb; }
+function wp_enqueue_script( $handle = '', $src = '', $deps = array(), $ver = false, $in_footer = false ) {
+	$GLOBALS['stub']['enqueued_scripts'][] = $handle;
+}
+// Signatur muss wp_localize_script() real nachbilden (Handle, Objektname, Daten),
+// sonst kann kein Test die lokalisierten JS-Settings (pms_settings) prüfen.
+function wp_localize_script( $handle, $object_name, $data ) {
+	$GLOBALS['stub']['localized'][ $handle ][ $object_name ] = $data;
+}
+function wp_create_nonce( $a = '' ) { return 'test-nonce'; }
+function admin_url( $p = '' ) { return 'https://example.com/wp-admin/' . $p; }
+function nocache_headers() {}
+function esc_html__( $t, $d = null ) { return $t; }
+function __( $t, $d = null ) { return $t; }
+function current_time( $type, $gmt = 0 ) {
+	return 'timestamp' === $type ? time() : gmdate( 'Y-m-d H:i:s' );
+}
+function wp_next_scheduled( $hook ) { return false; }
+function wp_schedule_event( $timestamp, $recurrence, $hook ) {}
+function wp_clear_scheduled_hook( $hook ) {}
+
+/**
+ * Minimaler $wpdb-Ersatz für PMS_Logger. Bewusst KEIN SQL-Parser: PMS_Logger
+ * ist absichtlich so geschrieben, dass es bis auf TRUNCATE/DELETE ohne WHERE
+ * ausschließlich strukturierte $wpdb-Methoden (insert/get_results/delete)
+ * ohne dynamisches WHERE/JOIN nutzt (siehe dessen eigene Doku dazu) -- ein
+ * Array pro "Tabelle" reicht deshalb aus, um sein Verhalten treu nachzubilden,
+ * ohne echtes SQL zu interpretieren.
+ */
+class Test_PMS_Wpdb {
+	public $prefix  = 'wp_';
+	public $rows    = array();
+	private $next_id = 1;
+
+	public function get_charset_collate() {
+		return '';
+	}
+
+	public function insert( $table, $data, $format = null ) {
+		$data['id']            = $this->next_id++;
+		$this->rows[ $table ][] = $data;
+		return 1;
+	}
+
+	public function get_results( $query, $output = null ) {
+		$table = $this->extract_table( $query );
+		$rows  = isset( $this->rows[ $table ] ) ? $this->rows[ $table ] : array();
+
+		usort(
+			$rows,
+			static function ( $a, $b ) {
+				return strcmp( (string) $b['created_at'], (string) $a['created_at'] );
+			}
+		);
+
+		return $rows;
+	}
+
+	public function delete( $table, $where, $format = null ) {
+		if ( ! isset( $this->rows[ $table ] ) ) {
+			return 0;
+		}
+		$before = count( $this->rows[ $table ] );
+		$this->rows[ $table ] = array_values(
+			array_filter(
+				$this->rows[ $table ],
+				static function ( $row ) use ( $where ) {
+					foreach ( $where as $key => $value ) {
+						if ( ( $row[ $key ] ?? null ) != $value ) { // phpcs:ignore Universal.Operators.StrictComparisons -- bewusst locker, id kommt teils als string aus $_POST.
+							return true; // behalten, WHERE trifft nicht zu.
+						}
+					}
+					return false; // löschen, WHERE trifft zu.
+				}
+			)
+		);
+		return $before - count( $this->rows[ $table ] );
+	}
+
+	public function query( $sql ) {
+		$table = $this->extract_table( $sql );
+		if ( null === $table ) {
+			return false;
+		}
+		if ( false !== stripos( $sql, 'TRUNCATE' ) || ( false !== stripos( $sql, 'DELETE' ) && false === stripos( $sql, 'WHERE' ) ) ) {
+			$this->rows[ $table ] = array();
+			return true;
+		}
+		return false;
+	}
+
+	private function extract_table( $sql ) {
+		if ( preg_match( '/\b(?:FROM|INTO|TABLE)\s+(\S+)/i', $sql, $m ) ) {
+			return rtrim( $m[1], ';' );
+		}
+		return null;
+	}
+}
+$GLOBALS['wpdb'] = new Test_PMS_Wpdb();
+
+/* ---------------------------------------------------------------------
+ * Plugin-Klassen laden (echter Code, kein Mock)
+ * ------------------------------------------------------------------- */
+
+$base = __DIR__ . '/../src/includes/';
+require $base . 'class-pms-settings.php';
+require $base . 'class-pms-logger.php';
+require $base . 'class-pms-consent.php';
+require $base . 'class-pms-capi.php';
+require $base . 'class-pms-frontend.php';
+require $base . 'class-pms-forms.php';
+require $base . 'class-pms-debug.php';
+require $base . 'class-pms-tools.php';
+require_once $base . 'class-pms-admin.php';
+
+// PMS_Pro_UTM lebt seit v0.6.0 in pro/ (nur von pixel-made-simple-pro.php
+// geladen), nicht mehr in includes/. Hier trotzdem unconditional geladen,
+// damit alle bestehenden Attribution-/UTM-Form-Fill-Tests unverändert gegen
+// echten Code laufen -- die Klasse selbst prüft PMS_IS_PRO nirgends, das
+// Free/Pro-Gating passiert ausschließlich über require/class_exists() in den
+// Bootstrap-Dateien bzw. in PMS_CAPI/PMS_Debug/PMS_Frontend. Siehe Abschnitt
+// 16 weiter unten für die eigenständigen Tests des Gatings selbst
+// (PMS_Settings::is_pro() / free_event_limit_reached()).
+require __DIR__ . '/../src/pro/class-pro-utm.php';
+
+/* ---------------------------------------------------------------------
+ * Test-Helfer (Reflection für private Properties/Methods)
+ * ------------------------------------------------------------------- */
+
+function reset_attribution() {
+	$p = new ReflectionProperty( 'PMS_Pro_UTM', 'cache' );
+	$p->setValue( null, null );
+	unset( $_COOKIE['pms_attribution'] );
+	foreach ( array( 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid' ) as $k ) {
+		unset( $_GET[ $k ] );
+	}
+}
+function call_private( $class, $method, ...$args ) {
+	$m = new ReflectionMethod( $class, $method );
+	return $m->invoke( null, ...$args );
+}
+function set_private( $class, $prop, $value ) {
+	$p = new ReflectionProperty( $class, $prop );
+	$p->setValue( null, $value );
+}
+function reset_consent_cache() {
+	set_private( 'PMS_Consent', 'cache', null );
+}
+function consent_check() {
+	reset_consent_cache();
+	return PMS_Consent::has_marketing_consent();
+}
+function reset_frontend() {
+	set_private( 'PMS_Frontend', 'matched_events', array() );
+	set_private( 'PMS_Frontend', 'active', false );
+	set_private( 'PMS_Frontend', 'settings', array() );
+	reset_consent_cache();
+	$GLOBALS['stub']['captured_posts']   = array();
+	$GLOBALS['stub']['localized']        = array();
+	$GLOBALS['stub']['enqueued_scripts'] = array();
+}
+function run_frontend() {
+	reset_frontend();
+	PMS_Frontend::prepare();
+	ob_start();
+	PMS_Frontend::print_scripts();
+	return ob_get_clean();
+}
+/**
+ * prepare() + enqueue_frontend() ausführen und die an pms-frontend
+ * lokalisierten JS-Settings zurückgeben (null, wenn das Skript in diesem
+ * Szenario gar nicht erst enqueued wurde).
+ */
+function run_enqueue() {
+	reset_frontend();
+	PMS_Frontend::prepare();
+	PMS_Frontend::enqueue_frontend();
+	return $GLOBALS['stub']['localized']['pms-frontend']['pms_settings'] ?? null;
+}
+function clear_consent_cookies() {
+	foreach ( array_keys( $_COOKIE ) as $k ) {
+		if ( '_fbp' !== $k && '_fbc' !== $k ) {
+			unset( $_COOKIE[ $k ] );
+		}
+	}
+}
+
+echo "=== 1. sanitize_settings: Neue Felder & Test-Code-Zeitstempel ===\n";
+
+$GLOBALS['stub']['options'] = array();
+$out = PMS_Settings::sanitize_settings( array( 'test_event_code' => 'TEST999' ) );
+check( 'Neuer Test-Code setzt Zeitstempel', abs( time() - $out['test_code_created_at'] ) < 5 );
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'test_event_code' => 'TEST999', 'test_code_created_at' => 12345 );
+$out = PMS_Settings::sanitize_settings( array( 'test_event_code' => 'TEST999' ) );
+check( 'Unveränderter Test-Code behält Zeitstempel', 12345 === $out['test_code_created_at'] );
+
+$out = PMS_Settings::sanitize_settings( array( 'test_event_code' => 'NEU111' ) );
+check( 'Geänderter Test-Code erneuert Zeitstempel', abs( time() - $out['test_code_created_at'] ) < 5 );
+
+$out = PMS_Settings::sanitize_settings( array( 'test_event_code' => '' ) );
+check( 'Leerer Test-Code setzt Zeitstempel auf 0', 0 === $out['test_code_created_at'] );
+
+$defaults = PMS_Settings::get();
+check( 'Default: Consent-Erkennung ist AKTIV (Neuinstallation)', 1 === $defaults['consent_detection'] );
+check( 'Default (Privacy-by-Default): Formular-Tracking ist INAKTIV', 0 === $defaults['form_tracking'] );
+check( 'Default (Privacy-by-Default): UTM-Passthrough ist INAKTIV', 0 === $defaults['utm_passthrough'] );
+check( 'Default: Live-Debug-Leiste ist AKTIV (nur für Admins wirksam)', 1 === $defaults['debug_bar'] );
+check( 'Default (Privacy-by-Default, v0.5.6): UTM-Form-Fill ist INAKTIV', 0 === $defaults['enable_utm_form_fill'] );
+check( 'Default: utm_form_fill_mode ist "all"', 'all' === $defaults['utm_form_fill_mode'] );
+check( 'Default: utm_form_fill_urls ist leer', '' === $defaults['utm_form_fill_urls'] );
+
+$fresh = PMS_Settings::sanitize_settings( array() );
+check( 'sanitize_settings: form_tracking ohne Input -> 0', 0 === $fresh['form_tracking'] );
+check( 'sanitize_settings: utm_passthrough ohne Input -> 0', 0 === $fresh['utm_passthrough'] );
+check( 'sanitize_settings: enable_utm_form_fill ohne Input -> 0', 0 === $fresh['enable_utm_form_fill'] );
+check( 'sanitize_settings: utm_form_fill_mode ohne Input -> "all"', 'all' === $fresh['utm_form_fill_mode'] );
+
+$clean_fill = PMS_Settings::sanitize_settings(
+	array(
+		'enable_utm_form_fill' => '1',
+		'utm_form_fill_mode'   => 'include',
+		'utm_form_fill_urls'   => " /Kontakt \r\n /LP/*  \n/kontakt\n\n",
+	)
+);
+check( 'sanitize_settings: enable_utm_form_fill übernommen', 1 === $clean_fill['enable_utm_form_fill'] );
+check( 'sanitize_settings: utm_form_fill_mode "include" übernommen', 'include' === $clean_fill['utm_form_fill_mode'] );
+check(
+	'sanitize_settings: utm_form_fill_urls zeilenbasiert normalisiert (klein, getrimmt, dedupliziert, Wildcard bleibt)',
+	"/kontakt\n/lp/*" === $clean_fill['utm_form_fill_urls'],
+	$clean_fill['utm_form_fill_urls']
+);
+
+$clean_fill2 = PMS_Settings::sanitize_settings( array( 'utm_form_fill_mode' => 'unbekannt' ) );
+check( 'sanitize_settings: unbekannter utm_form_fill_mode fällt auf "all" zurück', 'all' === $clean_fill2['utm_form_fill_mode'] );
+
+check( 'sanitize_url_patterns: Markup wird entfernt', false === strpos( PMS_Settings::sanitize_url_patterns( '/x<script>alert(1)</script>' ), '<' ) );
+
+echo "\n=== 1b. CAPI-Token: Erhalt bei Speicherungen ohne eigenes Feld (Bugfix v0.5.6) ===\n";
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'capi_token' => 'BESTEHENDER-TOKEN' );
+$out_no_key                                   = PMS_Settings::sanitize_settings( array( 'form_tracking' => '1' ) );
+check( 'capi_token bleibt erhalten, wenn der Schlüssel im Input fehlt (z. B. Tab "Erweitertes Tracking")', 'BESTEHENDER-TOKEN' === $out_no_key['capi_token'] );
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'capi_token' => 'BESTEHENDER-TOKEN' );
+$out_cleared                                  = PMS_Settings::sanitize_settings( array( 'capi_token' => '' ) );
+check( 'capi_token wird geleert, wenn explizit ein Leerstring übergeben wird (Tab "Allgemein")', '' === $out_cleared['capi_token'] );
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'capi_token' => 'ALT' );
+$out_new                                      = PMS_Settings::sanitize_settings( array( 'capi_token' => 'NEUER-TOKEN' ) );
+check( 'capi_token wird überschrieben, wenn ein neuer Wert übergeben wird', 'NEUER-TOKEN' === $out_new['capi_token'] );
+
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+echo "\n=== 2. Consent-Erkennung: Cookie-Muster (kein Banner-Plugin aktiv) ===\n";
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'consent_detection' => 0 );
+check( 'Erkennung deaktiviert -> Consent true', true === consent_check() );
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'consent_detection' => 1 );
+clear_consent_cookies();
+check( 'Fallback: kein Banner erkannt -> Consent true', true === consent_check() );
+
+$_COOKIE['cookielawinfo-checkbox-advertisement'] = 'yes';
+check( 'CLI/MHP: advertisement=yes -> true', true === consent_check() );
+$_COOKIE['cookielawinfo-checkbox-advertisement'] = 'no';
+check( 'CLI/MHP: advertisement=no -> false', false === consent_check() );
+clear_consent_cookies();
+
+// Realer Cookie-Wert aus dem Live-Test ("Alle akzeptieren"), unverändert übernommen.
+$_COOKIE['mhcookie'] = 'eyJncm91cHMiOlsiYWxsIl0sInNlcnZpY2VzIjp7ImNvb2tpZSI6W10sImRvbWFpbiI6W10sInJlc291cmNlIjpbXX0sImlhYl92ZW5kb3JzIjpbImFsbCJdLCJleHBpcnkiOjE4MTg0ODIxMjIsInRpbWVzdGFtcCI6MTc4Njk0NjAzMH0=';
+check( 'MHP mhcookie: realer "Alle akzeptieren"-Cookie -> true', true === consent_check() );
+
+$_COOKIE['mhcookie'] = base64_encode( '{"groups":["all"],"services":{"cookie":[],"domain":[],"resource":[]},"iab_vendors":["all"]}' );
+check( 'MHP mhcookie: groups=["all"] -> true', true === consent_check() );
+$_COOKIE['mhcookie'] = base64_encode( '{"groups":["marketing"]}' );
+check( 'MHP mhcookie: groups=["marketing"] -> true', true === consent_check() );
+$_COOKIE['mhcookie'] = base64_encode( '{"groups":["advertisement"]}' );
+check( 'MHP mhcookie: groups=["advertisement"] -> true', true === consent_check() );
+$_COOKIE['mhcookie'] = base64_encode( '{"groups":["essential"]}' );
+check( 'MHP mhcookie: groups=["essential"] (nur erforderlich) -> false', false === consent_check() );
+$_COOKIE['mhcookie'] = base64_encode( '{"groups":[]}' );
+check( 'MHP mhcookie: groups=[] (leer) -> false', false === consent_check() );
+$_COOKIE['mhcookie'] = base64_encode( '{"services":{}}' );
+check( 'MHP mhcookie: kein groups-Feld -> false', false === consent_check() );
+$_COOKIE['mhcookie'] = '!!!kein-base64!!!';
+check( 'MHP mhcookie: ungültiges Base64 -> false', false === consent_check() );
+$_COOKIE['mhcookie'] = base64_encode( 'kein json' );
+check( 'MHP mhcookie: ungültiges JSON -> false', false === consent_check() );
+clear_consent_cookies();
+
+echo "\n=== 2b. Security-Audit v0.5.5: Cookie-Längenbegrenzung vor JSON-Dekodierung ===\n";
+
+$_COOKIE['mhcookie'] = base64_encode( '{"groups":["all"],"pad":"' . str_repeat( 'x', 9000 ) . '"}' );
+check( 'MHP mhcookie: >8KB wird ungeparst verworfen (fail-closed)', false === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['mhcookie'] = base64_encode( '{"groups":["all"]}' );
+check( 'MHP mhcookie: normal große Cookies funktionieren weiterhin', true === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['borlabs-cookie'] = rawurlencode( '{"consents":{"marketing":["x"],"pad":"' . str_repeat( 'y', 9000 ) . '"}}' );
+check( 'Borlabs: >8KB wird ungeparst verworfen (fail-closed)', false === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['cookielawinfo-checkbox-marketing'] = 'yes';
+check( 'CLI: marketing-Kategorie=yes -> true', true === consent_check() );
+$_COOKIE['cookielawinfo-checkbox-marketing'] = 'no';
+check( 'CLI: marketing-Kategorie=no -> false', false === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['viewed_cookie_policy'] = 'yes';
+check( 'BUGFIX 1: viewed_cookie_policy=yes ALLEIN -> false ("Nur erforderliche")', false === consent_check() );
+$_COOKIE['cookielawinfo-checkbox-advertisement'] = 'yes';
+check( 'BUGFIX 1: viewed=yes + advertisement=yes -> true', true === consent_check() );
+$_COOKIE['cookielawinfo-checkbox-advertisement'] = 'no';
+check( 'BUGFIX 1: viewed=yes + advertisement=no -> false', false === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['cookieyes-consent'] = 'consent:yes,analytics:no,advertisement:yes';
+check( 'CookieYes: advertisement:yes -> true', true === consent_check() );
+$_COOKIE['cookieyes-consent'] = 'consent:yes,analytics:no,advertisement:no';
+check( 'CookieYes: advertisement:no -> false', false === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['borlabs-cookie'] = rawurlencode( '{"consents":{"essential":["borlabs-cookie"],"marketing":["facebook-pixel"]}}' );
+check( 'Borlabs: consents.marketing befüllt -> true', true === consent_check() );
+$_COOKIE['borlabs-cookie'] = rawurlencode( '{"consents":{"essential":["borlabs-cookie"]}}' );
+check( 'Borlabs: kein marketing-Consent -> false', false === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['cmplz_marketing'] = 'allow';
+check( 'Complianz: cmplz_marketing=allow -> true', true === consent_check() );
+$_COOKIE['cmplz_marketing'] = 'deny';
+check( 'Complianz: cmplz_marketing=deny -> false', false === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['complianz_consent_status'] = 'allow';
+check( 'Complianz (alt): consent_status=allow -> true', true === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['CookieConsent'] = rawurlencode( '{stamp:xyz,necessary:true,preferences:false,statistics:false,marketing:true}' );
+check( 'Cookiebot: marketing:true -> true', true === consent_check() );
+$_COOKIE['CookieConsent'] = rawurlencode( '{stamp:xyz,necessary:true,marketing:false}' );
+check( 'Cookiebot: marketing:false -> false', false === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['surecookies_consent'] = rawurlencode( '{"necessary":true,"marketing":true}' );
+check( 'SureCookies: marketing true -> true', true === consent_check() );
+clear_consent_cookies();
+
+$_COOKIE['real_cookie_banner-1'] = 'consent-data';
+check( 'Real Cookie Banner: Cookie vorhanden -> true', true === consent_check() );
+clear_consent_cookies();
+
+$GLOBALS['stub']['filters']['pms_has_marketing_consent'] = function () { return false; };
+$_COOKIE['cmplz_marketing'] = 'allow';
+check( 'Filter pms_has_marketing_consent überschreibt', false === consent_check() );
+unset( $GLOBALS['stub']['filters']['pms_has_marketing_consent'] );
+clear_consent_cookies();
+
+echo "\n=== 3. Basis: Matching & Gating (Consent-Erkennung aus) ===\n";
+
+$base_settings = array(
+	'pixel_enabled' => 1, 'pixel_id' => '123456789012345', 'capi_enabled' => 1,
+	'capi_token' => 'EAAtesttoken', 'test_event_code' => 'TEST123', 'test_code_created_at' => time(),
+	'exclude_admins' => 1, 'hash_email' => 0, 'consent_detection' => 0,
+	'google_enabled' => 1, 'google_tag_id' => 'AW-123456789', 'google_consent_mode' => 1,
+	'tiktok_enabled' => 1, 'tiktok_pixel_id' => 'C123ABC456',
+);
+$GLOBALS['stub']['options']['pms_settings'] = $base_settings;
+$GLOBALS['stub']['options']['pms_events_enabled'] = 1;
+$GLOBALS['stub']['options']['pms_events'] = array(
+	array(
+		'id' => 'ev1', 'name' => 'Lead Danke', 'event_type' => 'Lead', 'match_type' => 'exact', 'match_value' => '/bestaetigung/', 'active' => 1,
+		'meta_enabled' => 1, 'google_enabled' => 1, 'google_label' => 'AbCdEf123', 'tiktok_enabled' => 1, 'tiktok_event' => 'SubmitForm',
+	),
+);
+
+$_SERVER['REQUEST_URI']     = '/bestaetigung/?fbclid=AbC123xyz_-';
+$_SERVER['HTTP_HOST']       = 'example.com';
+$_SERVER['REMOTE_ADDR']     = '203.0.113.5';
+$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (Test)';
+$_COOKIE['_fbp']            = 'fb.1.1700000000000.1234567890';
+unset( $_COOKIE['_fbc'] );
+$_GET['fbclid']             = 'AbC123xyz_-';
+
+$html = run_frontend();
+
+check( 'Meta: init + PageView + Lead direkt ausgegeben', false !== strpos( $html, "fbq('init','123456789012345')" ) && false !== strpos( $html, "fbq('track','PageView')" ) && false !== strpos( $html, "fbq('track','Lead'" ) );
+check( 'Korrektur v0.5.7: KEIN test_event_code im PageView-Aufruf ans Browser-Pixel (Meta ignoriert es dort)', false === strpos( $html, 'test_event_code' ) );
+check( 'Korrektur v0.5.7: KEIN test_event_code im URL-Event-Aufruf ans Browser-Pixel', false !== strpos( $html, "fbq('track','Lead',{}," ) );
+// v0.6.2: Google Ads und TikTok sind Pro-only (siehe google_active()/
+// tiktok_active()-Doku in class-pms-frontend.php) -- PMS_IS_PRO ist an dieser
+// Stelle der Datei noch nicht definiert (siehe Abschnitt 17 ganz unten für
+// den Pro-Nachweis derselben Szenarien), $base_settings oben hat beide
+// Plattformen aber aktiviert konfiguriert. Bewusster Test: Free gibt trotz
+// vollständiger Google/TikTok-Konfiguration keines von beidem aus.
+check( 'Google: in Free NICHT ausgegeben (Pro-only seit v0.6.2)', false === strpos( $html, 'gtag(' ) );
+check( 'TikTok: in Free NICHT ausgegeben (Pro-only seit v0.6.2)', false === strpos( $html, 'ttq.load(' ) );
+check( 'noscript-Fallback vorhanden', false !== strpos( $html, '<noscript>' ) );
+check( 'Kein Consent-Bootstrap nötig', false === strpos( $html, 'pmsHasConsent' ) );
+check( 'BUGFIX 2: Direkter Block hinter globalem Init-Guard', false !== strpos( $html, 'window.pmsInitialized=window.pmsInitialized||false;' ) && false !== strpos( $html, 'if(!window.pmsInitialized)' ) );
+
+$post = $GLOBALS['stub']['captured_posts'][0] ?? array( 'url' => '', 'args' => array() );
+check( 'CAPI: Request an v26.0-Endpoint', 'https://graph.facebook.com/v26.0/123456789012345/events' === $post['url'] );
+$body = json_decode( $post['args']['body'] ?? '', true );
+$ev   = $body['data'][0] ?? array();
+check( 'CAPI: test_event_code (frisch) enthalten', 'TEST123' === ( $body['test_event_code'] ?? '' ) );
+preg_match( "/fbq\('track','Lead',\{[^}]*\},\{eventID:'([0-9a-f\-]{36})'\}\)/", $html, $m );
+check( 'DEDUPLIZIERUNG: Browser-eventID === CAPI-event_id', ( $m[1] ?? 'x' ) === ( $ev['event_id'] ?? 'y' ) );
+
+echo "\n=== 4. Test Event Code: 12h Auto-Expiry ===\n";
+
+$GLOBALS['stub']['options']['pms_settings']['test_code_created_at'] = time() - ( 13 * HOUR_IN_SECONDS );
+run_frontend();
+$body2 = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+check( 'Abgelaufener Test-Code wird NICHT gesendet', is_array( $body2 ) && ! array_key_exists( 'test_event_code', $body2 ) );
+$saved = $GLOBALS['stub']['options']['pms_settings'];
+check( 'Abgelaufener Test-Code wird in der DB geleert', '' === $saved['test_event_code'] && 0 === $saved['test_code_created_at'] );
+
+$GLOBALS['stub']['options']['pms_settings']['test_event_code']      = 'TEST123';
+$GLOBALS['stub']['options']['pms_settings']['test_code_created_at'] = time() - ( 11 * HOUR_IN_SECONDS );
+run_frontend();
+$body3 = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+check( '11h alter Test-Code wird noch gesendet', 'TEST123' === ( $body3['test_event_code'] ?? '' ) );
+
+echo "\n=== 5. Consent-Erkennung im Frontend (Banner aktiv: CLI_VERSION) ===\n";
+
+define( 'CLI_VERSION', '3.3.0' );
+clear_consent_cookies();
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 1;
+
+check( 'Banner aktiv + keine Entscheidung -> Consent false', false === consent_check() );
+
+$html5 = run_frontend();
+check( 'Deferred: Consent-Bootstrap vorhanden', false !== strpos( $html5, 'pmsHasConsent' ) && false !== strpos( $html5, 'pmsInit' ) );
+check( 'Deferred: Banner-Events registriert', false !== strpos( $html5, 'CLI_Cookie_Accept_All' ) && false !== strpos( $html5, 'borlabs-cookie-consent-saved' ) && false !== strpos( $html5, 'cmplz_fire_categories' ) && false !== strpos( $html5, 'CookiebotOnConsentReady' ) );
+check( 'Deferred: Meta-Skript im Bootstrap gekapselt', false !== strpos( $html5, "fbq('init'" ) );
+check( 'Deferred: TikTok in Free weiterhin NICHT ausgegeben (Pro-only seit v0.6.2)', false === strpos( $html5, 'ttq.load(' ) );
+check( 'Deferred: kein noscript (kein Tracking ohne Consent)', false === strpos( $html5, '<noscript>' ) );
+check( 'Deferred: Google in Free weiterhin NICHT ausgegeben, auch nicht der sonst sofortige Consent-Mode-Pfad (Pro-only seit v0.6.2)', false === strpos( $html5, 'googletagmanager.com/gtag/js' ) );
+check( 'Deferred: CAPI wird NICHT gesendet', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( 'BUGFIX 2: Bootstrap nutzt globalen Guard pmsInitTracking', false !== strpos( $html5, 'function pmsInitTracking(){if(window.pmsInitialized){return;}window.pmsInitialized=true;' ) );
+check( 'BUGFIX 2 (jetzt Pro-only): Google-Consent-Mode-Block in Free nicht vorhanden', false === strpos( $html5, 'pmsGtagInit' ) );
+check( 'BUGFIX 1 (JS): marketing-Kategorie wird geprüft', false !== strpos( $html5, "cookielawinfo-checkbox-marketing=yes" ) );
+check( 'BUGFIX 1 (JS): viewed_cookie_policy blockiert strikt', false !== strpos( $html5, "viewed_cookie_policy=')>-1)return false" ) && false === strpos( $html5, "viewed_cookie_policy=yes')>-1)return true" ) );
+check( 'MHP (JS): mhcookie wird Base64-dekodiert + als JSON geparst', false !== strpos( $html5, 'mhcookie=' ) && false !== strpos( $html5, 'atob(' ) && false !== strpos( $html5, 'JSON.parse(' ) );
+check( 'MHP (JS): groups-Array wird auf "all" geprüft', false !== strpos( $html5, 'mh.groups.indexOf("all")' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['google_consent_mode'] = 0;
+$html6 = run_frontend();
+check( 'Deferred ohne Consent Mode: Google in Free weiterhin NICHT ausgegeben (Pro-only seit v0.6.2)', false === strpos( $html6, 'pmsGs=document.createElement' ) && false === strpos( $html6, 'googletagmanager.com/gtag/js' ) );
+$GLOBALS['stub']['options']['pms_settings']['google_consent_mode'] = 1;
+
+$_COOKIE['cookielawinfo-checkbox-advertisement'] = 'yes';
+$html7 = run_frontend();
+check( 'Consent erteilt: Skripte direkt, kein Bootstrap', false === strpos( $html7, 'pmsHasConsent' ) && false !== strpos( $html7, "fbq('track','Lead'" ) );
+check( 'Consent erteilt: CAPI wird gesendet', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+
+$_COOKIE['cookielawinfo-checkbox-advertisement'] = 'no';
+run_frontend();
+check( 'Consent verweigert: CAPI bricht vor Request ab', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+clear_consent_cookies();
+
+echo "\n=== 6. WP Consent API (höchste Priorität) ===\n";
+
+if ( ! function_exists( 'wp_has_consent' ) ) {
+	function wp_has_consent( $category ) {
+		return $GLOBALS['stub']['wp_consent'];
+	}
+}
+$GLOBALS['stub']['wp_consent'] = true;
+check( 'wp_has_consent(true) -> Consent true', true === consent_check() );
+$GLOBALS['stub']['wp_consent'] = false;
+check( 'wp_has_consent(false) -> Consent false', false === consent_check() );
+$GLOBALS['stub']['wp_consent'] = true;
+
+echo "\n=== 7. Negativfälle & XSS ===\n";
+
+$GLOBALS['stub']['options']['pms_settings']['capi_enabled'] = 0;
+$html8 = run_frontend();
+check( 'CAPI aus: kein Server-Request', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+$GLOBALS['stub']['options']['pms_settings']['capi_enabled'] = 1;
+
+$GLOBALS['stub']['options']['pms_settings']['capi_token'] = '';
+run_frontend();
+check( 'Leerer Token: kein CAPI-Request', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+$GLOBALS['stub']['options']['pms_settings']['capi_token'] = 'EAAtesttoken';
+
+$GLOBALS['stub']['options']['pms_events_enabled'] = 0;
+$html9 = run_frontend();
+check( 'Globaler Event-Schalter aus: keine Custom Events, Basis bleibt', false === strpos( $html9, "'send_to'" ) && false !== strpos( $html9, "fbq('track','PageView')" ) );
+$GLOBALS['stub']['options']['pms_events_enabled'] = 1;
+
+reset_frontend();
+ob_start();
+PMS_Frontend::print_scripts();
+check( 'Ohne prepare(): print_scripts gibt nichts aus', '' === ob_get_clean() );
+
+$GLOBALS['stub']['options']['pms_events'] = array(
+	array(
+		'id' => 'evx', 'name' => "Böse'};alert(1);//", 'event_type' => 'CustomEvent', 'match_type' => 'contains', 'match_value' => 'bestaetigung', 'active' => 1,
+		'meta_enabled' => 1, 'tiktok_enabled' => 1, 'tiktok_event' => 'CustomEvent',
+	),
+);
+$html10 = run_frontend();
+check( 'XSS: Anführungszeichen im Event-Namen escaped', false === strpos( $html10, "Böse'};" ) );
+
+echo "\n=== 8. Feature 2: First-Touch & UTM-Attribution ===\n";
+
+$GLOBALS['stub']['options']['pms_settings']['utm_passthrough'] = 1;
+
+reset_attribution();
+$_GET['utm_source']   = 'facebook';
+$_GET['utm_medium']   = 'cpc';
+$_GET['utm_campaign'] = 'sommer-2026';
+$_GET['fbclid']       = 'AbC123xyz_-';
+PMS_Pro_UTM::capture();
+$attr = PMS_Pro_UTM::get();
+check( 'Attribution: UTM-Parameter erfasst', 'facebook' === ( $attr['utm_source'] ?? '' ) && 'sommer-2026' === ( $attr['utm_campaign'] ?? '' ) );
+check( 'Attribution: Zeitstempel gesetzt', ! empty( $attr['ts'] ) );
+
+$custom = PMS_Pro_UTM::custom_data();
+check( 'Attribution: custom_data enthält UTM', 'cpc' === ( $custom['utm_medium'] ?? '' ) );
+check( 'Attribution: custom_data ohne fbclid/ts', ! isset( $custom['fbclid'] ) && ! isset( $custom['ts'] ) );
+check( 'Attribution: fbc im Meta-Format', 1 === preg_match( '/^fb\.1\.\d{13}\.AbC123xyz_-$/', PMS_Pro_UTM::fbc() ), PMS_Pro_UTM::fbc() );
+
+reset_attribution();
+$_COOKIE['pms_attribution'] = json_encode( array( 'utm_source' => 'google', 'utm_campaign' => 'alt', 'fbclid' => 'ALT1', 'ts' => 1700000000 ) );
+$_GET['utm_source']           = 'facebook';
+$_GET['fbclid']               = 'NEU2';
+PMS_Pro_UTM::capture();
+$attr2 = PMS_Pro_UTM::get();
+check( 'First-Touch: bestehende utm_source bleibt erhalten', 'google' === ( $attr2['utm_source'] ?? '' ), $attr2['utm_source'] ?? '?' );
+check( 'First-Touch: bestehende Kampagne bleibt erhalten', 'alt' === ( $attr2['utm_campaign'] ?? '' ) );
+check( 'First-Touch: fbclid wird auf den letzten Klick aktualisiert', 'NEU2' === ( $attr2['fbclid'] ?? '' ) );
+
+echo "\n=== 8b. Feature 2 (v0.5.6): gclid wie fbclid als Klick-ID behandelt ===\n";
+
+reset_attribution();
+$_GET['utm_source'] = 'google';
+$_GET['gclid']       = 'GCLID123';
+PMS_Pro_UTM::capture();
+$attrG = PMS_Pro_UTM::get();
+check( 'Attribution: gclid wird erfasst', 'GCLID123' === ( $attrG['gclid'] ?? '' ) );
+
+$customG = PMS_Pro_UTM::custom_data();
+check( 'Attribution: custom_data enthält KEIN gclid (Google-spezifisch, für Meta CAPI irrelevant)', ! isset( $customG['gclid'] ) );
+check( 'Attribution: custom_data weiterhin ohne fbclid', ! isset( $customG['fbclid'] ) );
+
+reset_attribution();
+$_COOKIE['pms_attribution'] = json_encode( array( 'gclid' => 'ALT-GCLID', 'utm_campaign' => 'alt', 'ts' => 1700000000 ) );
+$_GET['gclid']                = 'NEU-GCLID';
+PMS_Pro_UTM::capture();
+$attrG2 = PMS_Pro_UTM::get();
+check( 'gclid wird (wie fbclid) auf den letzten Klick aktualisiert, nicht First-Touch', 'NEU-GCLID' === ( $attrG2['gclid'] ?? '' ) );
+check( 'First-Touch für utm_campaign bleibt von der gclid-Aktualisierung unberührt', 'alt' === ( $attrG2['utm_campaign'] ?? '' ) );
+
+reset_attribution();
+$_COOKIE['pms_attribution'] = json_encode( array( 'utm_source' => '<script>x</script>evil', 'ts' => 1700000000 ) );
+$sanitized = PMS_Pro_UTM::get();
+check( 'Attribution: Cookie-Werte werden bereinigt', false === strpos( (string) ( $sanitized['utm_source'] ?? '' ), '<' ) );
+
+reset_attribution();
+$GLOBALS['stub']['options']['pms_settings']['utm_passthrough'] = 0;
+$_GET['utm_source'] = 'facebook';
+check( 'Attribution deaktiviert: keine Daten', array() === PMS_Pro_UTM::get() && array() === PMS_Pro_UTM::custom_data() );
+$GLOBALS['stub']['options']['pms_settings']['utm_passthrough'] = 1;
+
+reset_attribution();
+$_COOKIE['pms_attribution'] = json_encode( array( 'utm_source' => 'facebook', 'pad' => str_repeat( 'z', 9000 ) ) );
+check( 'Attribution-Cookie: >8KB wird ungeparst verworfen', array() === PMS_Pro_UTM::get() );
+reset_attribution();
+
+echo "\n=== 9. Feature 2: UTM & fbc im CAPI-Payload ===\n";
+
+reset_attribution();
+$_GET['utm_source']   = 'facebook';
+$_GET['utm_campaign'] = 'sommer-2026';
+$_GET['fbclid']       = 'FbclidAusUrl';
+unset( $_COOKIE['_fbc'] );
+$GLOBALS['stub']['options']['pms_events'] = array(
+	array(
+		'id' => 'ev1', 'name' => 'Lead Danke', 'event_type' => 'Lead', 'match_type' => 'exact', 'match_value' => '/bestaetigung/', 'active' => 1,
+		'meta_enabled' => 1,
+	),
+);
+$_SERVER['REQUEST_URI'] = '/bestaetigung/';
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 0;
+
+run_frontend();
+$bodyU = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+$evU   = $bodyU['data'][0] ?? array();
+check( 'CAPI: custom_data mit utm_source', 'facebook' === ( $evU['custom_data']['utm_source'] ?? '' ) );
+check( 'CAPI: custom_data mit utm_campaign', 'sommer-2026' === ( $evU['custom_data']['utm_campaign'] ?? '' ) );
+check( 'CAPI: fbc aus fbclid gesetzt', 1 === preg_match( '/^fb\.1\.\d{13}\.FbclidAusUrl$/', $evU['user_data']['fbc'] ?? '' ) );
+
+reset_attribution();
+$_COOKIE['pms_attribution'] = json_encode( array( 'fbclid' => 'AusCookie', 'ts' => 1700000000 ) );
+run_frontend();
+$bodyU2 = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+check( 'CAPI: fbc aus Attribution-Cookie (Tage nach dem Klick)', 'fb.1.1700000000000.AusCookie' === ( $bodyU2['data'][0]['user_data']['fbc'] ?? '' ), $bodyU2['data'][0]['user_data']['fbc'] ?? '?' );
+
+reset_attribution();
+$GLOBALS['stub']['options']['pms_settings']['utm_passthrough'] = 0;
+run_frontend();
+$bodyU3 = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+check( 'CAPI: ohne Attribution kein custom_data', ! isset( $bodyU3['data'][0]['custom_data'] ) );
+$GLOBALS['stub']['options']['pms_settings']['utm_passthrough'] = 1;
+
+echo "\n=== 10. Feature 1: Formular-Lead – Hashing & Payload ===\n";
+
+check( 'hash_email: normalisiert (trim + lowercase)', hash( 'sha256', 'kunde@example.com' ) === PMS_CAPI::hash_email( '  Kunde@Example.COM ' ) );
+check( 'hash_email: ungültige Adresse -> leer', '' === PMS_CAPI::hash_email( 'keine-mail' ) );
+check( 'hash_email: leerer Wert -> leer', '' === PMS_CAPI::hash_email( '' ) );
+check( 'hash_phone: Sonderzeichen entfernt', hash( 'sha256', '4901761234567' ) === PMS_CAPI::hash_phone( '+49 (0) 176 / 1234-567' ) );
+check( 'hash_phone: führende Null entfernt', hash( 'sha256', '1761234567' ) === PMS_CAPI::hash_phone( '0176 1234567' ) );
+check( 'hash_phone: Buchstaben -> leer', '' === PMS_CAPI::hash_phone( 'kein telefon' ) );
+check( 'hash_phone: zu kurz -> leer', '' === PMS_CAPI::hash_phone( '123' ) );
+
+echo "\n=== 10a-2. Security-Audit v0.5.5: Input-Längenbegrenzung ===\n";
+
+$huge_local = str_repeat( 'a', 5000 ) . '@example.com';
+check( 'hash_email: 5000 Zeichen langer Local-Part -> leer (kappt vor is_email)', '' === PMS_CAPI::hash_email( $huge_local ) );
+
+$valid_long_ok = str_repeat( 'a', 60 ) . '@example.com';
+check( 'hash_email: gültige, aber lange Adresse funktioniert weiterhin', '' !== PMS_CAPI::hash_email( $valid_long_ok ) );
+
+$huge_phone = '+49' . str_repeat( '1', 5000 );
+check( 'hash_phone: 5000-stellige Nummer wird auf 32 Zeichen gekappt vor dem Hashen',
+	hash( 'sha256', preg_replace( '/\D+/', '', substr( $huge_phone, 0, 32 ) ) ) === PMS_CAPI::hash_phone( $huge_phone )
+);
+
+$GLOBALS['stub']['captured_posts'] = array();
+// Seit v0.6.1 erwartet log() volle Event-Arrays (nicht nur Namen), damit es
+// pro Event einen PMS_Logger-Eintrag mit event_id schreiben kann.
+$log_ref = new ReflectionMethod( 'PMS_CAPI', 'log' );
+$logged  = $log_ref->invoke( null, array( array( 'event_type' => 'Lead', 'name' => 'Lead', 'event_id' => 'log-test-1' ) ), 'error', 400, '<script>alert(1)</script>Meta-Fehler ' . str_repeat( 'x', 400 ), array() );
+check( 'CAPI-Log: HTML/Script-Tags aus externer Meta-Antwort entfernt', false === strpos( $logged['message'], '<script>' ) && false !== strpos( $logged['message'], 'Meta-Fehler' ) );
+check( 'CAPI-Log: Nachricht auf 300 Zeichen gekappt', strlen( $logged['message'] ) <= 300 );
+
+$GLOBALS['stub']['captured_posts'] = array();
+$lead_event = array( 'id' => 'form-lead', 'name' => 'Lead', 'event_type' => 'Lead', 'event_id' => 'aaaa-bbbb-cccc-dddd', 'meta_enabled' => 1 );
+$status     = PMS_CAPI::send_events(
+	array( $lead_event ),
+	PMS_Settings::get(),
+	'https://example.com/danke/',
+	array( 'em' => array( PMS_CAPI::hash_email( 'kunde@example.com' ) ), 'ph' => array( PMS_CAPI::hash_phone( '0176 1234567' ) ) )
+);
+$bodyL = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+$evL   = $bodyL['data'][0] ?? array();
+check( 'Form-Lead: event_name Lead', 'Lead' === ( $evL['event_name'] ?? '' ) );
+check( 'Form-Lead: Event-ID vom Browser übernommen', 'aaaa-bbbb-cccc-dddd' === ( $evL['event_id'] ?? '' ) );
+check( 'Form-Lead: gehashte E-Mail im user_data', array( hash( 'sha256', 'kunde@example.com' ) ) === ( $evL['user_data']['em'] ?? array() ) );
+check( 'Form-Lead: gehashte Telefonnummer im user_data', array( hash( 'sha256', '1761234567' ) ) === ( $evL['user_data']['ph'] ?? array() ) );
+check( 'Form-Lead: Klartext-Daten NICHT im Payload', false === strpos( $GLOBALS['stub']['captured_posts'][0]['args']['body'], 'kunde@example.com' ) );
+check( 'Form-Lead: Status wird protokolliert', 'sent' === ( $status['status'] ?? '' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['form_tracking'] = 1;
+check( 'Forms: aktiv laut Einstellung', true === PMS_Forms::enabled() );
+$GLOBALS['stub']['options']['pms_settings']['form_tracking'] = 0;
+check( 'Forms: deaktivierbar', false === PMS_Forms::enabled() );
+$GLOBALS['stub']['options']['pms_settings']['form_tracking'] = 1;
+
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 1;
+$GLOBALS['stub']['wp_consent'] = false;
+reset_consent_cache();
+$GLOBALS['stub']['captured_posts'] = array();
+$blocked = PMS_CAPI::send_events( array( $lead_event ), PMS_Settings::get(), 'https://example.com/danke/', array() );
+check( 'Form-Lead ohne Consent: kein Request', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( 'Form-Lead ohne Consent: Status consent_blocked', 'consent_blocked' === ( $blocked['status'] ?? '' ) );
+$GLOBALS['stub']['wp_consent'] = true;
+reset_consent_cache();
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 0;
+
+echo "\n=== 10b. Formular-Grabber: granulare Steuerung ===\n";
+
+$GLOBALS['stub']['options']['pms_settings']['form_event_type'] = 'Contact';
+check( 'Event-Typ: Contact wird übernommen', 'Contact' === PMS_Forms::event_type() );
+$GLOBALS['stub']['options']['pms_settings']['form_event_type'] = 'Purchase';
+check( 'Event-Typ: unerlaubter Wert fällt auf Lead zurück', 'Lead' === PMS_Forms::event_type() );
+$GLOBALS['stub']['options']['pms_settings']['form_event_type'] = 'Lead';
+
+$clean = PMS_Settings::sanitize_settings( array( 'form_event_type' => 'Contact' ) );
+check( 'sanitize: Contact erlaubt', 'Contact' === $clean['form_event_type'] );
+$clean = PMS_Settings::sanitize_settings( array( 'form_event_type' => 'CustomEvent' ) );
+check( 'sanitize: fremder Event-Typ wird zu Lead', 'Lead' === $clean['form_event_type'] );
+
+check(
+	'URL-Filter: Normalisierung (klein, getrimmt, dedupliziert)',
+	'/kontakt, /angebot' === PMS_Settings::sanitize_url_filter( ' /Kontakt , /ANGEBOT,  /kontakt ,, ' ),
+	PMS_Settings::sanitize_url_filter( ' /Kontakt , /ANGEBOT,  /kontakt ,, ' )
+);
+check( 'URL-Filter: Markup wird entfernt', false === strpos( PMS_Settings::sanitize_url_filter( '/x<script>alert(1)</script>' ), '<' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['form_url_filter'] = '';
+check( 'URL-Filter leer: überall aktiv', true === PMS_Forms::url_allowed( '/beliebige-seite/' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['form_url_filter'] = '/kontakt, /angebot';
+check( 'URL-Filter: passende Seite erlaubt', true === PMS_Forms::url_allowed( '/kontakt/' ) );
+check( 'URL-Filter: Teilstring-Treffer erlaubt', true === PMS_Forms::url_allowed( '/de/angebot-anfordern/' ) );
+check( 'URL-Filter: Großschreibung ignoriert', true === PMS_Forms::url_allowed( '/KONTAKT/' ) );
+check( 'URL-Filter: fremde Seite blockiert', false === PMS_Forms::url_allowed( '/blog/artikel/' ) );
+check( 'URL-Filter: Startseite blockiert', false === PMS_Forms::url_allowed( '/' ) );
+
+check( 'form_url_filters(): Array mit beiden Pfaden', array( '/kontakt', '/angebot' ) === PMS_Settings::form_url_filters() );
+$GLOBALS['stub']['options']['pms_settings']['form_url_filter'] = '';
+
+$GLOBALS['stub']['captured_posts'] = array();
+$contact_event = array( 'id' => 'form-lead', 'name' => 'Contact', 'event_type' => 'Contact', 'event_id' => 'cccc-dddd', 'meta_enabled' => 1 );
+PMS_CAPI::send_events( array( $contact_event ), PMS_Settings::get(), 'https://example.com/kontakt/', array() );
+$bodyC = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+check( 'CAPI: event_name Contact statt Lead', 'Contact' === ( $bodyC['data'][0]['event_name'] ?? '' ) );
+
+echo "\n=== 10b-2. UTM-Form-Fill (v0.5.6): URL-Gating all/include/exclude + Wildcard ===\n";
+
+check(
+	'sanitize_url_patterns: zeilenbasiert, klein, getrimmt, dedupliziert, Wildcard bleibt erhalten',
+	"/kontakt\n/lp/*" === PMS_Settings::sanitize_url_patterns( " /Kontakt \r\n /LP/*  \n/kontakt\n\n" ),
+	PMS_Settings::sanitize_url_patterns( " /Kontakt \r\n /LP/*  \n/kontakt\n\n" )
+);
+check(
+	'utm_form_fill_url_patterns(): liest die gespeicherten Zeilen als Array',
+	array( '/kontakt', '/lp/*' ) === ( function () {
+		$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls'] = "/kontakt\n/lp/*";
+		return PMS_Settings::utm_form_fill_url_patterns();
+	} )()
+);
+
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode'] = 'all';
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls'] = '';
+check( 'Form-Fill: mode=all erlaubt jede Seite', true === PMS_Pro_UTM::form_fill_url_allowed( '/irgendwas/' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode'] = 'include';
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls'] = "/kontakt\n/lp/*";
+check( 'Form-Fill: include, exakt gelisteter Pfad erlaubt', true === PMS_Pro_UTM::form_fill_url_allowed( '/kontakt/' ) );
+check( 'Form-Fill: include, Wildcard-Muster erlaubt Unterseiten', true === PMS_Pro_UTM::form_fill_url_allowed( '/lp/campaign-1/' ) );
+check( 'Form-Fill: include, nicht gelistete Seite blockiert', false === PMS_Pro_UTM::form_fill_url_allowed( '/blog/artikel/' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode'] = 'exclude';
+check( 'Form-Fill: exclude, gelistete Seite blockiert', false === PMS_Pro_UTM::form_fill_url_allowed( '/kontakt/' ) );
+check( 'Form-Fill: exclude, nicht gelistete Seite erlaubt', true === PMS_Pro_UTM::form_fill_url_allowed( '/blog/artikel/' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode'] = 'include';
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls'] = '';
+check( 'Form-Fill: include ohne hinterlegte Muster erlaubt nichts', false === PMS_Pro_UTM::form_fill_url_allowed( '/kontakt/' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 0;
+check( 'Form-Fill: form_fill_enabled() spiegelt die Einstellung', false === PMS_Pro_UTM::form_fill_enabled() );
+$GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 1;
+check( 'Form-Fill: form_fill_enabled() aktivierbar', true === PMS_Pro_UTM::form_fill_enabled() );
+
+$GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 0;
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode']   = 'all';
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls']   = '';
+
+echo "\n=== 10c. Konflikt-Erkennung URL-Event vs. Formular-Tracking ===\n";
+
+$GLOBALS['stub']['options']['pms_events_enabled'] = 1;
+$GLOBALS['stub']['options']['pms_settings']['form_tracking']   = 1;
+$GLOBALS['stub']['options']['pms_settings']['form_event_type'] = 'Lead';
+$GLOBALS['stub']['options']['pms_events'] = array(
+	array(
+		'id' => 'evk', 'name' => 'Kontakt', 'event_type' => 'Lead', 'match_type' => 'exact',
+		'match_value' => '/kontakt/', 'active' => 1, 'meta_enabled' => 1,
+	),
+);
+
+$GLOBALS['stub']['options']['pms_settings']['form_url_filter'] = '';
+check( 'Konflikt: leerer URL-Filter meldet nichts', array() === PMS_Admin::detect_form_url_conflicts() );
+
+$GLOBALS['stub']['options']['pms_settings']['form_url_filter'] = '/kontakt';
+check( 'Konflikt: gleiche URL + gleicher Event-Typ wird erkannt', array( '/kontakt/' ) === PMS_Admin::detect_form_url_conflicts(), json_encode( PMS_Admin::detect_form_url_conflicts() ) );
+
+$GLOBALS['stub']['options']['pms_settings']['form_event_type'] = 'Contact';
+check( 'Kein Konflikt bei unterschiedlichem Event-Typ', array() === PMS_Admin::detect_form_url_conflicts() );
+$GLOBALS['stub']['options']['pms_settings']['form_event_type'] = 'Lead';
+
+$GLOBALS['stub']['options']['pms_settings']['form_url_filter'] = '/angebot';
+check( 'Kein Konflikt bei anderer URL', array() === PMS_Admin::detect_form_url_conflicts() );
+
+$GLOBALS['stub']['options']['pms_settings']['form_url_filter'] = '/kontakt';
+$GLOBALS['stub']['options']['pms_events'][0]['active'] = 0;
+check( 'Kein Konflikt bei inaktiver Event-Regel', array() === PMS_Admin::detect_form_url_conflicts() );
+$GLOBALS['stub']['options']['pms_events'][0]['active'] = 1;
+
+$GLOBALS['stub']['options']['pms_settings']['form_tracking'] = 0;
+check( 'Kein Konflikt bei deaktiviertem Formular-Tracking', array() === PMS_Admin::detect_form_url_conflicts() );
+$GLOBALS['stub']['options']['pms_settings']['form_tracking'] = 1;
+
+$GLOBALS['stub']['options']['pms_events_enabled'] = 0;
+check( 'Kein Konflikt bei global deaktivierten Events', array() === PMS_Admin::detect_form_url_conflicts() );
+$GLOBALS['stub']['options']['pms_events_enabled'] = 1;
+
+$GLOBALS['stub']['options']['pms_settings']['form_url_filter'] = '';
+$GLOBALS['stub']['options']['pms_events'] = array();
+
+echo "\n=== 11. Feature 4: Konfiguration exportieren & importieren ===\n";
+
+$export = array(
+	'format'         => 'pms-config',
+	'version'        => '0.5.0',
+	'settings'       => array(
+		'pixel_enabled'   => 1,
+		'pixel_id'        => '999888777666555',
+		'capi_token'      => 'EAAimport',
+		'form_tracking'   => 1,
+		'utm_passthrough' => 0,
+	),
+	'events'         => array(
+		array(
+			'id' => 'imp1', 'name' => 'Importiertes Event', 'event_type' => 'Contact',
+			'match_type' => 'contains', 'match_value' => 'kontakt', 'active' => 1, 'meta_enabled' => 1,
+		),
+	),
+	'events_enabled' => 1,
+);
+
+check( 'Import: gültige Konfiguration wird übernommen', true === PMS_Tools::import_from_json( json_encode( $export ) ) );
+$imported = PMS_Settings::get();
+check( 'Import: Pixel-ID übernommen', '999888777666555' === $imported['pixel_id'] );
+check( 'Import: Token übernommen', 'EAAimport' === $imported['capi_token'] );
+check( 'Import: Toggle-Zustände übernommen', 0 === $imported['utm_passthrough'] && 1 === $imported['form_tracking'] );
+$imported_events = PMS_Settings::get_events();
+check( 'Import: Event-Regel übernommen', isset( $imported_events['imp1'] ) && 'Contact' === $imported_events['imp1']['event_type'] );
+
+check( 'Import: falsches Format wird abgelehnt', false === PMS_Tools::import_from_json( json_encode( array( 'format' => 'fremd', 'settings' => array() ) ) ) );
+check( 'Import: fehlende settings werden abgelehnt', false === PMS_Tools::import_from_json( json_encode( array( 'format' => 'pms-config' ) ) ) );
+check( 'Import: kein JSON wird abgelehnt', false === PMS_Tools::import_from_json( 'kein json' ) );
+check( 'Import: leerer String wird abgelehnt', false === PMS_Tools::import_from_json( '' ) );
+
+$evil = json_encode(
+	array(
+		'format'   => 'pms-config',
+		'settings' => array( 'pixel_id' => '123<script>alert(1)</script>456', 'capi_token' => "EAA<script>x</script>" ),
+		'events'   => array( array( 'id' => 'x', 'name' => 'Y', 'event_type' => 'EvilType', 'match_type' => 'exact', 'match_value' => '/x/' ) ),
+	)
+);
+PMS_Tools::import_from_json( $evil );
+$after = PMS_Settings::get();
+check( 'Import: Pixel-ID wird auf Ziffern reduziert', '1231456' === $after['pixel_id'], $after['pixel_id'] );
+check( 'Import: Pixel-ID enthält kein Markup', 1 === preg_match( '/^\d+$/', $after['pixel_id'] ) );
+check( 'Import: Token ohne HTML', false === strpos( $after['capi_token'], '<' ) );
+check( 'Import: ungültiger Event-Typ wird verworfen', 0 === count( PMS_Settings::get_events() ) );
+
+echo "\n=== 12. Feature 3: Live-Debug-Leiste (Sichtbarkeit) ===\n";
+
+$GLOBALS['stub']['options']['pms_settings']['debug_bar'] = 1;
+$GLOBALS['stub']['is_user_logged_in'] = false;
+$GLOBALS['stub']['current_user_can']  = false;
+check( 'Debug-Leiste: für Besucher NICHT aktiv', false === PMS_Debug::enabled() );
+
+$GLOBALS['stub']['is_user_logged_in'] = true;
+check( 'Debug-Leiste: für eingeloggte Nicht-Admins NICHT aktiv', false === PMS_Debug::enabled() );
+
+$GLOBALS['stub']['current_user_can'] = true;
+check( 'Debug-Leiste: für Administratoren aktiv', true === PMS_Debug::enabled() );
+
+$GLOBALS['stub']['options']['pms_settings']['debug_bar'] = 0;
+check( 'Debug-Leiste: per Einstellung abschaltbar', false === PMS_Debug::enabled() );
+
+$GLOBALS['stub']['options']['pms_settings']['debug_bar'] = 1;
+$GLOBALS['stub']['is_admin'] = true;
+check( 'Debug-Leiste: im WP-Backend NICHT aktiv', false === PMS_Debug::enabled() );
+$GLOBALS['stub']['is_admin'] = false;
+
+$GLOBALS['stub']['current_user_can']  = false;
+$GLOBALS['stub']['is_user_logged_in'] = false;
+
+echo "\n=== 12b. Security-Audit v0.5.5: Debug-Leiste gegen Script-Breakout gehärtet ===\n";
+
+$log_prop = new ReflectionProperty( 'PMS_CAPI', 'log' );
+$log_prop->setValue( null, array( array(
+	'events' => array( 'Lead' ), 'status' => 'error', 'code' => 400,
+	'message' => '</script><script>alert(document.cookie)</script>',
+	'match_keys' => array(),
+) ) );
+
+$GLOBALS['stub']['options']['pms_settings']['debug_bar']    = 1;
+$GLOBALS['stub']['is_user_logged_in']                          = true;
+$GLOBALS['stub']['current_user_can']                           = true;
+$active_prop = new ReflectionProperty( 'PMS_Frontend', 'active' );
+$active_prop->setValue( null, false );
+
+ob_start();
+PMS_Debug::render();
+$debug_html = ob_get_clean();
+
+check( 'Debug-Leiste: genau ein echtes schließendes </script> im Output (kein Breakout)', 1 === substr_count( $debug_html, '</script>' ), 'gefunden: ' . substr_count( $debug_html, '</script>' ) );
+check( 'Debug-Leiste: kein zweites öffnendes <script> aus der Log-Nachricht', 1 === substr_count( $debug_html, '<script' ) );
+check( 'Debug-Leiste: Nachrichteninhalt bleibt im JSON-Payload erhalten', false !== strpos( $debug_html, 'alert(document.cookie)' ) );
+
+$log_prop->setValue( null, array() );
+$GLOBALS['stub']['current_user_can']  = false;
+$GLOBALS['stub']['is_user_logged_in'] = false;
+
+echo "\n=== 13. enqueue_frontend() (v0.5.7): Toggle-only Gating, URL-Matching jetzt rein clientseitig ===\n";
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	$base_settings,
+	array(
+		'consent_detection'    => 0,
+		'form_tracking'        => 1,
+		'form_url_filter'      => '',
+		'form_exclude_system'  => 1,
+		'enable_utm_form_fill' => 0,
+		'utm_form_fill_mode'   => 'all',
+		'utm_form_fill_urls'   => '',
+	)
+);
+$GLOBALS['stub']['options']['pms_events']         = array();
+$GLOBALS['stub']['options']['pms_events_enabled'] = 1;
+$_SERVER['REQUEST_URI']                             = '/beliebige-seite/';
+
+$loc = run_enqueue();
+check( 'enqueue: nur Formular-Tracking aktiv -> formTracking=true', true === ( $loc['formTracking'] ?? null ) );
+check( 'enqueue: nur Formular-Tracking aktiv -> utmFormFill=false', false === ( $loc['utmFormFill'] ?? null ) );
+check( 'enqueue: Skript wird geladen', in_array( 'pms-frontend', $GLOBALS['stub']['enqueued_scripts'], true ) );
+check( 'enqueue: lokalisiertes Objekt heißt pms_settings (v0.5.7, vorher pmsFront)', null !== $GLOBALS['stub']['localized']['pms-frontend']['pms_settings'] ?? null );
+check( 'Korrektur v0.5.7: kein testEventCode mehr im lokalisierten Objekt', ! array_key_exists( 'testEventCode', $loc ) );
+
+$GLOBALS['stub']['options']['pms_settings']['form_tracking']        = 0;
+$GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 1;
+
+$loc2 = run_enqueue();
+check( 'enqueue: nur UTM-Form-Fill aktiv -> formTracking=false', false === ( $loc2['formTracking'] ?? null ) );
+check( 'enqueue: nur UTM-Form-Fill aktiv -> utmFormFill=true', true === ( $loc2['utmFormFill'] ?? null ) );
+check( 'enqueue: Skript wird auch für ausschließlich UTM-Form-Fill geladen', in_array( 'pms-frontend', $GLOBALS['stub']['enqueued_scripts'], true ) );
+
+$GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 0;
+$loc3                                                                 = run_enqueue();
+check( 'enqueue: beide Features aus -> pms_settings wird nicht lokalisiert (0 Byte)', null === $loc3 );
+check( 'enqueue: beide Features aus -> wp_enqueue_script wird nicht aufgerufen', array() === $GLOBALS['stub']['enqueued_scripts'] );
+
+// Bugfix v0.5.7: Der Server prüft die URL-Include/Exclude-Regeln NICHT mehr
+// vor dem Enqueue (das führte live zu ReferenceErrors, wenn Server- und
+// Browser-Sicht auf den Pfad auseinanderliefen) – ein Pfad, der NICHT ins
+// konfigurierte include-Muster passt, darf am "wird überhaupt geladen"
+// nichts mehr ändern. Die URL-Auswertung übernimmt jetzt ausschließlich der
+// Client (utmFormFillAllowed() in frontend.js), dem hier weiterhin Modus und
+// Muster mitgegeben werden.
+$GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 1;
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode']   = 'include';
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls']   = '/kontakt';
+$_SERVER['REQUEST_URI']                                               = '/seite-nicht-im-include-muster/';
+$loc4 = run_enqueue();
+check( 'Bugfix v0.5.7: Skript wird geladen, obwohl die Server-URL nicht ins include-Muster passt', true === ( $loc4['utmFormFill'] ?? null ) );
+check( 'Bugfix v0.5.7: utmFormFillMode dennoch korrekt durchgereicht (Client filtert selbst)', 'include' === ( $loc4['utmFormFillMode'] ?? '' ) );
+check( 'Bugfix v0.5.7: utmFormFillUrls dennoch korrekt durchgereicht (Client filtert selbst)', array( '/kontakt' ) === ( $loc4['utmFormFillUrls'] ?? null ) );
+
+$GLOBALS['stub']['options']['pms_settings']['form_tracking']        = 0;
+$GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 0;
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode']   = 'all';
+$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls']   = '';
+$_SERVER['REQUEST_URI']                                               = '/bestaetigung/';
+
+/* ---------------------------------------------------------------------
+ * 14. v0.6.2: Free-Limit für die GESAMTZAHL an Custom Events (max. 2)
+ * Ersetzt das bis v0.6.1 gültige "max. 2 AKTIVE, beliebig viele insgesamt"-
+ * Modell: seit v0.6.2 ist bereits das ANLEGEN eines 3. Events gesperrt,
+ * unabhängig vom Aktiv-Status. PMS_IS_PRO ist an dieser Stelle noch nicht
+ * definiert -> is_pro() muss "Free" liefern (defensiver defined()-Check,
+ * siehe Doku der Methode).
+ * ------------------------------------------------------------------- */
+
+echo "\n=== 14. Free-Limit für die Gesamtzahl an Custom Events (max. 2) ===\n";
+
+function make_test_event( $id, $active ) {
+	return PMS_Settings::sanitize_event(
+		array(
+			'id'           => $id,
+			'name'         => 'Test Event ' . $id,
+			'event_type'   => 'Lead',
+			'match_type'   => 'exact',
+			'match_value'  => '/' . $id . '/',
+			'active'       => $active,
+			'meta_enabled' => 1,
+		)
+	);
+}
+
+check( 'is_pro(): PMS_IS_PRO nicht definiert -> false', false === PMS_Settings::is_pro() );
+
+$GLOBALS['stub']['options']['pms_events'] = array();
+check( 'free_event_limit_reached(): 0 Events -> nicht erreicht', false === PMS_Settings::free_event_limit_reached() );
+
+PMS_Settings::save_events(
+	array(
+		'ev-a' => make_test_event( 'ev-a', 0 ),
+		'ev-b' => make_test_event( 'ev-b', 0 ),
+	)
+);
+check(
+	'free_event_limit_reached(): genau 2 Events -> erreicht, UNABHÄNGIG vom Aktiv-Status (beide hier inaktiv)',
+	true === PMS_Settings::free_event_limit_reached()
+);
+
+// Bearbeiten/(De-)Aktivieren eines der beiden bestehenden Events ändert die
+// Gesamtzahl nicht -- bleibt in der Free-Version immer möglich.
+PMS_Settings::save_events(
+	array(
+		'ev-a' => make_test_event( 'ev-a', 1 ),
+		'ev-b' => make_test_event( 'ev-b', 1 ),
+	)
+);
+check( 'save_events(): beide bestehenden Events lassen sich weiterhin aktivieren', 1 === PMS_Settings::get_events()['ev-a']['active'] && 1 === PMS_Settings::get_events()['ev-b']['active'] );
+check( 'free_event_limit_reached(): bleibt erreicht (weiterhin 2 Events, nur jetzt aktiv)', true === PMS_Settings::free_event_limit_reached() );
+
+// save_events() ist die einzige Stelle, an der Events tatsächlich persistiert
+// werden (Admin-UI-Handler UND JSON-Import laufen beide darüber) -- deshalb
+// hier direkt mit 3 Events aufgerufen, so wie es z. B. ein Import einer auf
+// einer Pro-Site exportierten Konfiguration in eine Free-Site tun würde. Die
+// Admin-UI selbst verhindert das Anlegen eines 3. Events bereits vorher
+// (deaktivierter "Event hinzufügen"-Button, siehe PMS_Admin::render_event_form()).
+PMS_Settings::save_events(
+	array(
+		'ev-a' => make_test_event( 'ev-a', 1 ),
+		'ev-b' => make_test_event( 'ev-b', 1 ),
+		'ev-c' => make_test_event( 'ev-c', 1 ),
+	)
+);
+$after_cap = PMS_Settings::get_events();
+check( 'save_events(): 3. Event wird beim Speichern abgeschnitten, nicht nur deaktiviert', 2 === count( $after_cap ) );
+check( 'save_events(): erste 2 Events (Array-Reihenfolge) bleiben erhalten', isset( $after_cap['ev-a'] ) && isset( $after_cap['ev-b'] ) );
+check( 'save_events(): 3. Event ist nach dem Abschneiden nicht mehr vorhanden', ! isset( $after_cap['ev-c'] ) );
+
+$GLOBALS['stub']['options']['pms_events'] = array();
+
+/* ---------------------------------------------------------------------
+ * 15. v0.6.1: PMS_Logger -- record/get_entries/cleanup/truncate
+ * Weiterhin vor der PMS_IS_PRO-Definition (siehe Abschnitt 17 unten) --
+ * retention_days() muss hier also durchgehend den Free-Wert (3) liefern.
+ * ------------------------------------------------------------------- */
+
+echo "\n=== 15. PMS_Logger: record/get_entries/cleanup/truncate (Free) ===\n";
+
+$GLOBALS['wpdb']->rows = array();
+
+check( 'PMS_Logger::retention_days(): Free -> 3 Tage, unabhängig vom gespeicherten Setting-Wert', 3 === PMS_Logger::retention_days() );
+
+PMS_Logger::record( 'Lead', 'evt-1', 'capi', 200, array( 'em', 'fbc' ), '' );
+$rows = $GLOBALS['wpdb']->rows[ PMS_Logger::table_name() ];
+check( 'record(): genau eine Zeile geschrieben', 1 === count( $rows ) );
+check( 'record(): event_name korrekt', 'Lead' === $rows[0]['event_name'] );
+check( 'record(): event_id korrekt', 'evt-1' === $rows[0]['event_id'] );
+check( 'record(): source korrekt', 'capi' === $rows[0]['source'] );
+check( 'record(): http_status korrekt', 200 === $rows[0]['http_status'] );
+check( 'record(): user_data_keys als kommagetrennte Liste, KEINE Werte enthalten', 'em, fbc' === $rows[0]['user_data_keys'] );
+check( 'record(): leere error_message wird als NULL gespeichert, nicht als leerer String', null === $rows[0]['error_message'] );
+
+PMS_Logger::record( 'Purchase', 'evt-2', 'capi', 400, array(), '<script>alert(1)</script>Invalid token' );
+$rows = $GLOBALS['wpdb']->rows[ PMS_Logger::table_name() ];
+check( 'record(): zweite Zeile zusätzlich zur ersten', 2 === count( $rows ) );
+check( 'record(): error_message von HTML-Tags befreit', false === strpos( $rows[1]['error_message'], '<script>' ) && false !== strpos( $rows[1]['error_message'], 'Invalid token' ) );
+
+PMS_Logger::record( str_repeat( 'x', 100 ), 'evt-3', 'browser', 0 );
+$capped_row = $GLOBALS['wpdb']->rows[ PMS_Logger::table_name() ][2];
+check( 'record(): event_name auf 64 Zeichen gekappt', 64 === strlen( $capped_row['event_name'] ) );
+
+check( 'get_entries(): neueste zuerst (Insert-Reihenfolge umgekehrt sichtbar, da alle Test-Zeilen dieselbe Sekunde tragen -> zumindest 3 Einträge)', 3 === count( PMS_Logger::get_entries() ) );
+check( 'get_entries(): Status-Filter "error" liefert nur Zeilen mit error_message', 1 === count( PMS_Logger::get_entries( array( 'status' => 'error' ) ) ) );
+check( 'get_entries(): Event-Namen-Filter liefert nur passende Zeilen', 1 === count( PMS_Logger::get_entries( array( 'event_name' => 'Purchase' ) ) ) );
+check( 'get_entries(): limit wird respektiert', 2 === count( PMS_Logger::get_entries( array( 'limit' => 2 ) ) ) );
+
+check( 'get_distinct_event_names(): alle drei eindeutigen Namen', 3 === count( PMS_Logger::get_distinct_event_names() ) );
+
+PMS_Logger::truncate();
+check( 'truncate(): Tabelle danach leer', array() === PMS_Logger::get_entries() );
+
+/* ---------------------------------------------------------------------
+ * 16. v0.6.1: PMS_Logger <-> PMS_CAPI-Integration
+ * ------------------------------------------------------------------- */
+
+echo "\n=== 16. PMS_Logger <-> PMS_CAPI-Integration ===\n";
+
+// WICHTIG: PMS_Consent::detection_enabled() liest consent_detection über
+// PMS_Settings::get() IMMER aus dem AMBIENTEN Stub-Options-Stand -- ein
+// vorheriger Testabschnitt (10a) hinterlässt diesen bewusst auf 0. Ein
+// $settings-Array, das man nur als Parameter an send_events() durchreicht,
+// beeinflusst PMS_Consent also NICHT; consent_detection muss deshalb direkt
+// in den Stub-Options gesetzt werden, sonst befragt evaluate() nie unseren
+// wp_has_consent()-Stub und "Consent" gilt unabhängig vom Testszenario immer
+// als erteilt (detection_enabled() === false -> automatisch true).
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 1;
+
+$log_test_settings = array_merge(
+	PMS_Settings::get(),
+	array(
+		'capi_enabled' => 1,
+		'pixel_id'     => '123456789012345',
+		'capi_token'   => 'test-token',
+	)
+);
+
+$GLOBALS['wpdb']->rows             = array();
+$GLOBALS['stub']['captured_posts'] = array();
+$GLOBALS['stub']['wp_consent']     = true;
+reset_consent_cache();
+
+$log_event = array( 'id' => 'ev-log', 'name' => 'Lead', 'event_type' => 'Lead', 'event_id' => 'capi-evt-1', 'meta_enabled' => 1 );
+
+// 'sent' (Standard, nicht blockierend): wird trotzdem protokolliert, mit
+// http_status=0 UND leerer error_message ("abgeschickt, Ergebnis unbekannt" --
+// siehe PMS_CAPI::log()-Doku, NICHT gleichbedeutend mit einem Fehler).
+PMS_CAPI::send_events( array( $log_event ), $log_test_settings, 'https://example.com/danke/' );
+$rows = $GLOBALS['wpdb']->rows[ PMS_Logger::table_name() ] ?? array();
+check( 'send_events() (sent/fire-and-forget): erzeugt einen PMS_Logger-Eintrag', 1 === count( $rows ) );
+check( 'send_events() (sent): http_status=0, keine Fehlermeldung (kein Fehler, nur keine Rückmeldung)', 0 === $rows[0]['http_status'] && null === $rows[0]['error_message'] );
+check( 'send_events() (sent): source ist "capi" ohne browser_confirmed', 'capi' === $rows[0]['source'] );
+
+$GLOBALS['wpdb']->rows = array();
+reset_consent_cache();
+PMS_CAPI::send_events( array( $log_event ), $log_test_settings, 'https://example.com/danke/', array(), true /* browser_confirmed */ );
+$rows = $GLOBALS['wpdb']->rows[ PMS_Logger::table_name() ] ?? array();
+check( 'send_events() mit browser_confirmed=true: source wird "both"', 1 === count( $rows ) && 'both' === $rows[0]['source'] );
+
+// consent_blocked/skipped duerfen NICHT geloggt werden (kein echter Sende-
+// Versuch fand statt -- reine Rauschunterdrueckung, siehe PMS_CAPI::log()-Doku).
+$GLOBALS['wpdb']->rows         = array();
+$GLOBALS['stub']['wp_consent'] = false;
+reset_consent_cache(); // PMS_Consent cached das Ergebnis request-lokal -- ohne Reset sähe dieser Aufruf noch den Consent-Stand vorheriger Aufrufe.
+PMS_CAPI::send_events( array( $log_event ), $log_test_settings, 'https://example.com/danke/' );
+check( 'send_events() (consent_blocked): erzeugt KEINEN PMS_Logger-Eintrag', empty( $GLOBALS['wpdb']->rows[ PMS_Logger::table_name() ] ?? array() ) );
+
+// 'skipped': send_events() selbst prüft NUR pixel_id/capi_token auf leer --
+// capi_enabled wird bereits von den Aufrufern (PMS_Frontend/PMS_Forms) VOR
+// dem Aufruf geprüft, nicht hier noch einmal. Fehlender Token ist daher das
+// richtige Szenario, um "skipped" tatsächlich auszulösen.
+$GLOBALS['wpdb']->rows         = array();
+$GLOBALS['stub']['wp_consent'] = true;
+reset_consent_cache();
+PMS_CAPI::send_events( array( $log_event ), array_merge( $log_test_settings, array( 'capi_token' => '' ) ), 'https://example.com/danke/' );
+check( 'send_events() (skipped, kein CAPI-Token): erzeugt KEINEN PMS_Logger-Eintrag', empty( $GLOBALS['wpdb']->rows[ PMS_Logger::table_name() ] ?? array() ) );
+
+reset_consent_cache();
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 0;
+
+$GLOBALS['wpdb']->rows = array();
+
+/* ---------------------------------------------------------------------
+ * 17. v0.6.0: Pro-Version hat kein Event-Limit + v0.6.1 PMS_Logger-Retention
+ * PHP-Konstanten lassen sich nicht "un-definieren" (siehe Hinweis im
+ * Datei-Header) -- deshalb MUSS dieser Abschnitt der letzte der ganzen
+ * Datei sein. Alles, was hier oder danach noch liefe, würde fälschlich
+ * "Pro" statt "Free" sehen.
+ * ------------------------------------------------------------------- */
+
+echo "\n=== 17. Pro-Version: kein Event-Limit, konfigurierbare Log-Retention ===\n";
+
+define( 'PMS_IS_PRO', true );
+
+check( 'is_pro(): PMS_IS_PRO === true -> true', true === PMS_Settings::is_pro() );
+check( 'class_exists(PMS_Pro_UTM): Testsuite hat die Klasse geladen (Invariante für Abschnitte oben)', class_exists( 'PMS_Pro_UTM' ) );
+
+PMS_Settings::save_events(
+	array(
+		'ev-a' => make_test_event( 'ev-a', 1 ),
+		'ev-b' => make_test_event( 'ev-b', 1 ),
+		'ev-c' => make_test_event( 'ev-c', 1 ),
+		'ev-d' => make_test_event( 'ev-d', 1 ),
+	)
+);
+$pro_events = PMS_Settings::get_events();
+check( 'free_event_limit_reached(): in Pro immer false, unabhängig von der aktiven Anzahl', false === PMS_Settings::free_event_limit_reached() );
+check( 'save_events(): in Pro bleiben alle aktiven Events aktiv (kein Cap)', 1 === $pro_events['ev-a']['active'] && 1 === $pro_events['ev-b']['active'] && 1 === $pro_events['ev-c']['active'] && 1 === $pro_events['ev-d']['active'] );
+
+$GLOBALS['stub']['options']['pms_events'] = array();
+
+// v0.6.2: Google Ads/TikTok sind Pro-only (siehe google_active()/
+// tiktok_active()-Doku in class-pms-frontend.php); Abschnitt 3 weiter oben
+// bestätigt bereits, dass beide in Free trotz vollständiger Konfiguration
+// NICHT ausgegeben werden. Hier zusätzlich der Pro-Nachweis, dass die
+// zugrunde liegende Skript-Generierung selbst nach wie vor korrekt
+// funktioniert, sobald is_pro() true ist.
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'pixel_enabled'    => 0,
+		'google_enabled'   => 1,
+		'google_tag_id'    => 'AW-999999999',
+		'google_consent_mode' => 0,
+		'tiktok_enabled'   => 1,
+		'tiktok_pixel_id'  => 'C999XYZ000',
+		'consent_detection' => 0,
+	)
+);
+$_SERVER['REQUEST_URI'] = '/pro-google-tiktok-test/';
+$html_pro = run_frontend();
+check( 'Pro: Google-Skript wird ausgegeben (gtag config)', false !== strpos( $html_pro, "gtag('config','AW-999999999')" ) );
+check( 'Pro: TikTok-Skript wird ausgegeben (ttq.load)', false !== strpos( $html_pro, "ttq.load('C999XYZ000')" ) );
+
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+// PMS_Logger::retention_days() in Pro: liest das gespeicherte Setting statt
+// des Free-Fixwerts, fällt bei einem Wert außerhalb der Whitelist (z. B. nach
+// einem Downgrade+Upgrade mit verändertem Rohwert) auf den Default zurück.
+$GLOBALS['stub']['options']['pms_settings']['log_retention_days'] = 30;
+check( 'retention_days(): Pro liest den gespeicherten Wert (30)', 30 === PMS_Logger::retention_days() );
+
+$GLOBALS['stub']['options']['pms_settings']['log_retention_days'] = 5; // nicht in der Whitelist.
+check( 'retention_days(): Pro fällt bei ungültigem Wert auf den Default (7) zurück', 7 === PMS_Logger::retention_days() );
+
+$GLOBALS['stub']['options']['pms_settings']['log_retention_days'] = 14;
+$GLOBALS['wpdb']->rows                                             = array();
+PMS_Logger::record( 'Lead', 'old-evt', 'capi', 200, array(), '' );
+$GLOBALS['wpdb']->rows[ PMS_Logger::table_name() ][0]['created_at'] = gmdate( 'Y-m-d H:i:s', strtotime( '-20 days' ) );
+PMS_Logger::record( 'Lead', 'new-evt', 'capi', 200, array(), '' );
+PMS_Logger::cleanup_old_entries();
+$remaining = PMS_Logger::get_entries();
+check( 'cleanup_old_entries(): Eintrag älter als die Retention (20 Tage bei 14 Tagen Limit) wird gelöscht', 1 === count( $remaining ) );
+check( 'cleanup_old_entries(): der verbleibende Eintrag ist der neue', 'new-evt' === ( $remaining[0]['event_id'] ?? '' ) );
+
+$GLOBALS['wpdb']->rows = array();
+
+echo "\n==============================\n";
+echo 'Ergebnis: ' . $GLOBALS['t_pass'] . ' bestanden, ' . $GLOBALS['t_fail'] . " fehlgeschlagen\n";
+exit( $GLOBALS['t_fail'] > 0 ? 1 : 0 );

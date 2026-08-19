@@ -1,0 +1,15 @@
+{
+    "name": "sdv-design/pixel-made-simple",
+    "description": "Pixel Made Simple - lightweight Meta Pixel & Conversions API tracking for WordPress.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Dominik Seitz",
+            "homepage": "https://sdv.design"
+        }
+    ],
+    "scripts": {
+        "test": "php dev-tools/test-suite.php"
+    }
+}
