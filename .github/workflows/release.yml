@@ -1,0 +1,87 @@
+name: Release
+
+# Baut bei jedem Tag-Push (v1.0.0, v1.0.1, ...) automatisch zwei installierbare
+# ZIPs aus src/ und hängt beide an das GitHub-Release des Tags an. Ersetzt das
+# frühere manuelle "tar.exe -a -cf ..." (siehe CLAUDE.md) vollständig.
+#
+# Absichtlich ubuntu-latest statt windows-latest: Linux' "zip" schreibt immer
+# korrekte Vorwärtsschrägstrich-Pfade in die Archiveinträge. Windows'
+# PowerShell Compress-Archive tat das NICHT (Backslashes -> "Plugin file does
+# not exist." beim Installieren auf einem Linux-Server) - das war der Grund,
+# warum ZIPs in diesem Projekt bislang von Hand mit tar.exe gebaut wurden.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-free:
+    name: Build pixel-made-simple.zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage free package (strip Pro-only files)
+        run: |
+          mkdir -p build/pixel-made-simple
+          rsync -a \
+            --exclude '/pixel-made-simple-pro.php' \
+            --exclude '/pro/' \
+            --exclude '/plugin-update-checker/' \
+            src/ build/pixel-made-simple/
+
+      - name: Zip
+        working-directory: build
+        run: zip -r ../pixel-made-simple.zip pixel-made-simple
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pixel-made-simple
+          path: pixel-made-simple.zip
+
+  build-pro:
+    name: Build pixel-made-simple-pro.zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage Pro package (strip the Free main file)
+        run: |
+          mkdir -p build/pixel-made-simple-pro
+          rsync -a \
+            --exclude '/pixel-made-simple.php' \
+            src/ build/pixel-made-simple-pro/
+
+      - name: Zip
+        working-directory: build
+        run: zip -r ../pixel-made-simple-pro.zip pixel-made-simple-pro
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pixel-made-simple-pro
+          path: pixel-made-simple-pro.zip
+
+  release:
+    name: Publish GitHub release
+    needs: [build-free, build-pro]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release and attach both ZIPs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            dist/pixel-made-simple.zip \
+            dist/pixel-made-simple-pro.zip \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes

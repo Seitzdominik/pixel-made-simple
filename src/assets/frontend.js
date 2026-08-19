@@ -1,7 +1,7 @@
 /**
- * Lightweight Meta Pixel & CAPI Tracker – Formular-Auto-Grabber & UTM-Form-Fill.
+ * Pixel Made Simple – Formular-Auto-Grabber & UTM-Form-Fill.
  *
- * Zwei unabhängige Features (eigene Master-Toggles, siehe class-lmpct-frontend.php):
+ * Zwei unabhängige Features (eigene Master-Toggles, siehe class-pms-frontend.php):
  * 1. Formular-Auto-Grabber: erkennt Formular-Absendungen (native und
  *    AJAX-basierte Formular-Plugins), feuert das Browser-Event "Lead" mit
  *    Event-ID und meldet dieselbe ID plus Kontaktdaten an das Plugin-Backend,
@@ -15,7 +15,7 @@
 ( function () {
 	'use strict';
 
-	var cfg = window.lmpct_settings || {};
+	var cfg = window.pms_settings || {};
 
 	// Zwei unabhängige Features teilen sich diese Datei (siehe unten): der
 	// Formular-Auto-Grabber (cfg.formTracking) und der UTM-Form-Fill
@@ -36,7 +36,7 @@
 	 * Ist für dieses Formular bereits ein Event erzeugt worden?
 	 */
 	function isLocked( form ) {
-		return !! ( form && form.dataset && 'true' === form.dataset.lmpctSubmitted );
+		return !! ( form && form.dataset && 'true' === form.dataset.pmsSubmitted );
 	}
 
 	/**
@@ -48,13 +48,13 @@
 			return;
 		}
 
-		form.dataset.lmpctSubmitted = 'true';
+		form.dataset.pmsSubmitted = 'true';
 
 		setTimeout( function () {
 			try {
-				delete form.dataset.lmpctSubmitted;
+				delete form.dataset.pmsSubmitted;
 			} catch ( e ) {
-				form.removeAttribute( 'data-lmpct-submitted' );
+				form.removeAttribute( 'data-pms-submitted' );
 			}
 		}, LOCK_MS );
 	}
@@ -113,8 +113,8 @@
 	 * Prüfung; andernfalls hat der Server bereits Consent festgestellt.
 	 */
 	function hasConsent() {
-		if ( 'function' === typeof window.lmpctHasConsent ) {
-			return window.lmpctHasConsent();
+		if ( 'function' === typeof window.pmsHasConsent ) {
+			return window.pmsHasConsent();
 		}
 		return true;
 	}
@@ -243,7 +243,7 @@
 		}
 
 		if ( ! hasConsent() ) {
-			emit( 'lmpct:event', {
+			emit( 'pms:event', {
 				event: EVENT_NAME,
 				browser: 'blocked',
 				capi: 'consent_blocked',
@@ -260,12 +260,12 @@
 		if ( 'function' === typeof window.fbq ) {
 			// KEIN test_event_code hier (Bugfix v0.5.7): Meta's Pixel-SDK
 			// akzeptiert es nicht als custom_data-Feld und ignoriert das Event
-			// im Test-Stream. Der Test-Code bleibt CAPI-only (class-lmpct-capi.php).
+			// im Test-Stream. Der Test-Code bleibt CAPI-only (class-pms-capi.php).
 			window.fbq( 'track', EVENT_NAME, {}, { eventID: eventId } );
 			browserFired = true;
 		}
 
-		emit( 'lmpct:event', {
+		emit( 'pms:event', {
 			event: EVENT_NAME,
 			eventId: eventId,
 			browser: browserFired ? 'fired' : 'no_pixel',
@@ -280,7 +280,7 @@
 		}
 
 		var body = new URLSearchParams();
-		body.append( 'action', 'lmpct_form_lead' );
+		body.append( 'action', 'pms_form_lead' );
 		body.append( 'nonce', cfg.nonce || '' );
 		body.append( 'event_id', eventId );
 		body.append( 'event_name', EVENT_NAME );
@@ -303,7 +303,7 @@
 			return response.json();
 		} ).then( function ( result ) {
 			var payload = ( result && result.data ) || {};
-			emit( 'lmpct:capi', {
+			emit( 'pms:capi', {
 				eventId: eventId,
 				status: result && result.success ? ( payload.status || 'sent' ) : ( payload.reason || 'error' ),
 				code: payload.code || 0,
@@ -311,7 +311,7 @@
 				matchKeys: payload.match_keys || []
 			} );
 		} ).catch( function () {
-			emit( 'lmpct:capi', { eventId: eventId, status: 'error', message: 'request failed' } );
+			emit( 'pms:capi', { eventId: eventId, status: 'error', message: 'request failed' } );
 		} );
 	}
 
@@ -444,14 +444,14 @@
 		// Pro Kernfeld: name-Attribute (der Reihe nach geprüft) und CSS-Klassen
 		// (direkt auf dem Feld oder auf einem Wrapper-Element darum).
 		var FIELD_CONFIG = {
-			source: { names: [ 'utm_source', 'source' ], classes: [ 'utm-source', 'lmpct-utm-source' ] },
-			campaign: { names: [ 'utm_campaign', 'campaign' ], classes: [ 'utm-campaign', 'lmpct-utm-campaign' ] },
-			medium: { names: [ 'utm_medium', 'medium' ], classes: [ 'utm-medium', 'lmpct-utm-medium' ] }
+			source: { names: [ 'utm_source', 'source' ], classes: [ 'utm-source', 'pms-utm-source' ] },
+			campaign: { names: [ 'utm_campaign', 'campaign' ], classes: [ 'utm-campaign', 'pms-utm-campaign' ] },
+			medium: { names: [ 'utm_medium', 'medium' ], classes: [ 'utm-medium', 'pms-utm-medium' ] }
 		};
 
 		/**
 		 * Läuft der Form-Fill auf dieser Seite? Der Server (Bugfix v0.5.7,
-		 * class-lmpct-frontend.php) prüft nur noch, ob das Feature überhaupt
+		 * class-pms-frontend.php) prüft nur noch, ob das Feature überhaupt
 		 * aktiviert ist – die URL-Regeln (all/include/exclude, Wildcards)
 		 * wertet ausschließlich der Browser anhand seines eigenen, zuverlässig
 		 * aufgelösten window.location.pathname aus.
@@ -478,14 +478,14 @@
 		}
 
 		/**
-		 * Fallback auf das First-Touch-Cookie (class-lmpct-attribution.php),
+		 * Fallback auf das First-Touch-Cookie (pro/class-pro-utm.php, Pro-only),
 		 * falls der Besucher bereits über Unterseiten navigiert ist und die
 		 * Kampagnen-Parameter nicht mehr in der aktuellen URL stehen. Existiert
 		 * nur, wenn "First-touch & UTM passthrough" aktiviert ist – sonst liefert
 		 * dies einfach ein leeres Objekt (kein Fehler).
 		 */
 		function readCookieAttribution() {
-			var match = document.cookie.match( /(?:^|;\s*)lmpct_attribution=([^;]*)/ );
+			var match = document.cookie.match( /(?:^|;\s*)pms_attribution=([^;]*)/ );
 			if ( ! match ) {
 				return {};
 			}

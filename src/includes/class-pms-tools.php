@@ -2,19 +2,19 @@
 /**
  * Werkzeuge: Export und Import der kompletten Plugin-Konfiguration als JSON.
  *
- * @package Lightweight_Meta_Pixel_CAPI_Tracker
+ * @package Pixel_Made_Simple
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class LMPCT_Tools {
+class PMS_Tools {
 
 	const CAPABILITY = 'manage_options';
-	const FORMAT     = 'lmpct-config';
+	const FORMAT     = 'pms-config';
 
 	public static function init() {
-		add_action( 'admin_post_lmpct_export_settings', array( __CLASS__, 'handle_export' ) );
-		add_action( 'admin_post_lmpct_import_settings', array( __CLASS__, 'handle_import' ) );
+		add_action( 'admin_post_pms_export_settings', array( __CLASS__, 'handle_export' ) );
+		add_action( 'admin_post_pms_import_settings', array( __CLASS__, 'handle_import' ) );
 	}
 
 	/**
@@ -24,28 +24,37 @@ class LMPCT_Tools {
 	 */
 	public static function handle_export() {
 		if ( ! current_user_can( self::CAPABILITY ) ) {
-			wp_die( esc_html__( 'You do not have permission to perform this action.', 'lightweight-meta-pixel-capi-tracker' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'pixel-made-simple' ), '', array( 'response' => 403 ) );
 		}
 
-		check_admin_referer( 'lmpct_export_settings' );
+		// Defense-in-depth: die Free-Admin-UI zeigt für dieses Feature nur noch
+		// einen Upgrade-Teaser statt des Export-Buttons (siehe
+		// PMS_Admin::render_tools_tab()). Dieser Check fängt trotzdem jeden
+		// direkten POST an diesen admin-post.php-Endpunkt ab, z. B. wenn jemand
+		// die alte Formular-URL noch gespeichert hat.
+		if ( ! PMS_Settings::is_pro() ) {
+			wp_die( esc_html__( 'Exporting the configuration is a Pixel Made Simple Pro feature.', 'pixel-made-simple' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'pms_export_settings' );
 
 		$export = array(
 			'format'         => self::FORMAT,
-			'version'        => LMPCT_VERSION,
+			'version'        => PMS_VERSION,
 			'exported_at'    => gmdate( 'c' ),
 			'site'           => home_url( '/' ),
-			'settings'       => LMPCT_Settings::get(),
-			'events'         => array_values( LMPCT_Settings::get_events() ),
-			'events_enabled' => LMPCT_Settings::events_enabled() ? 1 : 0,
+			'settings'       => PMS_Settings::get(),
+			'events'         => array_values( PMS_Settings::get_events() ),
+			'events_enabled' => PMS_Settings::events_enabled() ? 1 : 0,
 		);
 
 		$json = wp_json_encode( $export, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		if ( ! is_string( $json ) ) {
-			wp_die( esc_html__( 'The configuration could not be exported.', 'lightweight-meta-pixel-capi-tracker' ) );
+			wp_die( esc_html__( 'The configuration could not be exported.', 'pixel-made-simple' ) );
 		}
 
-		$filename = 'lmpct-settings-export-' . gmdate( 'Y-m-d' ) . '.json';
+		$filename = 'pms-settings-export-' . gmdate( 'Y-m-d' ) . '.json';
 
 		nocache_headers();
 		header( 'Content-Type: application/json; charset=utf-8' );
@@ -63,22 +72,22 @@ class LMPCT_Tools {
 	 */
 	public static function handle_import() {
 		if ( ! current_user_can( self::CAPABILITY ) ) {
-			wp_die( esc_html__( 'You do not have permission to perform this action.', 'lightweight-meta-pixel-capi-tracker' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'pixel-made-simple' ), '', array( 'response' => 403 ) );
 		}
 
-		check_admin_referer( 'lmpct_import_settings' );
+		check_admin_referer( 'pms_import_settings' );
 
-		if ( empty( $_FILES['lmpct_import_file']['tmp_name'] ) || ! is_uploaded_file( $_FILES['lmpct_import_file']['tmp_name'] ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Pfad wird nur an is_uploaded_file/file_get_contents übergeben.
+		if ( empty( $_FILES['pms_import_file']['tmp_name'] ) || ! is_uploaded_file( $_FILES['pms_import_file']['tmp_name'] ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Pfad wird nur an is_uploaded_file/file_get_contents übergeben.
 			self::redirect( 'import_missing' );
 		}
 
-		$size = isset( $_FILES['lmpct_import_file']['size'] ) ? (int) $_FILES['lmpct_import_file']['size'] : 0;
+		$size = isset( $_FILES['pms_import_file']['size'] ) ? (int) $_FILES['pms_import_file']['size'] : 0;
 
 		if ( $size <= 0 || $size > 512000 ) {
 			self::redirect( 'import_invalid' );
 		}
 
-		$raw = file_get_contents( $_FILES['lmpct_import_file']['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Lokale Upload-Datei, kein Remote-Request.
+		$raw = file_get_contents( $_FILES['pms_import_file']['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Lokale Upload-Datei, kein Remote-Request.
 
 		if ( ! is_string( $raw ) || '' === trim( $raw ) ) {
 			self::redirect( 'import_invalid' );
@@ -110,23 +119,23 @@ class LMPCT_Tools {
 		}
 
 		// Einstellungen laufen durch dieselbe Sanitizing-Pipeline wie das Formular.
-		update_option( LMPCT_Settings::OPTION_SETTINGS, LMPCT_Settings::sanitize_settings( $data['settings'] ) );
+		update_option( PMS_Settings::OPTION_SETTINGS, PMS_Settings::sanitize_settings( $data['settings'] ) );
 
 		if ( isset( $data['events'] ) && is_array( $data['events'] ) ) {
 			$events = array();
 
 			foreach ( $data['events'] as $event ) {
-				$clean = LMPCT_Settings::sanitize_event( $event );
+				$clean = PMS_Settings::sanitize_event( $event );
 				if ( $clean ) {
 					$events[ $clean['id'] ] = $clean;
 				}
 			}
 
-			LMPCT_Settings::save_events( $events );
+			PMS_Settings::save_events( $events );
 		}
 
 		if ( isset( $data['events_enabled'] ) ) {
-			update_option( LMPCT_Settings::OPTION_EVENTS_ENABLED, empty( $data['events_enabled'] ) ? 0 : 1, false );
+			update_option( PMS_Settings::OPTION_EVENTS_ENABLED, empty( $data['events_enabled'] ) ? 0 : 1, false );
 		}
 
 		return true;
@@ -142,9 +151,9 @@ class LMPCT_Tools {
 		wp_safe_redirect(
 			add_query_arg(
 				array(
-					'page'          => LMPCT_Admin::PAGE_SLUG,
+					'page'          => PMS_Admin::PAGE_SLUG,
 					'tab'           => 'tools',
-					'lmpct_message' => $message,
+					'pms_message' => $message,
 				),
 				admin_url( 'admin.php' )
 			)

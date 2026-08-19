@@ -2,16 +2,38 @@
 /**
  * Zentraler Zugriff auf Einstellungen und Events inkl. Sanitization.
  *
- * @package Lightweight_Meta_Pixel_CAPI_Tracker
+ * @package Pixel_Made_Simple
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class LMPCT_Settings {
+class PMS_Settings {
 
-	const OPTION_SETTINGS       = 'lmpct_settings';
-	const OPTION_EVENTS         = 'lmpct_events';
-	const OPTION_EVENTS_ENABLED = 'lmpct_events_enabled';
+	const OPTION_SETTINGS       = 'pms_settings';
+	const OPTION_EVENTS         = 'pms_events';
+	const OPTION_EVENTS_ENABLED = 'pms_events_enabled';
+
+	/**
+	 * Free-Limit für gleichzeitig AKTIVE Custom Events (Tab "URL-Events").
+	 * Beliebig viele Event-Regeln lassen sich weiterhin anlegen/speichern –
+	 * nur die Anzahl der gleichzeitig aktiven ist begrenzt. In der Pro-
+	 * Version gibt es kein Limit (siehe is_pro()).
+	 */
+	const FREE_ACTIVE_EVENT_LIMIT = 2;
+
+	/**
+	 * Läuft gerade die Pro-Version?
+	 *
+	 * Defensiv per defined()-Check statt eines nackten PMS_IS_PRO-Zugriffs:
+	 * dev-tools/test-suite.php lädt diese Klasse ohne eines der beiden
+	 * Bootstrap-Files (die die Konstante sonst immer vor dem ersten Aufruf
+	 * setzen), daher muss "noch nicht definiert" sicher als "Free" gelten.
+	 *
+	 * @return bool
+	 */
+	public static function is_pro() {
+		return defined( 'PMS_IS_PRO' ) && true === PMS_IS_PRO;
+	}
 
 	/**
 	 * Von Meta unterstützte Standard-Events plus "CustomEvent".
@@ -147,7 +169,7 @@ class LMPCT_Settings {
 		}
 
 		// Der CAPI-Token hat nur auf Tab "Allgemein" ein echtes Feld (siehe
-		// LMPCT_Admin::render_advanced_tab(), die ihn bewusst NICHT als Hidden-
+		// PMS_Admin::render_advanced_tab(), die ihn bewusst NICHT als Hidden-
 		// Feld mitschickt, um seine Sichtbarkeit im Seitenquelltext auf diesen
 		// einen Tab zu beschränken). Fehlt der Schlüssel komplett im Input (weil
 		// von einem anderen Tab gespeichert wurde), bleibt der bisherige Wert
@@ -314,11 +336,66 @@ class LMPCT_Settings {
 	/**
 	 * Events speichern.
 	 *
+	 * In der Free-Version zusätzlich hartes serverseitiges Limit von
+	 * FREE_ACTIVE_EVENT_LIMIT gleichzeitig aktiven Events – unabhängig davon,
+	 * über welchen Weg gespeichert wird (Admin-UI-Handler in class-pms-admin.php
+	 * ODER JSON-Import in PMS_Tools::import_from_json()). Diese Methode ist der
+	 * einzige Ort, an dem Events tatsächlich persistiert werden, also der
+	 * richtige Ort für die Whitelist/den Cap – dieselbe Rolle wie
+	 * sanitize_settings() für die Einstellungen.
+	 *
+	 * Events über dem Limit werden NICHT verworfen, nur auf inaktiv gesetzt
+	 * (erste FREE_ACTIVE_EVENT_LIMIT aktive Events in Array-Reihenfolge bleiben
+	 * aktiv) – die Konfiguration bleibt vollständig erhalten, falls später auf
+	 * Pro aktualisiert wird.
+	 *
 	 * @param array $events Events, keyed by id.
 	 * @return void
 	 */
 	public static function save_events( array $events ) {
+		if ( ! self::is_pro() ) {
+			$active_count = 0;
+			foreach ( $events as $id => $event ) {
+				if ( empty( $event['active'] ) ) {
+					continue;
+				}
+				++$active_count;
+				if ( $active_count > self::FREE_ACTIVE_EVENT_LIMIT ) {
+					$events[ $id ]['active'] = 0;
+				}
+			}
+		}
+
 		update_option( self::OPTION_EVENTS, array_values( $events ), false );
+	}
+
+	/**
+	 * Ist das Free-Limit für gleichzeitig aktive Events erreicht?
+	 *
+	 * In der Pro-Version immer false (kein Limit). $exclude_id lässt das
+	 * gerade bearbeitete/umgeschaltete Event selbst außen vor, damit z. B.
+	 * das Deaktivieren-und-wieder-Aktivieren desselben, bereits aktiven
+	 * Events nicht fälschlich als "Limit erreicht" zählt.
+	 *
+	 * @param string $exclude_id Event-ID, die nicht mitgezählt werden soll.
+	 * @return bool
+	 */
+	public static function free_event_limit_reached( $exclude_id = '' ) {
+		if ( self::is_pro() ) {
+			return false;
+		}
+
+		$active_count = 0;
+		foreach ( self::get_events() as $id => $event ) {
+			if ( $id === $exclude_id ) {
+				continue;
+			}
+			if ( ! empty( $event['active'] ) ) {
+				++$active_count;
+			}
+		}
+
+		return $active_count >= self::FREE_ACTIVE_EVENT_LIMIT;
 	}
 
 	/**

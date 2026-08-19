@@ -1,24 +1,33 @@
 <?php
 /**
- * First-Touch- & UTM-Attribution.
+ * Pro-Feature: First-Touch- & UTM-Attribution + automatischer Formular-Fill.
  *
  * Speichert Kampagnen-Parameter beim Erstbesuch in einem First-Party-Cookie
- * (30 Tage, SameSite=Lax, für JS lesbar) und stellt sie den serverseitigen
- * CAPI-Events als custom_data bzw. als fbc bereit.
+ * (30 Tage, SameSite=Lax, für JS lesbar), stellt sie den serverseitigen
+ * CAPI-Events als custom_data bzw. als fbc bereit, und liefert die
+ * Einstellungen, die assets/frontend.js für den (in beiden Versionen
+ * enthaltenen) UTM-Form-Fill-Code benötigt.
+ *
+ * Wird ausschließlich von pixel-made-simple-pro.php geladen – die Free-
+ * Version bindet diese Datei nie ein. Andere geteilte Klassen (PMS_CAPI,
+ * PMS_Debug, PMS_Frontend) prüfen deshalb konsequent
+ * `class_exists( 'PMS_Pro_UTM' )`, bevor sie hierher aufrufen, und
+ * degradieren in der Free-Version einfach auf "keine Attribution-Daten"
+ * statt zu fataln.
  *
  * First-Touch-Semantik: Vorhandene UTM-Werte werden NICHT überschrieben.
  * Einzige Ausnahme sind fbclid und gclid – Klick-IDs müssen immer zum letzten
  * Anzeigenklick passen, sonst ordnen Meta/Google die Conversion der falschen
  * Kampagne zu.
  *
- * @package Lightweight_Meta_Pixel_CAPI_Tracker
+ * @package Pixel_Made_Simple
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class LMPCT_Attribution {
+class PMS_Pro_UTM {
 
-	const COOKIE_NAME = 'lmpct_attribution';
+	const COOKIE_NAME = 'pms_attribution';
 	const LIFETIME    = 2592000; // 30 Tage.
 
 	/**
@@ -70,7 +79,7 @@ class LMPCT_Attribution {
 	 * @return bool
 	 */
 	public static function enabled() {
-		$settings = LMPCT_Settings::get();
+		$settings = PMS_Settings::get();
 		return ! empty( $settings['utm_passthrough'] );
 	}
 
@@ -79,14 +88,14 @@ class LMPCT_Attribution {
 	 *
 	 * Unabhängig von enabled() (utm_passthrough): Diese Funktion füllt lediglich
 	 * Formularfelder im Browser, sendet aber selbst keine Daten an eine Plattform.
-	 * Sie liest zusätzlich das lmpct_attribution-Cookie als Fallback, sofern
+	 * Sie liest zusätzlich das pms_attribution-Cookie als Fallback, sofern
 	 * enabled() es überhaupt anlegt – ist utm_passthrough aus, greift nur die
 	 * URL-Parameter-Quelle.
 	 *
 	 * @return bool
 	 */
 	public static function form_fill_enabled() {
-		$settings = LMPCT_Settings::get();
+		$settings = PMS_Settings::get();
 		return ! empty( $settings['enable_utm_form_fill'] );
 	}
 
@@ -97,14 +106,14 @@ class LMPCT_Attribution {
 	 * @return bool
 	 */
 	public static function form_fill_url_allowed( $path ) {
-		$settings = LMPCT_Settings::get();
+		$settings = PMS_Settings::get();
 		$mode     = (string) ( $settings['utm_form_fill_mode'] ?? 'all' );
 
 		if ( 'all' === $mode ) {
 			return true;
 		}
 
-		$matched = self::path_matches_patterns( (string) $path, LMPCT_Settings::utm_form_fill_url_patterns() );
+		$matched = self::path_matches_patterns( (string) $path, PMS_Settings::utm_form_fill_url_patterns() );
 
 		return 'exclude' === $mode ? ! $matched : $matched;
 	}

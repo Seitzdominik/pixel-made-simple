@@ -12,12 +12,12 @@
  *   Marketing-Einwilligung           -> Consent verweigert (Browser-Skripte
  *   werden verzögert, CAPI bricht vor dem HTTP-Request ab).
  *
- * @package Lightweight_Meta_Pixel_CAPI_Tracker
+ * @package Pixel_Made_Simple
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class LMPCT_Consent {
+class PMS_Consent {
 
 	/**
 	 * Request-Cache für das Auswertungsergebnis.
@@ -41,7 +41,7 @@ class LMPCT_Consent {
 	 * @return bool
 	 */
 	public static function detection_enabled() {
-		$settings = LMPCT_Settings::get();
+		$settings = PMS_Settings::get();
 		return ! empty( $settings['consent_detection'] );
 	}
 
@@ -62,11 +62,11 @@ class LMPCT_Consent {
 		/**
 		 * Consent-Ergebnis überschreiben, z. B. für nicht unterstützte Banner.
 		 *
-		 * add_filter( 'lmpct_has_marketing_consent', fn( $consent ) => my_check() );
+		 * add_filter( 'pms_has_marketing_consent', fn( $consent ) => my_check() );
 		 *
 		 * @param bool $consent Ob eine Marketing-Einwilligung vorliegt.
 		 */
-		return (bool) apply_filters( 'lmpct_has_marketing_consent', self::$cache );
+		return (bool) apply_filters( 'pms_has_marketing_consent', self::$cache );
 	}
 
 	/**
@@ -241,7 +241,7 @@ class LMPCT_Consent {
 		 *
 		 * @param bool $active Ob ein bekanntes Cookie-Banner aktiv ist.
 		 */
-		return (bool) apply_filters( 'lmpct_consent_banner_active', $active );
+		return (bool) apply_filters( 'pms_consent_banner_active', $active );
 	}
 
 	/**
@@ -257,7 +257,7 @@ class LMPCT_Consent {
 		// bloßes viewed_cookie_policy (= Banner bedient) blockiert.
 		// 8192 = derselbe Grenzwert wie serverseitig (self::MAX_COOKIE_LEN);
 		// verhindert unnötiges atob()/JSON.parse() auf überlangen Werten.
-		return 'function lmpctHasConsent(){var c=document.cookie,m,L=8192;'
+		return 'function pmsHasConsent(){var c=document.cookie,m,L=8192;'
 			. 'm=c.match(/(?:^|;\\s*)mhcookie=([^;]*)/);'
 			. 'if(m){if(m[1].length>L)return false;try{var mh=JSON.parse(atob(decodeURIComponent(m[1])));'
 			. 'if(mh&&Array.isArray(mh.groups)){return mh.groups.indexOf("all")>-1||mh.groups.indexOf("marketing")>-1||mh.groups.indexOf("advertisement")>-1;}'
@@ -297,7 +297,7 @@ class LMPCT_Consent {
 		 *
 		 * @param string[] $events Event-Namen.
 		 */
-		return (array) apply_filters( 'lmpct_consent_events', $events );
+		return (array) apply_filters( 'pms_consent_events', $events );
 	}
 
 	/**

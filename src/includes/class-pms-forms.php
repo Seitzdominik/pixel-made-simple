@@ -6,14 +6,14 @@
  * meldet Event-ID sowie Kontaktdaten hier an. Die Rohdaten werden ausschließlich
  * gehasht (SHA-256) an die Conversions API übergeben und niemals gespeichert.
  *
- * @package Lightweight_Meta_Pixel_CAPI_Tracker
+ * @package Pixel_Made_Simple
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class LMPCT_Forms {
+class PMS_Forms {
 
-	const NONCE_ACTION = 'lmpct_form_lead';
+	const NONCE_ACTION = 'pms_form_lead';
 
 	/**
 	 * Harte Obergrenzen für POST-Parameter dieses (nopriv-)AJAX-Endpunkts.
@@ -26,8 +26,8 @@ class LMPCT_Forms {
 	const MAX_LEN_URL      = 2000;
 
 	public static function init() {
-		add_action( 'wp_ajax_lmpct_form_lead', array( __CLASS__, 'handle_lead' ) );
-		add_action( 'wp_ajax_nopriv_lmpct_form_lead', array( __CLASS__, 'handle_lead' ) );
+		add_action( 'wp_ajax_pms_form_lead', array( __CLASS__, 'handle_lead' ) );
+		add_action( 'wp_ajax_nopriv_pms_form_lead', array( __CLASS__, 'handle_lead' ) );
 	}
 
 	/**
@@ -36,7 +36,7 @@ class LMPCT_Forms {
 	 * @return bool
 	 */
 	public static function enabled() {
-		$settings = LMPCT_Settings::get();
+		$settings = PMS_Settings::get();
 		return ! empty( $settings['form_tracking'] );
 	}
 
@@ -46,7 +46,7 @@ class LMPCT_Forms {
 	 * @return string 'Lead' oder 'Contact'.
 	 */
 	public static function event_type() {
-		return LMPCT_Settings::form_event_type();
+		return PMS_Settings::form_event_type();
 	}
 
 	/**
@@ -59,7 +59,7 @@ class LMPCT_Forms {
 	 * @return bool
 	 */
 	public static function url_allowed( $path ) {
-		$filters = LMPCT_Settings::form_url_filters();
+		$filters = PMS_Settings::form_url_filters();
 
 		if ( empty( $filters ) ) {
 			return true;
@@ -88,18 +88,18 @@ class LMPCT_Forms {
 			wp_send_json_error( array( 'reason' => 'disabled' ), 200 );
 		}
 
-		$settings = LMPCT_Settings::get();
+		$settings = PMS_Settings::get();
 
 		if ( ! empty( $settings['exclude_admins'] ) && current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'reason' => 'admin_excluded' ), 200 );
 		}
 
-		/** Dokumentiert in class-lmpct-frontend.php */
-		if ( ! apply_filters( 'lmpct_allow_tracking', true ) ) {
+		/** Dokumentiert in class-pms-frontend.php */
+		if ( ! apply_filters( 'pms_allow_tracking', true ) ) {
 			wp_send_json_error( array( 'reason' => 'tracking_disabled' ), 200 );
 		}
 
-		if ( ! LMPCT_Consent::has_marketing_consent() ) {
+		if ( ! PMS_Consent::has_marketing_consent() ) {
 			wp_send_json_error( array( 'reason' => 'no_consent' ), 200 );
 		}
 
@@ -122,7 +122,7 @@ class LMPCT_Forms {
 		// konfigurierte Einstellung zurück (der Client bestimmt sie nicht frei).
 		$event_name = substr( (string) wp_unslash( $_POST['event_name'] ?? '' ), 0, self::MAX_LEN_FIELD );
 		$event_name = sanitize_text_field( $event_name );
-		if ( ! in_array( $event_name, LMPCT_Settings::form_event_types(), true ) ) {
+		if ( ! in_array( $event_name, PMS_Settings::form_event_types(), true ) ) {
 			$event_name = self::event_type();
 		}
 
@@ -140,14 +140,14 @@ class LMPCT_Forms {
 		$user_data = array();
 
 		$raw_email  = substr( (string) wp_unslash( $_POST['email'] ?? '' ), 0, self::MAX_LEN_FIELD );
-		$email_hash = LMPCT_CAPI::hash_email( $raw_email );
+		$email_hash = PMS_CAPI::hash_email( $raw_email );
 		if ( '' !== $email_hash ) {
 			$user_data['em'] = array( $email_hash );
 		}
 		unset( $raw_email );
 
 		$raw_phone  = substr( (string) wp_unslash( $_POST['phone'] ?? '' ), 0, self::MAX_LEN_FIELD );
-		$phone_hash = LMPCT_CAPI::hash_phone( $raw_phone );
+		$phone_hash = PMS_CAPI::hash_phone( $raw_phone );
 		if ( '' !== $phone_hash ) {
 			$user_data['ph'] = array( $phone_hash );
 		}
@@ -161,7 +161,7 @@ class LMPCT_Forms {
 			'meta_enabled' => 1,
 		);
 
-		$status = LMPCT_CAPI::send_events(
+		$status = PMS_CAPI::send_events(
 			array( $event ),
 			$settings,
 			$source_url,

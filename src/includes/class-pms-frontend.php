@@ -12,12 +12,12 @@
  * - Google Ads mit aktivem Consent Mode v2 lädt immer sofort – genau dafür
  *   existiert der Consent Mode (Defaults stehen auf "denied").
  *
- * @package Lightweight_Meta_Pixel_CAPI_Tracker
+ * @package Pixel_Made_Simple
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class LMPCT_Frontend {
+class PMS_Frontend {
 
 	/**
 	 * Auf dieser Seite gematchte Events, jeweils inkl. generierter event_id.
@@ -85,7 +85,7 @@ class LMPCT_Frontend {
 	 * den Formular-Auto-Grabber und den UTM-Form-Fill. Beide haben eigene
 	 * Master-Toggles, teilen sich aber dieselbe Datei.
 	 *
-	 * Bugfix v0.5.7: Das Skript (und `window.lmpct_settings`) wird geladen,
+	 * Bugfix v0.5.7: Das Skript (und `window.pms_settings`) wird geladen,
 	 * sobald Tracking auf der Seite aktiv ist UND mindestens eines der beiden
 	 * Features per Master-Toggle aktiviert ist – OHNE die URL-Include/Exclude-
 	 * Regeln serverseitig vorzuprüfen. Der Browser kennt seinen eigenen,
@@ -104,28 +104,28 @@ class LMPCT_Frontend {
 			return;
 		}
 
-		$form_tracking_active = class_exists( 'LMPCT_Forms' ) && LMPCT_Forms::enabled();
-		$utm_form_fill_active = class_exists( 'LMPCT_Attribution' ) && LMPCT_Attribution::form_fill_enabled();
+		$form_tracking_active = class_exists( 'PMS_Forms' ) && PMS_Forms::enabled();
+		$utm_form_fill_active = class_exists( 'PMS_Pro_UTM' ) && PMS_Pro_UTM::form_fill_enabled();
 
 		if ( ! $form_tracking_active && ! $utm_form_fill_active ) {
 			return;
 		}
 
-		wp_enqueue_script( 'lmpct-frontend', LMPCT_PLUGIN_URL . 'assets/frontend.js', array(), LMPCT_VERSION, true );
+		wp_enqueue_script( 'pms-frontend', PMS_PLUGIN_URL . 'assets/frontend.js', array(), PMS_VERSION, true );
 
 		wp_localize_script(
-			'lmpct-frontend',
-			'lmpct_settings',
+			'pms-frontend',
+			'pms_settings',
 			array(
 				'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
-				'nonce'           => wp_create_nonce( LMPCT_Forms::NONCE_ACTION ),
+				'nonce'           => wp_create_nonce( PMS_Forms::NONCE_ACTION ),
 				'formTracking'    => $form_tracking_active,
-				'eventType'       => LMPCT_Forms::event_type(),
-				'urlFilter'       => LMPCT_Settings::form_url_filters(),
+				'eventType'       => PMS_Forms::event_type(),
+				'urlFilter'       => PMS_Settings::form_url_filters(),
 				'excludeSystem'   => ! empty( self::$settings['form_exclude_system'] ),
 				'utmFormFill'     => $utm_form_fill_active,
 				'utmFormFillMode' => (string) ( self::$settings['utm_form_fill_mode'] ?? 'all' ),
-				'utmFormFillUrls' => LMPCT_Settings::utm_form_fill_url_patterns(),
+				'utmFormFillUrls' => PMS_Settings::utm_form_fill_url_patterns(),
 			)
 		);
 	}
@@ -140,10 +140,10 @@ class LMPCT_Frontend {
 			return;
 		}
 
-		self::$settings = LMPCT_Settings::get();
+		self::$settings = PMS_Settings::get();
 		self::$active   = true;
 
-		if ( LMPCT_Settings::events_enabled() ) {
+		if ( PMS_Settings::events_enabled() ) {
 			self::$matched_events = self::match_events( self::current_request_uri() );
 		}
 
@@ -161,9 +161,9 @@ class LMPCT_Frontend {
 		);
 
 		if ( ! empty( $meta_events ) ) {
-			// Die Consent-Prüfung (DSGVO) übernimmt LMPCT_CAPI::send_events()
+			// Die Consent-Prüfung (DSGVO) übernimmt PMS_CAPI::send_events()
 			// unmittelbar vor dem HTTP-Request.
-			LMPCT_CAPI::send_events( $meta_events, self::$settings, self::current_source_url() );
+			PMS_CAPI::send_events( $meta_events, self::$settings, self::current_source_url() );
 		}
 	}
 
@@ -190,7 +190,7 @@ class LMPCT_Frontend {
 			return false;
 		}
 
-		$settings = LMPCT_Settings::get();
+		$settings = PMS_Settings::get();
 
 		$any_platform =
 			( ! empty( $settings['pixel_enabled'] ) && ! empty( $settings['pixel_id'] ) ) ||
@@ -210,11 +210,11 @@ class LMPCT_Frontend {
 		/**
 		 * Tracking global unterbinden, z. B. durch eine eigene Consent-Logik.
 		 *
-		 * add_filter( 'lmpct_allow_tracking', fn( $allow ) => my_consent_given() );
+		 * add_filter( 'pms_allow_tracking', fn( $allow ) => my_consent_given() );
 		 *
 		 * @param bool $allow Ob getrackt werden darf.
 		 */
-		$allowed = (bool) apply_filters( 'lmpct_allow_tracking', true );
+		$allowed = (bool) apply_filters( 'pms_allow_tracking', true );
 
 		if ( ! $allowed ) {
 			self::$skip_reason = 'filtered';
@@ -267,7 +267,7 @@ class LMPCT_Frontend {
 	 * @return array[] Gematchte Events inkl. 'event_id'.
 	 */
 	private static function match_events( $request_uri ) {
-		$events = LMPCT_Settings::get_events();
+		$events = PMS_Settings::get_events();
 		if ( empty( $events ) ) {
 			return array();
 		}
@@ -333,12 +333,12 @@ class LMPCT_Frontend {
 			return;
 		}
 
-		$consent_given = LMPCT_Consent::has_marketing_consent();
+		$consent_given = PMS_Consent::has_marketing_consent();
 		$immediate_js  = ''; // Läuft sofort, geschützt durch den globalen Init-Guard.
 		$deferred_js   = ''; // Läuft erst nach Einwilligung, gleicher Guard.
 		$gtag_src      = '';
 
-		echo "\n<!-- Lightweight Meta Pixel & CAPI Tracker -->\n";
+		echo "\n<!-- Pixel Made Simple -->\n";
 
 		// Meta Pixel.
 		if ( self::meta_active() ) {
@@ -361,13 +361,13 @@ class LMPCT_Frontend {
 				// Eigener Guard: Läuft VOR der Marketing-Einwilligung (Consent Mode)
 				// und darf die spätere Pixel-Initialisierung nicht blockieren.
 				wp_print_inline_script_tag(
-					'if(!window.lmpctGtagInit){window.lmpctGtagInit=true;' . "\n" . self::build_google_js() . '}'
+					'if(!window.pmsGtagInit){window.pmsGtagInit=true;' . "\n" . self::build_google_js() . '}'
 				);
 				echo '<script async src="' . esc_url( $gtag_src ) . '"></script>' . "\n"; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- Bewusst direkt im Head, wie von Google vorgesehen.
 				$gtag_src = '';
 			} else {
 				$deferred_js .= self::build_google_js()
-					. "var lmpctGs=document.createElement('script');lmpctGs.async=true;lmpctGs.src='" . esc_url( $gtag_src ) . "';document.head.appendChild(lmpctGs);\n";
+					. "var pmsGs=document.createElement('script');pmsGs.async=true;pmsGs.src='" . esc_url( $gtag_src ) . "';document.head.appendChild(pmsGs);\n";
 				$gtag_src = '';
 			}
 		}
@@ -386,8 +386,8 @@ class LMPCT_Frontend {
 		// (auch wenn wp_head mehrfach rendert oder Banner-Events erneut feuern).
 		if ( '' !== $immediate_js ) {
 			wp_print_inline_script_tag(
-				'window.lmpctInitialized=window.lmpctInitialized||false;'
-				. 'if(!window.lmpctInitialized){window.lmpctInitialized=true;' . "\n"
+				'window.pmsInitialized=window.pmsInitialized||false;'
+				. 'if(!window.pmsInitialized){window.pmsInitialized=true;' . "\n"
 				. $immediate_js
 				. '}'
 			);
@@ -408,7 +408,7 @@ class LMPCT_Frontend {
 			wp_print_inline_script_tag( self::build_consent_bootstrap( $deferred_js ) );
 		}
 
-		echo "<!-- / Lightweight Meta Pixel & CAPI Tracker -->\n";
+		echo "<!-- / Pixel Made Simple -->\n";
 	}
 
 	/**
@@ -427,7 +427,7 @@ class LMPCT_Frontend {
 		// zunächst angenommen akzeptiert Meta's Pixel-SDK test_event_code nicht
 		// als custom_data-Feld – ein so markiertes Event wird im Test-Events-
 		// Stream schlicht ignoriert. Der Test-Code bleibt ausschließlich in der
-		// serverseitigen CAPI-Payload (siehe LMPCT_CAPI::send_events()).
+		// serverseitigen CAPI-Payload (siehe PMS_CAPI::send_events()).
 		$js  = "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');\n";
 		$js .= "fbq('init','" . esc_js( $pixel_id ) . "');\n";
 		$js .= "fbq('track','PageView');\n";
@@ -437,7 +437,7 @@ class LMPCT_Frontend {
 				continue;
 			}
 			$method = ( 'CustomEvent' === $event['event_type'] ) ? 'trackCustom' : 'track';
-			$name   = LMPCT_Settings::resolved_event_name( $event );
+			$name   = PMS_Settings::resolved_event_name( $event );
 			$js    .= "fbq('" . $method . "','" . esc_js( $name ) . "',{},{eventID:'" . esc_js( $event['event_id'] ) . "'});\n";
 		}
 
@@ -494,7 +494,7 @@ class LMPCT_Frontend {
 			if ( empty( $event['tiktok_enabled'] ) ) {
 				continue;
 			}
-			$js .= "ttq.track('" . esc_js( LMPCT_Settings::resolved_tiktok_event_name( $event ) ) . "');\n";
+			$js .= "ttq.track('" . esc_js( PMS_Settings::resolved_tiktok_event_name( $event ) ) . "');\n";
 		}
 
 		$js .= "}(window,document,'ttq');\n";
@@ -511,20 +511,20 @@ class LMPCT_Frontend {
 	 * @return string
 	 */
 	private static function build_consent_bootstrap( $deferred_js ) {
-		$events_json = wp_json_encode( array_values( LMPCT_Consent::consent_events() ) );
+		$events_json = wp_json_encode( array_values( PMS_Consent::consent_events() ) );
 
-		// Globaler Init-Guard (window.lmpctInitialized): garantiert, dass Pixel-
+		// Globaler Init-Guard (window.pmsInitialized): garantiert, dass Pixel-
 		// Init und PageView pro Seitenaufruf maximal EINMAL laufen – auch wenn
 		// der Bootstrap doppelt gerendert wird oder Banner-Events (z. B.
 		// surecookies_consent_updated) kurz nach dem Laden erneut feuern.
-		return '(function(){window.lmpctInitialized=window.lmpctInitialized||false;'
-			. LMPCT_Consent::consent_check_js()
+		return '(function(){window.pmsInitialized=window.pmsInitialized||false;'
+			. PMS_Consent::consent_check_js()
 			// Für den Formular-Auto-Grabber global verfügbar machen.
-			. 'window.lmpctHasConsent=lmpctHasConsent;'
-			. 'function lmpctInitTracking(){if(window.lmpctInitialized){return;}window.lmpctInitialized=true;' . "\n" . $deferred_js . '}'
-			. 'if(lmpctHasConsent()){lmpctInitTracking();}'
-			. 'var lmpctEvts=' . $events_json . ';'
-			. 'lmpctEvts.forEach(function(e){var f=function(){setTimeout(function(){if(lmpctHasConsent()){lmpctInitTracking();}},100);};document.addEventListener(e,f);window.addEventListener(e,f);});'
+			. 'window.pmsHasConsent=pmsHasConsent;'
+			. 'function pmsInitTracking(){if(window.pmsInitialized){return;}window.pmsInitialized=true;' . "\n" . $deferred_js . '}'
+			. 'if(pmsHasConsent()){pmsInitTracking();}'
+			. 'var pmsEvts=' . $events_json . ';'
+			. 'pmsEvts.forEach(function(e){var f=function(){setTimeout(function(){if(pmsHasConsent()){pmsInitTracking();}},100);};document.addEventListener(e,f);window.addEventListener(e,f);});'
 			. '})();';
 	}
 }

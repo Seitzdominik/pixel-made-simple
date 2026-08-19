@@ -2,15 +2,15 @@
 /**
  * Meta Conversions API: serverseitiger, nicht-blockierender Event-Versand.
  *
- * @package Lightweight_Meta_Pixel_CAPI_Tracker
+ * @package Pixel_Made_Simple
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class LMPCT_CAPI {
+class PMS_CAPI {
 
 	/**
-	 * Graph-API-Version. Über den Filter 'lmpct_graph_api_version' anpassbar,
+	 * Graph-API-Version. Über den Filter 'pms_graph_api_version' anpassbar,
 	 * damit das Plugin auch nach Meta-Deprecations ohne Update weiterläuft.
 	 */
 	const GRAPH_API_VERSION = 'v26.0';
@@ -44,29 +44,29 @@ class LMPCT_CAPI {
 	public static function send_events( array $events, array $settings, $source_url, array $extra_user_data = array() ) {
 		$names = array();
 		foreach ( $events as $event ) {
-			$names[] = LMPCT_Settings::resolved_event_name( $event );
+			$names[] = PMS_Settings::resolved_event_name( $event );
 		}
 
 		// DSGVO: Ohne Marketing-Einwilligung wird kein Request abgesetzt.
-		if ( class_exists( 'LMPCT_Consent' ) && ! LMPCT_Consent::has_marketing_consent() ) {
-			return self::log( $names, 'consent_blocked', 0, __( 'No marketing consent', 'lightweight-meta-pixel-capi-tracker' ), array() );
+		if ( class_exists( 'PMS_Consent' ) && ! PMS_Consent::has_marketing_consent() ) {
+			return self::log( $names, 'consent_blocked', 0, __( 'No marketing consent', 'pixel-made-simple' ), array() );
 		}
 
 		$pixel_id = preg_replace( '/\D+/', '', (string) ( $settings['pixel_id'] ?? '' ) );
 		$token    = (string) ( $settings['capi_token'] ?? '' );
 
 		if ( '' === $pixel_id || '' === $token || empty( $events ) ) {
-			return self::log( $names, 'skipped', 0, __( 'Pixel ID or access token missing', 'lightweight-meta-pixel-capi-tracker' ), array() );
+			return self::log( $names, 'skipped', 0, __( 'Pixel ID or access token missing', 'pixel-made-simple' ), array() );
 		}
 
 		$user_data = array_merge( self::build_user_data( $settings ), $extra_user_data );
-		$custom    = class_exists( 'LMPCT_Attribution' ) ? LMPCT_Attribution::custom_data() : array();
+		$custom    = class_exists( 'PMS_Pro_UTM' ) ? PMS_Pro_UTM::custom_data() : array();
 		$now       = time();
 		$data      = array();
 
 		foreach ( $events as $event ) {
 			$payload = array(
-				'event_name'       => LMPCT_Settings::resolved_event_name( $event ),
+				'event_name'       => PMS_Settings::resolved_event_name( $event ),
 				'event_time'       => $now,
 				'event_id'         => (string) $event['event_id'],
 				'event_source_url' => $source_url,
@@ -84,7 +84,7 @@ class LMPCT_CAPI {
 			 * @param array $payload Event-Payload.
 			 * @param array $event   Konfiguriertes Plugin-Event.
 			 */
-			$data[] = apply_filters( 'lmpct_capi_event_data', $payload, $event );
+			$data[] = apply_filters( 'pms_capi_event_data', $payload, $event );
 		}
 
 		$body = array(
@@ -102,7 +102,7 @@ class LMPCT_CAPI {
 		 *
 		 * @param string $version Z. B. 'v26.0'.
 		 */
-		$version = apply_filters( 'lmpct_graph_api_version', self::GRAPH_API_VERSION );
+		$version = apply_filters( 'pms_graph_api_version', self::GRAPH_API_VERSION );
 		$version = preg_replace( '/[^v0-9.]/', '', (string) $version );
 
 		$endpoint = sprintf( 'https://graph.facebook.com/%s/%s/events', $version, rawurlencode( $pixel_id ) );
@@ -113,7 +113,7 @@ class LMPCT_CAPI {
 		 *
 		 * @param bool $blocking Standard: false (fire-and-forget).
 		 */
-		$blocking = (bool) apply_filters( 'lmpct_capi_blocking', false );
+		$blocking = (bool) apply_filters( 'pms_capi_blocking', false );
 
 		$response = wp_remote_post(
 			$endpoint,
@@ -135,7 +135,7 @@ class LMPCT_CAPI {
 		if ( is_wp_error( $response ) ) {
 			$message = $response->get_error_message();
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[LMPCT] CAPI-Fehler: ' . $message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( '[PMS] CAPI-Fehler: ' . $message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			}
 			return self::log( $names, 'error', 0, $message, $keys );
 		}
@@ -144,7 +144,7 @@ class LMPCT_CAPI {
 		$raw  = (string) wp_remote_retrieve_body( $response );
 
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( '[LMPCT] CAPI-Antwort: ' . $raw ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( '[PMS] CAPI-Antwort: ' . $raw ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 		}
 
 		if ( $code >= 200 && $code < 300 ) {
@@ -197,7 +197,7 @@ class LMPCT_CAPI {
 	 * Test-Tracking im Live-Betrieb passiert.
 	 *
 	 * Ausschließlich für die CAPI relevant (private): Der Test-Code wird bewusst
-	 * NICHT an den Browser-Pixel weitergereicht (siehe LMPCT_Frontend::build_meta_js(),
+	 * NICHT an den Browser-Pixel weitergereicht (siehe PMS_Frontend::build_meta_js(),
 	 * Bugfix v0.5.7 – Meta's Pixel-SDK akzeptiert ihn dort nicht als custom_data
 	 * und ignoriert das Event im Test-Stream).
 	 *
@@ -216,7 +216,7 @@ class LMPCT_CAPI {
 		if ( $created_at > 0 && ( time() - $created_at ) > $max_age ) {
 			$settings['test_event_code']      = '';
 			$settings['test_code_created_at'] = 0;
-			update_option( LMPCT_Settings::OPTION_SETTINGS, $settings );
+			update_option( PMS_Settings::OPTION_SETTINGS, $settings );
 			return '';
 		}
 
@@ -268,7 +268,7 @@ class LMPCT_CAPI {
 		 * @param string $digits Nur-Ziffern-Nummer.
 		 * @param string $phone  Ursprünglicher Rohwert.
 		 */
-		$digits = (string) apply_filters( 'lmpct_normalize_phone', $digits, $phone );
+		$digits = (string) apply_filters( 'pms_normalize_phone', $digits, $phone );
 
 		if ( strlen( $digits ) < 6 ) {
 			return '';
@@ -316,8 +316,8 @@ class LMPCT_CAPI {
 			}
 		}
 
-		if ( ! $fbc && class_exists( 'LMPCT_Attribution' ) ) {
-			$fbc = LMPCT_Attribution::fbc();
+		if ( ! $fbc && class_exists( 'PMS_Pro_UTM' ) ) {
+			$fbc = PMS_Pro_UTM::fbc();
 		}
 
 		if ( $fbc ) {
@@ -339,7 +339,7 @@ class LMPCT_CAPI {
 		 *
 		 * @param array $user_data user_data-Payload.
 		 */
-		return apply_filters( 'lmpct_capi_user_data', $user_data );
+		return apply_filters( 'pms_capi_user_data', $user_data );
 	}
 
 	/**
