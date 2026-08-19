@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.1
+Stable tag: 0.6.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -38,7 +38,7 @@ Dieses Free-Plugin deckt den kompletten Funktionsumfang oben ab. **Pixel Made Si
 == Installation ==
 
 1. ZIP über „Plugins → Installieren → Plugin hochladen" installieren und aktivieren.
-2. Unter „Pixel Tracker" im Admin-Menü die gewünschten Plattformen aufklappen, IDs eintragen und per Master-Toggle aktivieren.
+2. Unter „Pixel Made Simple" im Admin-Menü die gewünschten Plattformen aufklappen, IDs eintragen und per Master-Toggle aktivieren.
 3. Optional: CAPI Access Token hinterlegen und die Conversions API aktivieren.
 4. Im Tab „Events verwalten" URL-Regeln für Conversion-Seiten anlegen und den Plattformen zuweisen.
 
@@ -90,6 +90,16 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.2 =
+* Härtung des Free/Pro-Kollisionsschutzes: Die Admin-Notice bei gleichzeitiger Aktivierung ist jetzt in beiden Versionen identisch formuliert und der automatische Deaktivierungs-Mechanismus bewusst asymmetrisch – im Kollisionsfall bleibt immer Pro aktiv, nie Free (spätestens ab dem nächsten Seitenaufruf, siehe Code-Kommentar in `pixel-made-simple.php`/`pixel-made-simple-pro.php` für den Bulk-Aktivieren-Sonderfall).
+* Menü-Label in der WordPress-Seitenleiste von „Pixel Tracker" zu „Pixel Made Simple" geändert.
+* **Weitere Free/Pro-Abgrenzung:**
+  * **Google Ads & TikTok Pixel (Pro):** Beide Plattformen sind jetzt Pixel Made Simple Pro vorbehalten. Tab „Allgemein" zeigt sie in der Free-Version als ausgegraute Teaser-Boxen mit „Upgrade to Pro"-Button; serverseitig zusätzlich abgesichert (die Skript-Ausgabe prüft den Pro-Status unabhängig von der UI). Meta Pixel & Conversions API bleiben vollständig kostenlos.
+  * **Custom Events (Free-Limit geändert):** Die Free-Version erlaubt jetzt maximal 2 Event-Regeln **insgesamt** (vorher: beliebig viele Regeln, aber nur 2 gleichzeitig aktiv). Ab dem 2. Event ist der „Event hinzufügen"-Button deaktiviert mit dem Hinweis „In der Free-Version sind bis zu 2 URL-Events enthalten. Upgrade auf Pro für unbegrenzte Events."
+  * **Konfiguration importieren (jetzt Pro):** Der JSON-Import ist jetzt zusammen mit dem Export ein reines Pro-Feature (vorher war nur der Export Pro-only). Serverseitig zusätzlich abgesichert, nicht nur in der UI ausgeblendet.
+  * **Unverändert kostenlos:** Meta Pixel & Conversions API, URL-Events (bis zum neuen 2er-Limit), Formular-Auto-Grabber, Cookie-Consent-Erkennung, Admin-Live-Debug-Leiste, Event Log (mit den seit 0.6.1 bestehenden Free-Einschränkungen).
+* Neu: `composer.json`/`package.json` im Projekt-Root als dünne Wrapper um die bestehenden `dev-tools/`-Test- und Build-Skripte (`composer test`, `npm test`, `npm run build`) – rein für Entwickler-Tooling, ohne Auswirkung auf die ausgelieferten Plugin-ZIPs.
 
 = 0.6.1 =
 * Neu: **Event Log** (Tab „Event Log") – protokolliert Browser- und Conversions-API-Events in einer eigenen Datenbanktabelle, damit du Conversions direkt im WordPress-Backend nachvollziehen kannst, ohne den Meta Events Manager zu öffnen. Zeigt Zeitpunkt, Event, Event-ID (für den Dedup-Abgleich mit dem Meta Events Manager), Quelle (Browser/CAPI/beides), Status (grün „200 OK", rot „Fehler" inkl. Tooltip mit der Fehlermeldung, neutral „Gesendet" für nicht-blockierende Fire-and-Forget-Sends ohne Rückmeldung) und die übergebenen Match-Keys (z. B. `em`, `fbc`) – niemals die Werte selbst.

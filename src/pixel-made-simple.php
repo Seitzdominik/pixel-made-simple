@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Lightweight, high-performance tracking for Meta Pixel & Conversions API, Google Ads (Consent Mode v2) and TikTok Pixel – with URL-based multi-platform events and clean event deduplication.
- * Version:           0.6.1
+ * Version:           0.6.2
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -21,22 +21,41 @@ defined( 'ABSPATH' ) || exit;
  * für die spiegelbildliche Guard). Beide Haupt-Dateien inkludieren dieselben
  * Klassen aus includes/; liefen beide durch, würde WordPress "Cannot redeclare
  * class PMS_Settings" werfen – am wahrscheinlichsten, wenn Free und Pro im
- * selben Bulk-Activate-Request aktiviert werden (der Activation-Hook unten
- * greift dann erst NACH diesem Request). Deshalb bricht die zweite Datei, die
- * in einem PHP-Prozess lädt, hier sofort ab, statt fatal zu enden.
+ * selben Bulk-Activate-Request aktiviert oder per Bulk-Update gleichzeitig
+ * aktualisiert werden. Deshalb bricht die zweite Datei, die in einem
+ * PHP-Prozess lädt, hier sofort ab, statt fatal zu enden.
+ *
+ * Asymmetrisch mit Absicht: Pro soll im Kollisionsfall immer die Version
+ * sein, die am Ende aktiv bleibt. Lädt Free zuerst und Pro erkennt die
+ * Kollision, kann Pro in DIESEM Request trotzdem nicht weiterladen (Free hat
+ * die geteilten Klassen bereits deklariert) – Pro deaktiviert deshalb Free
+ * (nicht sich selbst), sodass ab dem NÄCHSTEN Request nur noch Pro lädt, ganz
+ * normal ohne Guard. Lädt Free zuerst und erkennt seinerseits, dass Pro schon
+ * aktiv ist, deaktiviert Free direkt sich selbst – Pro läuft in diesem Fall
+ * bereits vollständig im selben Request weiter.
  */
 if ( defined( 'PMS_IS_PRO' ) && true === PMS_IS_PRO ) {
 	add_action(
 		'admin_notices',
 		function () {
-			echo '<div class="notice notice-error"><p>' . esc_html__( 'Pixel Made Simple: please deactivate either the free or the Pro version – both cannot run at the same time.', 'pixel-made-simple' ) . '</p></div>';
+			echo '<div class="notice notice-warning"><p>' . esc_html__( 'Pixel Made Simple Pro is already active. The free version is not needed and has been deactivated automatically.', 'pixel-made-simple' ) . '</p></div>';
 		}
 	);
+
+	if ( is_admin() ) {
+		if ( ! function_exists( 'deactivate_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		if ( function_exists( 'deactivate_plugins' ) ) {
+			deactivate_plugins( plugin_basename( __FILE__ ) );
+		}
+	}
+
 	return;
 }
 
 define( 'PMS_IS_PRO', false );
-define( 'PMS_VERSION', '0.6.1' );
+define( 'PMS_VERSION', '0.6.2' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

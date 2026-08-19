@@ -117,7 +117,7 @@ class PMS_Debug {
 			'capi'        => PMS_CAPI::get_log(),
 			'attribution' => $attribution,
 			'i18n'        => array(
-				'title'       => __( 'Pixel Tracker – Live Debug', 'pixel-made-simple' ),
+				'title'       => __( 'Pixel Made Simple – Live Debug', 'pixel-made-simple' ),
 				'consent'     => __( 'Consent', 'pixel-made-simple' ),
 				'browser'     => __( 'Browser', 'pixel-made-simple' ),
 				'capi'        => __( 'CAPI', 'pixel-made-simple' ),
@@ -187,7 +187,7 @@ class PMS_Debug {
 #pms-debug .pms-muted{color:#8b949e}
 @media (max-width:600px){#pms-debug .pms-name{min-width:0;width:100%}}
 </style>
-<div id="pms-debug" class="pms-min" role="complementary" aria-label="Pixel Tracker Debug">
+<div id="pms-debug" class="pms-min" role="complementary" aria-label="Pixel Made Simple Debug">
 	<div id="pms-debug-head">
 		<strong></strong>
 		<span class="pms-pill pms-neutral" data-pms="consent"></span>

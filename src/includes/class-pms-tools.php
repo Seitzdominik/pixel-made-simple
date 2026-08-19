@@ -75,6 +75,13 @@ class PMS_Tools {
 			wp_die( esc_html__( 'You do not have permission to perform this action.', 'pixel-made-simple' ), '', array( 'response' => 403 ) );
 		}
 
+		// Defense-in-depth wie bei handle_export(): die Free-Admin-UI zeigt seit
+		// v0.6.2 auch für Import nur noch einen Upgrade-Teaser statt der
+		// Formular (siehe PMS_Admin::render_tools_tab()).
+		if ( ! PMS_Settings::is_pro() ) {
+			wp_die( esc_html__( 'Importing a configuration is a Pixel Made Simple Pro feature.', 'pixel-made-simple' ), '', array( 'response' => 403 ) );
+		}
+
 		check_admin_referer( 'pms_import_settings' );
 
 		if ( empty( $_FILES['pms_import_file']['tmp_name'] ) || ! is_uploaded_file( $_FILES['pms_import_file']['tmp_name'] ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Pfad wird nur an is_uploaded_file/file_get_contents übergeben.

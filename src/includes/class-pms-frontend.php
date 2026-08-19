@@ -192,10 +192,18 @@ class PMS_Frontend {
 
 		$settings = PMS_Settings::get();
 
+		// Google/TikTok sind seit v0.6.2 Pro-only (siehe google_active()-Doku
+		// weiter unten) -- hier separat dupliziert, weil should_track() vor
+		// prepare() läuft und self::$settings deshalb noch nicht gesetzt ist,
+		// die privaten *_active()-Methoden also nicht wiederverwendet werden
+		// können. Ohne den is_pro()-Guard hier würde ein bei einem Downgrade
+		// noch gespeichertes google_enabled=1 allein schon Tracking auslösen,
+		// obwohl print_scripts() für Google/TikTok danach ohnehin nichts mehr
+		// ausgibt -- kein Sicherheitsproblem, aber ein unnötiger Request-Pfad.
 		$any_platform =
 			( ! empty( $settings['pixel_enabled'] ) && ! empty( $settings['pixel_id'] ) ) ||
-			( ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) ) ||
-			( ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) );
+			( PMS_Settings::is_pro() && ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) ) ||
+			( PMS_Settings::is_pro() && ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) );
 
 		if ( ! $any_platform ) {
 			self::$skip_reason = 'no_platform';
@@ -227,12 +235,31 @@ class PMS_Frontend {
 		return ! empty( self::$settings['pixel_enabled'] ) && ! empty( self::$settings['pixel_id'] );
 	}
 
+	/**
+	 * Google Ads ist seit v0.6.2 ein Pro-only-Feature (siehe
+	 * PMS_Admin::render_general_tab()). Die Laufzeit-Prüfung hier ist
+	 * Defense-in-Depth, unabhängig vom UI-Ausblenden: verhindert, dass ein
+	 * bei einem Downgrade auf Free noch gespeichertes google_enabled=1
+	 * weiterhin Skripte ausgibt.
+	 *
+	 * @return bool
+	 */
 	private static function google_active() {
-		return ! empty( self::$settings['google_enabled'] ) && ! empty( self::$settings['google_tag_id'] );
+		return PMS_Settings::is_pro()
+			&& ! empty( self::$settings['google_enabled'] )
+			&& ! empty( self::$settings['google_tag_id'] );
 	}
 
+	/**
+	 * TikTok ist seit v0.6.2 ein Pro-only-Feature, siehe google_active()-Doku
+	 * oben (gleiches Prinzip).
+	 *
+	 * @return bool
+	 */
 	private static function tiktok_active() {
-		return ! empty( self::$settings['tiktok_enabled'] ) && ! empty( self::$settings['tiktok_pixel_id'] );
+		return PMS_Settings::is_pro()
+			&& ! empty( self::$settings['tiktok_enabled'] )
+			&& ! empty( self::$settings['tiktok_pixel_id'] );
 	}
 
 	/**

@@ -51,7 +51,7 @@ class PMS_Admin {
 	public static function register_menu() {
 		add_menu_page(
 			__( 'Meta Pixel & CAPI Tracker', 'pixel-made-simple' ),
-			__( 'Pixel Tracker', 'pixel-made-simple' ),
+			__( 'Pixel Made Simple', 'pixel-made-simple' ),
 			self::CAPABILITY,
 			self::PAGE_SLUG,
 			array( __CLASS__, 'render_page' ),
@@ -118,26 +118,30 @@ class PMS_Admin {
 	 * Whitelist der per AJAX autosavenden Einstellungs-Keys, getrennt von
 	 * sanitize_settings(). 'bool' -> 0/1-Toggle (der historische Normalfall).
 	 * 'log_retention_days' ist der erste nicht-boolesche Autosave-Key
-	 * (Dropdown im Event-Log-Tab) und zusätzlich Pro-only.
+	 * (Dropdown im Event-Log-Tab). Keys, die als Pro-only markiert sind,
+	 * werden in handle_toggle_autosave() zusätzlich per is_pro() geprüft --
+	 * die Free-UI zeigt für sie ohnehin keinen echten Toggle mehr an (siehe
+	 * render_general_tab()), das hier ist reines Defense-in-Depth gegen
+	 * direkte AJAX-Requests.
 	 *
-	 * @return array<string,string>
+	 * @return array<string,array{type:string,pro_only:bool}>
 	 */
 	private static function autosave_allowed_keys() {
 		return array(
-			'exclude_admins'       => 'bool',
-			'consent_detection'    => 'bool',
-			'pixel_enabled'        => 'bool',
-			'capi_enabled'         => 'bool',
-			'hash_email'           => 'bool',
-			'google_enabled'       => 'bool',
-			'google_consent_mode'  => 'bool',
-			'tiktok_enabled'       => 'bool',
-			'form_tracking'        => 'bool',
-			'form_exclude_system'  => 'bool',
-			'utm_passthrough'      => 'bool',
-			'enable_utm_form_fill' => 'bool',
-			'debug_bar'            => 'bool',
-			'log_retention_days'   => 'log_retention_days',
+			'exclude_admins'       => array( 'type' => 'bool', 'pro_only' => false ),
+			'consent_detection'    => array( 'type' => 'bool', 'pro_only' => false ),
+			'pixel_enabled'        => array( 'type' => 'bool', 'pro_only' => false ),
+			'capi_enabled'         => array( 'type' => 'bool', 'pro_only' => false ),
+			'hash_email'           => array( 'type' => 'bool', 'pro_only' => false ),
+			'google_enabled'       => array( 'type' => 'bool', 'pro_only' => true ),
+			'google_consent_mode'  => array( 'type' => 'bool', 'pro_only' => true ),
+			'tiktok_enabled'       => array( 'type' => 'bool', 'pro_only' => true ),
+			'form_tracking'        => array( 'type' => 'bool', 'pro_only' => false ),
+			'form_exclude_system'  => array( 'type' => 'bool', 'pro_only' => false ),
+			'utm_passthrough'      => array( 'type' => 'bool', 'pro_only' => true ),
+			'enable_utm_form_fill' => array( 'type' => 'bool', 'pro_only' => true ),
+			'debug_bar'            => array( 'type' => 'bool', 'pro_only' => false ),
+			'log_retention_days'   => array( 'type' => 'log_retention_days', 'pro_only' => true ),
 		);
 	}
 
@@ -160,13 +164,13 @@ class PMS_Admin {
 			wp_send_json_error( array( 'message' => 'invalid_key' ), 400 );
 		}
 
-		if ( 'log_retention_days' === $allowed[ $key ] && ! PMS_Settings::is_pro() ) {
+		if ( ! empty( $allowed[ $key ]['pro_only'] ) && ! PMS_Settings::is_pro() ) {
 			wp_send_json_error( array( 'message' => 'pro_required' ), 403 );
 		}
 
 		$settings = PMS_Settings::get();
 
-		if ( 'log_retention_days' === $allowed[ $key ] ) {
+		if ( 'log_retention_days' === $allowed[ $key ]['type'] ) {
 			$requested        = (int) wp_unslash( $_POST['value'] ?? 0 );
 			$settings[ $key ] = in_array( $requested, PMS_Settings::ALLOWED_LOG_RETENTION_DAYS, true )
 				? $requested
@@ -202,8 +206,7 @@ class PMS_Admin {
 			'imported'       => array( 'success', __( 'Configuration imported successfully.', 'pixel-made-simple' ) ),
 			'import_invalid' => array( 'error', __( 'The file could not be imported. Please upload a valid export of this plugin.', 'pixel-made-simple' ) ),
 			'import_missing' => array( 'error', __( 'Please choose a JSON file to import.', 'pixel-made-simple' ) ),
-			'free_limit_reached' => array( 'error', __( 'The free version allows a maximum of 2 active custom events. Deactivate another event first, or upgrade to Pro for unlimited events.', 'pixel-made-simple' ) ),
-			'free_limit_active'  => array( 'warning', __( 'Event saved, but not activated: the free version allows a maximum of 2 active custom events. Upgrade to Pro for unlimited events.', 'pixel-made-simple' ) ),
+			'free_limit_reached' => array( 'error', __( 'The free version includes up to 2 URL events. Upgrade to Pro for unlimited events.', 'pixel-made-simple' ) ),
 			'log_cleared'        => array( 'success', __( 'Event log cleared.', 'pixel-made-simple' ) ),
 		);
 
@@ -364,35 +367,6 @@ class PMS_Admin {
 			</div>
 		</div>
 		<?php
-	}
-
-	/**
-	 * Ist der Status-Toggle für dieses Event gesperrt (Free-Limit erreicht,
-	 * Event selbst aber gerade inaktiv)? Bereits aktive Events lassen sich in
-	 * der Free-Version weiterhin jederzeit deaktivieren.
-	 *
-	 * @param string $event_id        Event-ID (leer = noch ungespeichertes neues Event).
-	 * @param bool   $currently_active Aktueller Aktiv-Zustand.
-	 * @return bool
-	 */
-	private static function is_event_locked( $event_id, $currently_active ) {
-		return ! $currently_active && PMS_Settings::free_event_limit_reached( $event_id );
-	}
-
-	/**
-	 * Gesperrter Platzhalter-Toggle mit Upgrade-Tooltip (Ersatz für toggle(),
-	 * wenn is_event_locked() zutrifft).
-	 *
-	 * @return void
-	 */
-	private static function render_locked_event_toggle() {
-		?>
-		<span class="pms-toggle pms-toggle-locked" aria-hidden="true">
-			<span class="pms-toggle-slider"></span>
-			<span class="dashicons dashicons-lock"></span>
-		</span>
-		<?php
-		self::tip( __( 'Free plan limit reached (2 active events max). Upgrade to Pro for unlimited events.', 'pixel-made-simple' ) );
 	}
 
 	/* ---------------------------------------------------------------------
@@ -685,27 +659,37 @@ class PMS_Admin {
 			?>
 		<?php endif; ?>
 
-		<div class="pms-card">
-			<h2><?php esc_html_e( 'Import configuration', 'pixel-made-simple' ); ?></h2>
-			<div class="pms-card-body">
-				<p><?php esc_html_e( 'Upload a previously exported JSON file. All values are validated and sanitised before they are saved.', 'pixel-made-simple' ); ?></p>
-				<p class="description"><strong><?php esc_html_e( 'Note:', 'pixel-made-simple' ); ?></strong> <?php esc_html_e( 'The import overwrites the current settings and all event rules.', 'pixel-made-simple' ); ?></p>
-				<form method="post" action="<?php echo esc_url( $admin_post ); ?>" enctype="multipart/form-data">
-					<input type="hidden" name="action" value="pms_import_settings" />
-					<?php wp_nonce_field( 'pms_import_settings' ); ?>
-					<p>
-						<input type="file" name="pms_import_file" accept="application/json,.json" required />
-					</p>
-					<p>
-						<button type="submit" class="button pms-delete-button"
-							data-pms-confirm="<?php esc_attr_e( 'Really import? The current settings and event rules will be overwritten.', 'pixel-made-simple' ); ?>">
-							<span class="dashicons dashicons-upload" aria-hidden="true"></span>
-							<?php esc_html_e( 'Import configuration', 'pixel-made-simple' ); ?>
-						</button>
-					</p>
-				</form>
+		<?php if ( PMS_Settings::is_pro() ) : ?>
+			<div class="pms-card">
+				<h2><?php esc_html_e( 'Import configuration', 'pixel-made-simple' ); ?></h2>
+				<div class="pms-card-body">
+					<p><?php esc_html_e( 'Upload a previously exported JSON file. All values are validated and sanitised before they are saved.', 'pixel-made-simple' ); ?></p>
+					<p class="description"><strong><?php esc_html_e( 'Note:', 'pixel-made-simple' ); ?></strong> <?php esc_html_e( 'The import overwrites the current settings and all event rules.', 'pixel-made-simple' ); ?></p>
+					<form method="post" action="<?php echo esc_url( $admin_post ); ?>" enctype="multipart/form-data">
+						<input type="hidden" name="action" value="pms_import_settings" />
+						<?php wp_nonce_field( 'pms_import_settings' ); ?>
+						<p>
+							<input type="file" name="pms_import_file" accept="application/json,.json" required />
+						</p>
+						<p>
+							<button type="submit" class="button pms-delete-button"
+								data-pms-confirm="<?php esc_attr_e( 'Really import? The current settings and event rules will be overwritten.', 'pixel-made-simple' ); ?>">
+								<span class="dashicons dashicons-upload" aria-hidden="true"></span>
+								<?php esc_html_e( 'Import configuration', 'pixel-made-simple' ); ?>
+							</button>
+						</p>
+					</form>
+				</div>
 			</div>
-		</div>
+		<?php else : ?>
+			<?php
+			self::render_pro_teaser_box(
+				__( 'Import configuration', 'pixel-made-simple' ),
+				__( 'Upload a previously exported JSON file to apply all settings, platform IDs and event rules in one step. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
+				'import'
+			);
+			?>
+		<?php endif; ?>
 		<?php
 	}
 
@@ -898,25 +882,34 @@ class PMS_Admin {
 			<?php
 			// Einstellungen der anderen Tabs erhalten (sonst würden sie beim
 			// Speichern dieses Formulars zurückgesetzt).
-			self::preserve_hidden_settings(
-				$s,
-				array(
-					'exclude_admins',
-					'consent_detection',
-					'pixel_enabled',
-					'pixel_id',
-					'capi_enabled',
-					'capi_token',
-					'test_event_code',
-					'test_code_created_at',
-					'hash_email',
-					'google_enabled',
-					'google_tag_id',
-					'google_consent_mode',
-					'tiktok_enabled',
-					'tiktok_pixel_id',
-				)
+			$general_skip = array(
+				'exclude_admins',
+				'consent_detection',
+				'pixel_enabled',
+				'pixel_id',
+				'capi_enabled',
+				'capi_token',
+				'test_event_code',
+				'test_code_created_at',
+				'hash_email',
 			);
+			if ( PMS_Settings::is_pro() ) {
+				// Google/TikTok haben auf DIESEM Tab nur dann noch echte Felder,
+				// wenn Pro tatsächlich rendert (siehe unten) -- in Free zeigt der
+				// Tab stattdessen Teaser-Boxen ohne echte Felder; dort MÜSSEN diese
+				// fünf Keys stattdessen ganz normal über preserve_hidden_settings()
+				// erhalten bleiben (dasselbe Muster wie schon bei den UTM-Keys im
+				// Tab "Erweitertes Tracking"), sonst würde das Speichern dieses
+				// Formulars eine unter Pro bereits gesetzte Google/TikTok-
+				// Konfiguration bei einem Downgrade auf Free stillschweigend auf
+				// 0/leer zurücksetzen.
+				$general_skip[] = 'google_enabled';
+				$general_skip[] = 'google_tag_id';
+				$general_skip[] = 'google_consent_mode';
+				$general_skip[] = 'tiktok_enabled';
+				$general_skip[] = 'tiktok_pixel_id';
+			}
+			self::preserve_hidden_settings( $s, $general_skip );
 			?>
 
 			<h2 class="pms-section-title"><?php esc_html_e( 'Global Options', 'pixel-made-simple' ); ?></h2>
@@ -1000,44 +993,59 @@ class PMS_Admin {
 			</table>
 			<?php self::accordion_close(); ?>
 
-			<?php self::accordion_open( __( 'Google Ads', 'pixel-made-simple' ), 'pms_settings[google_enabled]', ! empty( $s['google_enabled'] ), __( 'Enable Google Ads tracking', 'pixel-made-simple' ), 'google_enabled' ); ?>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row">
-						<label for="pms-google-tag-id"><?php esc_html_e( 'Google Tag ID', 'pixel-made-simple' ); ?></label>
-						<?php self::tip( __( 'Google Ads → Tools & Settings → Google Tag → copy the ID (AW-XXXXX).', 'pixel-made-simple' ) ); ?>
-					</th>
-					<td>
-						<input type="text" id="pms-google-tag-id" class="regular-text code"
-							name="pms_settings[google_tag_id]" value="<?php echo esc_attr( $s['google_tag_id'] ); ?>"
-							placeholder="AW-123456789" autocomplete="off" />
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><?php esc_html_e( 'Google Consent Mode v2 (default)', 'pixel-made-simple' ); ?></th>
-					<td>
-						<?php self::toggle( 'pms_settings[google_consent_mode]', ! empty( $s['google_consent_mode'] ), __( 'Enable Google Consent Mode v2 defaults', 'pixel-made-simple' ), false, 'google_consent_mode' ); ?>
-						<p class="description"><?php esc_html_e( 'Sets ad_storage, ad_user_data, ad_personalization and analytics_storage to "denied" by default before the tag loads. Your consent banner then sends the consent update. Recommended for the EU.', 'pixel-made-simple' ); ?></p>
-					</td>
-				</tr>
-			</table>
-			<?php self::accordion_close(); ?>
+			<?php if ( PMS_Settings::is_pro() ) : ?>
+				<?php self::accordion_open( __( 'Google Ads', 'pixel-made-simple' ), 'pms_settings[google_enabled]', ! empty( $s['google_enabled'] ), __( 'Enable Google Ads tracking', 'pixel-made-simple' ), 'google_enabled' ); ?>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row">
+							<label for="pms-google-tag-id"><?php esc_html_e( 'Google Tag ID', 'pixel-made-simple' ); ?></label>
+							<?php self::tip( __( 'Google Ads → Tools & Settings → Google Tag → copy the ID (AW-XXXXX).', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<input type="text" id="pms-google-tag-id" class="regular-text code"
+								name="pms_settings[google_tag_id]" value="<?php echo esc_attr( $s['google_tag_id'] ); ?>"
+								placeholder="AW-123456789" autocomplete="off" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Google Consent Mode v2 (default)', 'pixel-made-simple' ); ?></th>
+						<td>
+							<?php self::toggle( 'pms_settings[google_consent_mode]', ! empty( $s['google_consent_mode'] ), __( 'Enable Google Consent Mode v2 defaults', 'pixel-made-simple' ), false, 'google_consent_mode' ); ?>
+							<p class="description"><?php esc_html_e( 'Sets ad_storage, ad_user_data, ad_personalization and analytics_storage to "denied" by default before the tag loads. Your consent banner then sends the consent update. Recommended for the EU.', 'pixel-made-simple' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php self::accordion_close(); ?>
 
-			<?php self::accordion_open( __( 'TikTok', 'pixel-made-simple' ), 'pms_settings[tiktok_enabled]', ! empty( $s['tiktok_enabled'] ), __( 'Enable TikTok Pixel', 'pixel-made-simple' ), 'tiktok_enabled' ); ?>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row">
-						<label for="pms-tiktok-pixel-id"><?php esc_html_e( 'TikTok Pixel ID', 'pixel-made-simple' ); ?></label>
-						<?php self::tip( __( 'TikTok Ads Manager → Assets → Events → Web events → copy the pixel ID.', 'pixel-made-simple' ) ); ?>
-					</th>
-					<td>
-						<input type="text" id="pms-tiktok-pixel-id" class="regular-text code"
-							name="pms_settings[tiktok_pixel_id]" value="<?php echo esc_attr( $s['tiktok_pixel_id'] ); ?>"
-							placeholder="C1234567890ABCDEFG" autocomplete="off" />
-					</td>
-				</tr>
-			</table>
-			<?php self::accordion_close(); ?>
+				<?php self::accordion_open( __( 'TikTok', 'pixel-made-simple' ), 'pms_settings[tiktok_enabled]', ! empty( $s['tiktok_enabled'] ), __( 'Enable TikTok Pixel', 'pixel-made-simple' ), 'tiktok_enabled' ); ?>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row">
+							<label for="pms-tiktok-pixel-id"><?php esc_html_e( 'TikTok Pixel ID', 'pixel-made-simple' ); ?></label>
+							<?php self::tip( __( 'TikTok Ads Manager → Assets → Events → Web events → copy the pixel ID.', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<input type="text" id="pms-tiktok-pixel-id" class="regular-text code"
+								name="pms_settings[tiktok_pixel_id]" value="<?php echo esc_attr( $s['tiktok_pixel_id'] ); ?>"
+								placeholder="C1234567890ABCDEFG" autocomplete="off" />
+						</td>
+					</tr>
+				</table>
+				<?php self::accordion_close(); ?>
+			<?php else : ?>
+				<?php
+				self::render_pro_teaser_box(
+					__( 'Google Ads', 'pixel-made-simple' ),
+					__( 'Track conversions with Google Ads (gtag.js), including Google Consent Mode v2 defaults. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
+					'google-ads'
+				);
+				self::render_pro_teaser_box(
+					__( 'TikTok', 'pixel-made-simple' ),
+					__( 'Track conversions with the TikTok Pixel using the official web events. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
+					'tiktok'
+				);
+				?>
+			<?php endif; ?>
 
 			<?php submit_button( __( 'Save Settings', 'pixel-made-simple' ) ); ?>
 		</form>
@@ -1084,7 +1092,7 @@ class PMS_Admin {
 		<?php if ( PMS_Settings::free_event_limit_reached() ) : ?>
 			<div class="notice notice-warning inline">
 				<p>
-					<?php esc_html_e( 'You’ve reached the free plan’s limit of 2 active custom events.', 'pixel-made-simple' ); ?>
+					<?php esc_html_e( 'The free version includes up to 2 URL events.', 'pixel-made-simple' ); ?>
 					<a href="<?php echo esc_url( self::upgrade_url( 'events-limit' ) ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Upgrade to Pro for unlimited events.', 'pixel-made-simple' ); ?></a>
 				</p>
 			</div>
@@ -1109,25 +1117,21 @@ class PMS_Admin {
 					<?php foreach ( $events as $event ) : ?>
 						<tr>
 							<td class="pms-col-status">
-								<?php if ( self::is_event_locked( $event['id'], ! empty( $event['active'] ) ) ) : ?>
-									<?php self::render_locked_event_toggle(); ?>
-								<?php else : ?>
-									<form method="post" action="<?php echo esc_url( $admin_post ); ?>">
-										<input type="hidden" name="action" value="pms_toggle_event" />
-										<input type="hidden" name="event_id" value="<?php echo esc_attr( $event['id'] ); ?>" />
-										<?php wp_nonce_field( 'pms_toggle_event_' . $event['id'] ); ?>
-										<?php
-										self::toggle(
-											'active',
-											! empty( $event['active'] ),
-											/* translators: %s: event name */
-											sprintf( __( 'Enable event “%s”', 'pixel-made-simple' ), $event['name'] ),
-											true
-										);
-										?>
-										<noscript><button type="submit" class="button-link"><?php esc_html_e( 'Toggle', 'pixel-made-simple' ); ?></button></noscript>
-									</form>
-								<?php endif; ?>
+								<form method="post" action="<?php echo esc_url( $admin_post ); ?>">
+									<input type="hidden" name="action" value="pms_toggle_event" />
+									<input type="hidden" name="event_id" value="<?php echo esc_attr( $event['id'] ); ?>" />
+									<?php wp_nonce_field( 'pms_toggle_event_' . $event['id'] ); ?>
+									<?php
+									self::toggle(
+										'active',
+										! empty( $event['active'] ),
+										/* translators: %s: event name */
+										sprintf( __( 'Enable event “%s”', 'pixel-made-simple' ), $event['name'] ),
+										true
+									);
+									?>
+									<noscript><button type="submit" class="button-link"><?php esc_html_e( 'Toggle', 'pixel-made-simple' ); ?></button></noscript>
+								</form>
 							</td>
 							<td><strong><?php echo esc_html( $event['name'] ); ?></strong></td>
 							<td class="pms-col-platforms">
@@ -1288,33 +1292,44 @@ class PMS_Admin {
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Status', 'pixel-made-simple' ); ?></th>
 						<td>
-							<?php if ( self::is_event_locked( $values['id'], ! empty( $values['active'] ) ) ) : ?>
-								<?php self::render_locked_event_toggle(); ?>
-								<span class="pms-global-toggle-label"><?php esc_html_e( 'Event active', 'pixel-made-simple' ); ?></span>
-								<p class="description"><?php esc_html_e( 'The free version allows a maximum of 2 active custom events. This event will be saved but stay inactive until you deactivate another event or upgrade to Pro.', 'pixel-made-simple' ); ?></p>
-							<?php else : ?>
-								<?php self::toggle( 'active', ! empty( $values['active'] ), __( 'Event active', 'pixel-made-simple' ) ); ?>
-								<span class="pms-global-toggle-label"><?php esc_html_e( 'Event active', 'pixel-made-simple' ); ?></span>
-							<?php endif; ?>
+							<?php self::toggle( 'active', ! empty( $values['active'] ), __( 'Event active', 'pixel-made-simple' ) ); ?>
+							<span class="pms-global-toggle-label"><?php esc_html_e( 'Event active', 'pixel-made-simple' ); ?></span>
 						</td>
 					</tr>
 				</table>
 
+				<?php
+				// Nur das ANLEGEN eines weiteren Events ist in Free begrenzt --
+				// Bearbeiten eines bestehenden Events ändert die Gesamtzahl nicht
+				// und bleibt deshalb immer möglich (siehe
+				// PMS_Settings::free_event_limit_reached()-Doku).
+				$limit_blocks_new = ! $is_edit && PMS_Settings::free_event_limit_reached();
+				?>
 				<p class="submit">
-					<?php
-					submit_button(
-						$is_edit ? __( 'Update Event', 'pixel-made-simple' ) : __( 'Create Event', 'pixel-made-simple' ),
-						'primary',
-						'submit',
-						false
-					);
-					?>
+					<?php if ( $limit_blocks_new ) : ?>
+						<button type="submit" class="button button-primary" disabled="disabled"><?php esc_html_e( 'Add Event', 'pixel-made-simple' ); ?></button>
+					<?php else : ?>
+						<?php
+						submit_button(
+							$is_edit ? __( 'Update Event', 'pixel-made-simple' ) : __( 'Add Event', 'pixel-made-simple' ),
+							'primary',
+							'submit',
+							false
+						);
+						?>
+					<?php endif; ?>
 					<?php if ( $is_edit ) : ?>
 						<a class="button" href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'tab' => 'events' ), admin_url( 'admin.php' ) ) ); ?>">
 							<?php esc_html_e( 'Cancel', 'pixel-made-simple' ); ?>
 						</a>
 					<?php endif; ?>
 				</p>
+				<?php if ( $limit_blocks_new ) : ?>
+					<p class="description">
+						<?php esc_html_e( 'The free version includes up to 2 URL events.', 'pixel-made-simple' ); ?>
+						<a href="<?php echo esc_url( self::upgrade_url( 'events-limit' ) ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Upgrade to Pro for unlimited events.', 'pixel-made-simple' ); ?></a>
+					</p>
+				<?php endif; ?>
 			</form>
 		</div>
 		<?php
@@ -1362,6 +1377,14 @@ class PMS_Admin {
 		$event_id = sanitize_key( wp_unslash( $_POST['event_id'] ?? '' ) );
 		$is_new   = ( '' === $event_id );
 
+		// Defense-in-depth: die Admin-UI zeigt für ein neues Event bereits einen
+		// deaktivierten "Event hinzufügen"-Button, sobald das Free-Limit erreicht
+		// ist (siehe render_event_form()). Bearbeiten eines bestehenden Events
+		// ändert die Gesamtzahl nicht und ist deshalb nie betroffen.
+		if ( $is_new && PMS_Settings::free_event_limit_reached() ) {
+			self::redirect_events( 'free_limit_reached' );
+		}
+
 		if ( $is_new ) {
 			$event_id = sanitize_key( str_replace( '-', '', wp_generate_uuid4() ) );
 		}
@@ -1379,16 +1402,6 @@ class PMS_Admin {
 			self::redirect_events( 'missing_label' );
 		}
 
-		// Free-Limit: Aktivierung nur erlauben, wenn dieses Event (sich selbst
-		// ausgenommen, falls es bereits existiert) das Limit nicht überschreitet.
-		// Das Event wird trotzdem gespeichert, nur eben inaktiv (siehe
-		// PMS_Settings::save_events()) – die eingegebenen Daten gehen nicht verloren.
-		$active           = ! empty( $_POST['active'] );
-		$blocked_by_limit = $active && PMS_Settings::free_event_limit_reached( $event_id );
-		if ( $blocked_by_limit ) {
-			$active = false;
-		}
-
 		$event = PMS_Settings::sanitize_event(
 			array(
 				'id'             => $event_id,
@@ -1396,7 +1409,7 @@ class PMS_Admin {
 				'event_type'     => wp_unslash( $_POST['event_type'] ?? '' ),
 				'match_type'     => wp_unslash( $_POST['match_type'] ?? '' ),
 				'match_value'    => wp_unslash( $_POST['match_value'] ?? '' ),
-				'active'         => $active,
+				'active'         => ! empty( $_POST['active'] ),
 				'meta_enabled'   => $meta_enabled,
 				'google_enabled' => $google_enabled,
 				'google_label'   => $google_label,
@@ -1418,7 +1431,7 @@ class PMS_Admin {
 		$events[ $event_id ] = $event;
 		PMS_Settings::save_events( $events );
 
-		self::redirect_events( $blocked_by_limit ? 'free_limit_active' : 'saved' );
+		self::redirect_events( 'saved' );
 	}
 
 	public static function handle_delete_event() {
@@ -1451,13 +1464,10 @@ class PMS_Admin {
 			self::redirect_events( 'not_found' );
 		}
 
-		$want_active = empty( $_POST['active'] ) ? 0 : 1;
-
-		if ( $want_active && PMS_Settings::free_event_limit_reached( $event_id ) ) {
-			self::redirect_events( 'free_limit_reached' );
-		}
-
-		$events[ $event_id ]['active'] = $want_active;
+		// Free-Limit betrifft nur das ANLEGEN eines neuen Events (siehe
+		// handle_save_event()) -- Umschalten eines bestehenden Events ändert die
+		// Gesamtzahl nicht und ist deshalb nie eingeschränkt.
+		$events[ $event_id ]['active'] = empty( $_POST['active'] ) ? 0 : 1;
 		PMS_Settings::save_events( $events );
 
 		self::redirect_events( 'toggled' );

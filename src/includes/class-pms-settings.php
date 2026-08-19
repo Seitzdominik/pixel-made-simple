@@ -14,12 +14,13 @@ class PMS_Settings {
 	const OPTION_EVENTS_ENABLED = 'pms_events_enabled';
 
 	/**
-	 * Free-Limit für gleichzeitig AKTIVE Custom Events (Tab "URL-Events").
-	 * Beliebig viele Event-Regeln lassen sich weiterhin anlegen/speichern –
-	 * nur die Anzahl der gleichzeitig aktiven ist begrenzt. In der Pro-
-	 * Version gibt es kein Limit (siehe is_pro()).
+	 * Free-Limit für die GESAMTZAHL an Custom Events (Tab "URL-Events"), nicht
+	 * nur die aktiven. Ab diesem Stand ist "Event hinzufügen" in der Free-
+	 * Version gesperrt -- anders als bis v0.6.1, wo beliebig viele Events
+	 * anlegbar waren und nur die Aktivierung gedeckelt war (siehe Changelog
+	 * 0.6.2). In der Pro-Version gibt es kein Limit (siehe is_pro()).
 	 */
-	const FREE_ACTIVE_EVENT_LIMIT = 2;
+	const FREE_EVENT_LIMIT = 2;
 
 	/**
 	 * Event-Log-Aufbewahrung (Tab "Event Log", siehe PMS_Logger). Free ist
@@ -355,65 +356,48 @@ class PMS_Settings {
 	 * Events speichern.
 	 *
 	 * In der Free-Version zusätzlich hartes serverseitiges Limit von
-	 * FREE_ACTIVE_EVENT_LIMIT gleichzeitig aktiven Events – unabhängig davon,
-	 * über welchen Weg gespeichert wird (Admin-UI-Handler in class-pms-admin.php
-	 * ODER JSON-Import in PMS_Tools::import_from_json()). Diese Methode ist der
+	 * FREE_EVENT_LIMIT Events INSGESAMT – unabhängig davon, über welchen Weg
+	 * gespeichert wird (Admin-UI-Handler in class-pms-admin.php ODER
+	 * JSON-Import in PMS_Tools::import_from_json()). Diese Methode ist der
 	 * einzige Ort, an dem Events tatsächlich persistiert werden, also der
 	 * richtige Ort für die Whitelist/den Cap – dieselbe Rolle wie
 	 * sanitize_settings() für die Einstellungen.
 	 *
-	 * Events über dem Limit werden NICHT verworfen, nur auf inaktiv gesetzt
-	 * (erste FREE_ACTIVE_EVENT_LIMIT aktive Events in Array-Reihenfolge bleiben
-	 * aktiv) – die Konfiguration bleibt vollständig erhalten, falls später auf
-	 * Pro aktualisiert wird.
+	 * Events über dem Limit werden abgeschnitten (erste FREE_EVENT_LIMIT in
+	 * Array-Reihenfolge bleiben erhalten) – greift praktisch nur beim Import
+	 * einer auf einer Pro-Site exportierten Konfiguration in eine Free-Site,
+	 * da die Admin-UI das Anlegen eines weiteren Events bereits vorher sperrt
+	 * (siehe PMS_Admin::render_event_form()/handle_save_event()).
 	 *
 	 * @param array $events Events, keyed by id.
 	 * @return void
 	 */
 	public static function save_events( array $events ) {
-		if ( ! self::is_pro() ) {
-			$active_count = 0;
-			foreach ( $events as $id => $event ) {
-				if ( empty( $event['active'] ) ) {
-					continue;
-				}
-				++$active_count;
-				if ( $active_count > self::FREE_ACTIVE_EVENT_LIMIT ) {
-					$events[ $id ]['active'] = 0;
-				}
-			}
+		if ( ! self::is_pro() && count( $events ) > self::FREE_EVENT_LIMIT ) {
+			$events = array_slice( $events, 0, self::FREE_EVENT_LIMIT, true );
 		}
 
 		update_option( self::OPTION_EVENTS, array_values( $events ), false );
 	}
 
 	/**
-	 * Ist das Free-Limit für gleichzeitig aktive Events erreicht?
+	 * Ist das Free-Limit für die Gesamtzahl an Events erreicht (bereits
+	 * FREE_EVENT_LIMIT Events vorhanden, unabhängig vom Aktiv-Status)?
 	 *
-	 * In der Pro-Version immer false (kein Limit). $exclude_id lässt das
-	 * gerade bearbeitete/umgeschaltete Event selbst außen vor, damit z. B.
-	 * das Deaktivieren-und-wieder-Aktivieren desselben, bereits aktiven
-	 * Events nicht fälschlich als "Limit erreicht" zählt.
+	 * In der Pro-Version immer false (kein Limit). Anders als bis v0.6.1
+	 * gibt es keinen $exclude_id-Parameter mehr: Ein bestehendes Event zu
+	 * bearbeiten oder zu (de)aktivieren ändert die Gesamtzahl nicht und ist
+	 * deshalb nie durch dieses Limit blockiert – nur das ANLEGEN eines
+	 * zusätzlichen Events ist betroffen.
 	 *
-	 * @param string $exclude_id Event-ID, die nicht mitgezählt werden soll.
 	 * @return bool
 	 */
-	public static function free_event_limit_reached( $exclude_id = '' ) {
+	public static function free_event_limit_reached() {
 		if ( self::is_pro() ) {
 			return false;
 		}
 
-		$active_count = 0;
-		foreach ( self::get_events() as $id => $event ) {
-			if ( $id === $exclude_id ) {
-				continue;
-			}
-			if ( ! empty( $event['active'] ) ) {
-				++$active_count;
-			}
-		}
-
-		return $active_count >= self::FREE_ACTIVE_EVENT_LIMIT;
+		return count( self::get_events() ) >= self::FREE_EVENT_LIMIT;
 	}
 
 	/**
