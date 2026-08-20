@@ -924,6 +924,7 @@ $base_settings = array(
 	'exclude_admins' => 1, 'hash_email' => 0, 'consent_detection' => 0,
 	'google_enabled' => 1, 'google_tag_id' => 'AW-123456789', 'google_consent_mode' => 1,
 	'tiktok_enabled' => 1, 'tiktok_pixel_id' => 'C123ABC456',
+	'ga4_measurement_id' => 'G-ABC1234XYZ',
 );
 $GLOBALS['stub']['options']['pms_settings'] = $base_settings;
 $GLOBALS['stub']['options']['pms_events_enabled'] = 1;
@@ -955,6 +956,10 @@ check( 'Korrektur v0.5.7: KEIN test_event_code im URL-Event-Aufruf ans Browser-P
 // vollständiger Google/TikTok-Konfiguration keines von beidem aus.
 check( 'Google: in Free NICHT ausgegeben (Pro-only seit v0.6.2)', false === strpos( $html, 'gtag(' ) );
 check( 'TikTok: in Free NICHT ausgegeben (Pro-only seit v0.6.2)', false === strpos( $html, 'ttq.load(' ) );
+// v0.6.8: GA4 ist ebenfalls Pro-only, gleiches Prinzip wie Google/TikTok --
+// $base_settings oben hat testweise auch eine GA4-ID gesetzt (Pro-Nachweis
+// derselben Konfiguration in Abschnitt 24).
+check( 'GA4: in Free NICHT ausgegeben (Pro-only seit v0.6.8)', false === strpos( $html, "gtag('config','G-ABC1234XYZ')" ) );
 check( 'noscript-Fallback vorhanden', false !== strpos( $html, '<noscript>' ) );
 check( 'Kein Consent-Bootstrap nötig', false === strpos( $html, 'pmsHasConsent' ) );
 check( 'BUGFIX 2: Direkter Block hinter globalem Init-Guard', false !== strpos( $html, 'window.pmsInitialized=window.pmsInitialized||false;' ) && false !== strpos( $html, 'if(!window.pmsInitialized)' ) );
@@ -966,6 +971,18 @@ $ev   = $body['data'][0] ?? array();
 check( 'CAPI: test_event_code (frisch) enthalten', 'TEST123' === ( $body['test_event_code'] ?? '' ) );
 preg_match( "/fbq\('track','Lead',\{[^}]*\},\{eventID:'([0-9a-f\-]{36})'\}\)/", $html, $m );
 check( 'DEDUPLIZIERUNG: Browser-eventID === CAPI-event_id', ( $m[1] ?? 'x' ) === ( $ev['event_id'] ?? 'y' ) );
+
+// v0.6.8: GA4 allein (ohne Meta/Google Ads/TikTok) darf in Free gar kein
+// Tracking aktivieren -- der neue GA4-Zweig in should_track()s $any_platform
+// muss denselben is_pro()-Guard tragen wie Google Ads/TikTok. Eigene,
+// isolierte Settings-Fixture über sanitize_settings(array()) (alle Bools
+// defaulten dabei auf 0/aus, siehe dortiges Muster), danach $base_settings
+// wiederhergestellt -- Abschnitt 4 direkt im Anschluss braucht die
+// ursprüngliche Fixture unverändert.
+$GLOBALS['stub']['options']['pms_settings'] = PMS_Settings::sanitize_settings( array( 'ga4_measurement_id' => 'g-only123' ) );
+$html_ga4_only = run_frontend();
+check( 'GA4 allein reicht in Free NICHT, um Tracking zu aktivieren (Pro-only, should_track() liefert leeren Output)', '' === $html_ga4_only );
+$GLOBALS['stub']['options']['pms_settings'] = $base_settings;
 
 echo "\n=== 4. Test Event Code: 12h Auto-Expiry ===\n";
 
@@ -2751,6 +2768,137 @@ $GLOBALS['stub']['wc_orders']               = array();
 wc_test_reset();
 sc_test_reset();
 $GLOBALS['stub']['options']['pms_settings'] = array();
+
+echo "\n=== 24. GA4-Integration (v0.6.8): Sanitizing, kombiniertes Google-Ads/GA4-Script-Rendering, Admin-UI ===\n";
+
+/* --- 24a. sanitize_settings(): ga4_measurement_id -- Großbuchstaben/Trim,
+ * Zeichen-Whitelist wie bei google_tag_id/tiktok_pixel_id (Abschnitt 22a/23). --- */
+
+check( 'ga4_measurement_id: Default ist leer', '' === PMS_Settings::sanitize_settings( array() )['ga4_measurement_id'] );
+check( 'ga4_measurement_id: Kleinbuchstaben werden zu Großbuchstaben normalisiert', 'G-ABC123XYZ' === PMS_Settings::sanitize_settings( array( 'ga4_measurement_id' => 'g-abc123xyz' ) )['ga4_measurement_id'] );
+check( 'ga4_measurement_id: führende/nachgestellte Leerzeichen werden getrimmt', 'G-ABC123XYZ' === PMS_Settings::sanitize_settings( array( 'ga4_measurement_id' => '  g-abc123xyz  ' ) )['ga4_measurement_id'] );
+check( 'ga4_measurement_id: Markup/Sonderzeichen werden entfernt (XSS-Schutz), Bindestrich bleibt erhalten', 'G-ABC123SCRIPTALERT1SCRIPT' === PMS_Settings::sanitize_settings( array( 'ga4_measurement_id' => 'g-abc123<script>alert(1)</script>' ) )['ga4_measurement_id'] );
+
+/* --- 24b. Pro + NUR GA4 (kein Google Ads) -- eigener gtag.js-Loader, ein
+ * einziger gtag('config', ...)-Aufruf, KEINE Google-Ads-Conversion. Belegt
+ * zugleich die googleEnabled-Erweiterung in class-pro-woo.php/class-pro-
+ * surecart.php ist NICHT nötig, damit gtag.js selbst hier lädt -- die
+ * Frontend-Ausgabe hängt allein an ga4_active(), unabhängig von den
+ * WooCommerce/SureCart-JS-Settings. --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'pixel_enabled'       => 0,
+		'google_enabled'      => 0,
+		'google_tag_id'       => '',
+		'google_consent_mode' => 0,
+		'tiktok_enabled'      => 0,
+		'ga4_measurement_id'  => 'G-ONLYGA4',
+		'consent_detection'   => 0,
+	)
+);
+$_SERVER['REQUEST_URI'] = '/ga4-only-test/';
+$html_ga4_pro = run_frontend();
+check( '24b.1 Pro + nur GA4: gtag.js-Loader wird ausgegeben', false !== strpos( $html_ga4_pro, 'window.dataLayer=window.dataLayer||[]' ) );
+check( '24b.2 Pro + nur GA4: gtag(config, GA4-ID) wird ausgegeben', false !== strpos( $html_ga4_pro, "gtag('config','G-ONLYGA4')" ) );
+check( '24b.3 Pro + nur GA4: EIN einziger gtag.js-<script>-Tag (src-Query trägt die GA4-ID, da kein Google Ads konfiguriert)', 1 === substr_count( $html_ga4_pro, 'googletagmanager.com/gtag/js?id=G-ONLYGA4' ) );
+check( '24b.4 Pro + nur GA4: KEINE Google-Ads-Conversion (kein Tag-ID konfiguriert)', false === strpos( $html_ga4_pro, "gtag('event','conversion'" ) );
+
+/* --- 24c. Pro + Google Ads UND GA4 gleichzeitig -- EIN gtag.js-Loader, ZWEI
+ * config-Aufrufe, Conversion-Event weiterhin nur an die Google-Ads-ID
+ * gebunden (GA4 kennt keine Conversion-Labels, siehe build_google_js()). --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'pixel_enabled'       => 0,
+		'google_enabled'      => 1,
+		'google_tag_id'       => 'AW-123456789',
+		'google_consent_mode' => 0,
+		'tiktok_enabled'      => 0,
+		'ga4_measurement_id'  => 'G-BOTH4567',
+		'consent_detection'   => 0,
+	)
+);
+$GLOBALS['stub']['options']['pms_events_enabled'] = 1;
+$GLOBALS['stub']['options']['pms_events']         = array(
+	array(
+		'id' => 'ev-both', 'name' => 'Beide Google-Ziele', 'event_type' => 'Lead', 'match_type' => 'exact', 'match_value' => '/beide-ziele/', 'active' => 1,
+		'meta_enabled' => 0, 'google_enabled' => 1, 'google_label' => 'AbCdEf123', 'tiktok_enabled' => 0,
+	),
+);
+$_SERVER['REQUEST_URI'] = '/beide-ziele/';
+$html_both = run_frontend();
+check( '24c.1 Google Ads + GA4: EIN einziger gtag.js-<script>-Tag (nicht zweimal geladen)', 1 === substr_count( $html_both, 'googletagmanager.com/gtag/js?id=' ) );
+check( '24c.2 Google Ads + GA4: gtag(config, Google-Ads-Tag-ID)', false !== strpos( $html_both, "gtag('config','AW-123456789')" ) );
+check( '24c.3 Google Ads + GA4: gtag(config, GA4-Measurement-ID)', false !== strpos( $html_both, "gtag('config','G-BOTH4567')" ) );
+check( '24c.4 Google Ads + GA4: genau ZWEI gtag(config, ...)-Aufrufe', 2 === substr_count( $html_both, "gtag('config'," ) );
+check( '24c.5 Google Ads + GA4: Conversion-Event trägt weiterhin send_to mit der Google-Ads-ID, nicht der GA4-ID', false !== strpos( $html_both, "gtag('event','conversion',{'send_to':'AW-123456789/AbCdEf123'})" ) );
+
+/* --- 24d. Admin-UI: Tab "Allgemein" zeigt das GA4-Feld innerhalb der
+ * Google-Ads-Box (Pro), der Key bleibt auf jedem anderen Tab (hier:
+ * "E-Commerce") als Hidden-Feld geschützt -- dasselbe Cross-Tab-Muster wie
+ * bei sc_tracking_enabled in Abschnitt 23i. --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge( PMS_Settings::get(), array( 'ga4_measurement_id' => 'G-ADMINTEST' ) );
+$GLOBALS['stub']['options']['pms_events']   = array();
+$GLOBALS['stub']['current_user_can']        = true;
+
+$_GET['page'] = PMS_Admin::PAGE_SLUG;
+$_GET['tab']  = 'general';
+ob_start();
+PMS_Admin::render_page();
+$ga4_general_output = ob_get_clean();
+check( '24d.1 tab=general (Pro): GA4-Measurement-ID-Feld ist vorhanden', false !== strpos( $ga4_general_output, 'name="pms_settings[ga4_measurement_id]"' ) );
+check( '24d.2 tab=general (Pro): GA4-Feld zeigt den gespeicherten Wert', false !== strpos( $ga4_general_output, 'value="G-ADMINTEST"' ) );
+check( '24d.3 tab=general (Pro): GA4-Feld ist ein echtes Textfeld, kein Hidden-Feld', 1 === preg_match( '/<input type="text"[^>]*name="pms_settings\[ga4_measurement_id\]"/', $ga4_general_output ) );
+
+$_GET['tab'] = 'ecommerce';
+ob_start();
+PMS_Admin::render_page();
+$ga4_ecommerce_output = ob_get_clean();
+check( '24d.4 tab=ecommerce schützt ga4_measurement_id als Hidden-Feld (kein echtes Feld auf diesem Tab)', 1 === preg_match( '/<input type="hidden" name="pms_settings\[ga4_measurement_id\]" value="G-ADMINTEST"/', $ga4_ecommerce_output ) );
+
+/* --- 24e. WooCommerce Purchase (PMS_Pro_Woo_Purchase::ga4_purchase_js()) --
+ * eigenständig von der Google-Ads-Conversion (google_tag_id bewusst leer):
+ * gtag('event','purchase', ...) ohne send_to, transaction_id/value/currency/
+ * items[] aus denselben Bestelldaten wie Meta/TikTok (make_test_order()).
+ * current_user_can muss hier zurückgesetzt werden -- 24d hat es für den
+ * Admin-Rendering-Test auf true gestellt, should_process() würde sonst
+ * wegen exclude_admins (Default 1) fälschlich false liefern. --- */
+
+$GLOBALS['stub']['current_user_can'] = false;
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled' => 1,
+		'pixel_enabled'       => 0,
+		'google_enabled'      => 0,
+		'google_tag_id'       => '',
+		'ga4_measurement_id'  => 'G-WOOPURCHASE',
+		'consent_detection'   => 0,
+	)
+);
+$ga4_order = make_test_order( array( 'id' => 2005 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $ga4_order->get_id() );
+$ga4_purchase_output = ob_get_clean();
+
+check( '24e.1 GA4-Purchase: gtag(event, purchase) wird ausgegeben', false !== strpos( $ga4_purchase_output, "gtag('event','purchase'" ) );
+check( '24e.2 GA4-Purchase: transaction_id ist die deterministische Order-ID', false !== strpos( $ga4_purchase_output, '"transaction_id":"pms_order_2005"' ) );
+check( '24e.3 GA4-Purchase: value/currency aus der Bestellung (55.00 EUR gross, Default wc_purchase_value_type)', false !== strpos( $ga4_purchase_output, '"value":55' ) && false !== strpos( $ga4_purchase_output, '"currency":"EUR"' ) );
+check( '24e.4 GA4-Purchase: items[] enthält beide Bestellpositionen mit item_id/price/quantity', false !== strpos( $ga4_purchase_output, '"item_id":"501","price":20,"quantity":2' ) && false !== strpos( $ga4_purchase_output, '"item_id":"777","price":9.99,"quantity":1' ) );
+check( '24e.5 GA4-Purchase: KEIN send_to (unabhängig von einer Google-Ads-Conversion, die hier nicht konfiguriert ist)', false === strpos( $ga4_purchase_output, 'send_to' ) );
+
+wc_test_reset();
+$GLOBALS['stub']['wc_orders'] = array();
+
+unset( $_GET['tab'], $_GET['page'] );
+$GLOBALS['stub']['current_user_can']        = false;
+$GLOBALS['stub']['options']['pms_settings'] = array();
+$GLOBALS['stub']['options']['pms_events']   = array();
 
 echo "\n==============================\n";
 echo 'Ergebnis: ' . $GLOBALS['t_pass'] . ' bestanden, ' . $GLOBALS['t_fail'] . " fehlgeschlagen\n";

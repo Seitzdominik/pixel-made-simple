@@ -983,10 +983,10 @@ class PMS_Admin {
 				'tiktok_access_token',
 			);
 			if ( PMS_Settings::is_pro() ) {
-				// Google/TikTok haben auf DIESEM Tab nur dann noch echte Felder,
+				// Google/GA4/TikTok haben auf DIESEM Tab nur dann noch echte Felder,
 				// wenn Pro tatsächlich rendert (siehe unten) -- in Free zeigt der
 				// Tab stattdessen Teaser-Boxen ohne echte Felder; dort MÜSSEN diese
-				// fünf Keys stattdessen ganz normal über preserve_hidden_settings()
+				// sieben Keys stattdessen ganz normal über preserve_hidden_settings()
 				// erhalten bleiben (dasselbe Muster wie schon bei den UTM-Keys im
 				// Tab "Erweitertes Tracking"), sonst würde das Speichern dieses
 				// Formulars eine unter Pro bereits gesetzte Google/TikTok-
@@ -995,6 +995,12 @@ class PMS_Admin {
 				$general_skip[] = 'google_enabled';
 				$general_skip[] = 'google_tag_id';
 				$general_skip[] = 'google_consent_mode';
+				// ga4_measurement_id (seit v0.6.8) hat kein eigenes Bool-Toggle
+				// (siehe PMS_Settings::get()-Doku), lebt aber im selben
+				// Pro-only-Zweig wie google_tag_id direkt darüber -- dieselbe
+				// Downgrade-Falle: ohne diesen Eintrag würde das Speichern
+				// dieses Tabs auf Free eine unter Pro gesetzte GA4-ID leeren.
+				$general_skip[] = 'ga4_measurement_id';
 				$general_skip[] = 'tiktok_enabled';
 				$general_skip[] = 'tiktok_pixel_id';
 				$general_skip[] = 'tiktok_capi_enabled';
@@ -1113,6 +1119,18 @@ class PMS_Admin {
 							<p class="description"><?php esc_html_e( 'Sets ad_storage, ad_user_data, ad_personalization and analytics_storage to "denied" by default before the tag loads. Your consent banner then sends the consent update. Recommended for the EU.', 'pixel-made-simple' ); ?></p>
 						</td>
 					</tr>
+					<tr>
+						<th scope="row">
+							<label for="pms-ga4-measurement-id"><?php esc_html_e( 'GA4 Measurement ID', 'pixel-made-simple' ); ?></label>
+							<?php self::tip( __( 'Google Analytics → Admin → Data streams → your web stream → copy the Measurement ID.', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<input type="text" id="pms-ga4-measurement-id" class="regular-text code"
+								name="pms_settings[ga4_measurement_id]" value="<?php echo esc_attr( $s['ga4_measurement_id'] ); ?>"
+								placeholder="G-XXXXXXXXXX" autocomplete="off" />
+							<p class="description"><?php esc_html_e( 'Optional, independent of Google Ads above. Reuses the same gtag.js loader – view_item, add_to_cart, begin_checkout and purchase from WooCommerce/SureCart tracking are picked up automatically once set.', 'pixel-made-simple' ); ?></p>
+						</td>
+					</tr>
 				</table>
 				<?php self::accordion_close(); ?>
 
@@ -1153,7 +1171,7 @@ class PMS_Admin {
 				<?php
 				self::render_pro_teaser_box(
 					__( 'Google Ads', 'pixel-made-simple' ),
-					__( 'Track conversions with Google Ads (gtag.js), including Google Consent Mode v2 defaults. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
+					__( 'Track conversions with Google Ads and GA4 (gtag.js), including Google Consent Mode v2 defaults. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
 					'google-ads'
 				);
 				self::render_pro_teaser_box(

@@ -137,7 +137,18 @@ class PMS_Pro_WooCommerce {
 				// geladen (dieselbe Bedingung), hier wird nichts neu enqueued.
 				// Kein zusätzlicher is_pro()-Check nötig: should_load() oben
 				// garantiert das bereits (Google/TikTok sind ohnehin Pro-only).
-				'googleEnabled' => ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ),
+				//
+				// Seit v0.6.8 zählt zusätzlich ga4_measurement_id: die drei
+				// Events werden ohne send_to gefeuert (siehe pms-woocommerce.js),
+				// erreichen also automatisch JEDES per gtag('config', ...)
+				// registrierte Ziel -- GA4 UND Google Ads gleichermaßen (siehe
+				// PMS_Frontend::build_google_js()). Ohne diese Erweiterung würde
+				// ein Shop mit NUR GA4 (kein Google Ads) hier fälschlich
+				// 'googleEnabled':false bekommen und nie ein gtag('event', ...)
+				// feuern, obwohl class-pms-frontend.php gtag.js in diesem Fall
+				// längst lädt.
+				'googleEnabled' => ( ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) )
+					|| '' !== trim( (string) ( $settings['ga4_measurement_id'] ?? '' ) ),
 				'tiktokEnabled' => ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ),
 			)
 		);

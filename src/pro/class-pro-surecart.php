@@ -193,8 +193,25 @@ class PMS_Pro_SureCart {
 				// gtag/ttq selbst lädt bereits class-pms-frontend.php, hier
 				// wird nichts neu enqueued. Kein zusätzlicher is_pro()-Check
 				// nötig: should_load() garantiert das bereits.
-				'googleEnabled' => ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ),
+				//
+				// Seit v0.6.8 zählt zusätzlich ga4_measurement_id für dieses
+				// Flag -- ViewContent/AddToCart/InitiateCheckout feuern ohne
+				// send_to (siehe pms-surecart.js) und erreichen damit jedes
+				// per gtag('config', ...) registrierte Ziel automatisch,
+				// GA4 UND Google Ads gleichermaßen. Ein Shop mit NUR GA4
+				// (kein Google Ads) bekäme sonst fälschlich 'googleEnabled':
+				// false, obwohl class-pms-frontend.php gtag.js in diesem Fall
+				// längst lädt (siehe PMS_Frontend::build_google_js()).
+				'googleEnabled' => ( ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) )
+					|| '' !== trim( (string) ( $settings['ga4_measurement_id'] ?? '' ) ),
 				'tiktokEnabled' => ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ),
+				// GA4-Purchase (siehe firePurchase()/fireGA4Purchase() in
+				// pms-surecart.js) ist unabhängig von Google Ads -- eigene,
+				// simple Anwesenheitsprüfung statt googleEnabled, da SureCart
+				// (anders als WooCommerce) den Purchase-Browser-Pixel-Call
+				// selbst aus diesem Skript heraus feuert (kein PHP-Render-Hook,
+				// siehe Klassen-Doku oben).
+				'ga4MeasurementId' => ! empty( $settings['ga4_measurement_id'] ) ? preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) $settings['ga4_measurement_id'] ) : '',
 				// Purchase-Tracking (PMS_Pro_SureCart_Purchase) feuert die
 				// Browser-Pixel selbst aus diesem Skript heraus (siehe
 				// dortige Klassen-Doku für die ausführliche Begründung,

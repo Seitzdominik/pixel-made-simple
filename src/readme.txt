@@ -2,11 +2,11 @@
 Contributors: dominikseitz
 Author: Dominik Seitz
 Author URI: https://sdv.design
-Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
+Tags: meta pixel, conversions api, google ads, google analytics, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.7
+Stable tag: 0.6.8
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -90,6 +90,11 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.8 =
+* Neu (Pro): **Google Analytics 4 (GA4).** Neues Feld „GA4 Measurement ID" in der bestehenden Google-Ads-Box auf Tab „Allgemein" – eigenständig von Google Ads, funktioniert auch ohne konfigurierten Google-Ads-Tag. Teilt sich denselben gtag.js-Loader wie Google Ads: Sind auf einer Website sowohl Google Ads als auch GA4 konfiguriert, wird gtag.js nur einmal geladen, mit je einem eigenen `gtag('config', …)`-Aufruf pro Ziel. `view_item`/`add_to_cart`/`begin_checkout` aus dem bestehenden WooCommerce-/SureCart-Tracking erreichen GA4 automatisch, sobald die Measurement-ID gesetzt ist; `purchase` (WooCommerce-Danke-Seite inkl. Server-Side-Fallback sowie SureCart) sendet zusätzlich ein eigenes, von der Google-Ads-Conversion unabhängiges GA4-Standardevent mit Bestellwert, Währung und Positionen.
+* Intern: Die an `pms-woocommerce.js`/`pms-surecart.js` lokalisierte `googleEnabled`-Einstellung berücksichtigt jetzt auch eine konfigurierte GA4-ID (vorher ausschließlich an Google Ads gebunden) – ohne diese Korrektur hätte ein Shop mit ausschließlich GA4 (ohne Google Ads) keines der drei Browser-Events an Google gesendet, obwohl gtag.js technisch bereits geladen war.
+* `dev-tools/test-suite.php` sowie die JS-Test-Harnesses für WooCommerce/SureCart decken das Sanitizing der Measurement-ID, das kombinierte Google-Ads/GA4-Script-Rendering, das GA4-Purchase-Event (WooCommerce serverseitig, SureCart clientseitig) und die Admin-Oberfläche ab (462 → 486 PHP-Tests, SureCart-JS-Harness 36 → 40 Tests).
 
 = 0.6.7 =
 * Neu (Pro): **SureCart-Tracking.** Zweite E-Commerce-Integration neben WooCommerce, eigene Box auf Tab „E-Commerce" (nur sichtbar, wenn SureCart installiert ist). Trackt `ViewContent` (Produktseite), `AddToCart` und `InitiateCheckout` fürs Meta Pixel, Google Ads und TikTok Pixel, dedupliziert über dieselbe Event-ID wie im Browser. `Purchase` löst serverseitig über SureCarts eigene Hooks (`surecart/checkout_confirmed`, mit Fallback über `surecart/order_updated` für Bestellungen, die außerhalb der regulären Checkout-Bestätigung bezahlt werden) sowohl die Meta Conversions API als auch die TikTok Events API aus, dedupliziert über eine deterministische Event-ID (`pms_sc_order_{Checkout-ID}`) und ein Dedup-Flag in der Checkout-Metadata. Optionale Advanced Matching (gehashte Rechnungsdaten) für Meta/TikTok sowie ein eigenes Google-Ads-Conversion-Label für Purchase, analog zu WooCommerce.

@@ -135,6 +135,16 @@ class PMS_Settings {
 			'google_enabled'      => 0,
 			'google_tag_id'       => '',
 			'google_consent_mode' => 1,
+			// GA4 (Pro-only, seit v0.6.8). Eigenständig von google_tag_id/
+			// google_enabled -- ein Kunde kann GA4 ohne Google Ads betreiben
+			// (oder umgekehrt). Teilt sich denselben gtag.js-Loader wie Google
+			// Ads (siehe PMS_Frontend::print_scripts()/build_google_js()),
+			// deshalb bewusst KEIN eigenes ga4_enabled-Bool-Toggle -- die reine
+			// Anwesenheit einer Measurement-ID entscheidet, ob gtag('config', ...)
+			// dafür ausgegeben wird (dasselbe Muster wie z. B.
+			// wc_google_conversion_label, das ebenfalls ohne eigenes Toggle
+			// allein über seine Nicht-Leere gated).
+			'ga4_measurement_id'  => '',
 			// TikTok. tiktok_capi_enabled/tiktok_access_token spiegeln
 			// capi_enabled/capi_token für Meta (Events API, seit v0.6.6 nur
 			// für WooCommerce-Purchase genutzt, siehe pro/class-pro-woo-purchase.php).
@@ -249,6 +259,11 @@ class PMS_Settings {
 			'google_enabled'       => empty( $input['google_enabled'] ) ? 0 : 1,
 			'google_tag_id'        => preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) ( $input['google_tag_id'] ?? '' ) ),
 			'google_consent_mode'  => empty( $input['google_consent_mode'] ) ? 0 : 1,
+			// Format lt. Google: "G-" + alphanumerisch (z. B. G-ABC1234XYZ).
+			// Groß/klein wird vereinheitlicht (Nutzer kopiert die ID oft in
+			// Kleinschreibung aus irgendeiner Doku), Zeichen-Whitelist danach
+			// dasselbe Muster wie bei google_tag_id/tiktok_pixel_id oben.
+			'ga4_measurement_id'   => preg_replace( '/[^A-Z0-9\-]+/', '', strtoupper( trim( (string) ( $input['ga4_measurement_id'] ?? '' ) ) ) ),
 			'tiktok_enabled'       => empty( $input['tiktok_enabled'] ) ? 0 : 1,
 			'tiktok_pixel_id'      => preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['tiktok_pixel_id'] ?? '' ) ),
 			'tiktok_capi_enabled'  => empty( $input['tiktok_capi_enabled'] ) ? 0 : 1,

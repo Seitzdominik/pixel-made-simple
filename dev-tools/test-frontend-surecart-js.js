@@ -131,6 +131,7 @@ function run( cfgOverrides, domOverrides ) {
 			googleEnabled: false,
 			tiktokEnabled: false,
 			googleTagId: '',
+			ga4MeasurementId: '',
 			scGoogleConversionLabel: '',
 			scGoogleAdvancedMatching: false,
 			purchaseNonce: 'test-purchase-nonce',
@@ -477,6 +478,60 @@ console.log( '\n=== 6. Purchase: Checkout-Snapshot mit status=paid, deterministi
 	await flushMicrotasks();
 	check( '6.6 Kein Conversion-Label konfiguriert -> kein gtag(conversion)-Aufruf', ! win.gtagCalls.some( ( c ) => 'conversion' === c[ 1 ] ) );
 	check( '6.7 Meta/TikTok feuern trotzdem unabhängig vom fehlenden Google-Label', win.fbqCalls.some( ( c ) => 'Purchase' === c[ 1 ] ) );
+}
+
+{
+	// GA4-Purchase (seit v0.6.8): eigenständig von der Google-Ads-Conversion
+	// oben -- feuert OHNE send_to und deshalb auch OHNE konfiguriertes
+	// Google-Ads-Conversion-Label/Tag-ID, sobald nur ga4MeasurementId gesetzt
+	// ist (dieselbe Unterscheidung wie serverseitig in
+	// PMS_Pro_Woo_Purchase::ga4_purchase_js()). Line-Items werden hier bewusst
+	// VOR dem "paid"-Checkout-Snapshot beobachtet: Purchase feuert -- anders
+	// als InitiateCheckout -- ohne Gnadenfrist sofort beim Snapshot (siehe
+	// CLAUDE.md "SureCart-Tracking (Pro)"), contents/items sind also nur dann
+	// befüllt, wenn die Line-Items zu diesem Zeitpunkt schon bekannt waren.
+	const checkoutUrl   = 'https://example.com/wp-json/surecart/v1/checkouts/chk_paid_ga4';
+	const lineItemsUrl  = 'https://example.com/wp-json/surecart/v1/line_items?checkout=chk_paid_ga4';
+	const { window: win } = run(
+		{ googleEnabled: true, ga4MeasurementId: 'G-ABC123XYZ', googleTagId: '', scGoogleConversionLabel: '' },
+		{
+			fetchResponses: {
+				[ checkoutUrl ]: { id: 'chk_paid_ga4', status: 'paid', total_amount: 2500, currency: 'eur' },
+				[ lineItemsUrl ]: { data: [ { id: 'li_9', quantity: 2, price: 'price_9', total_amount: 2500, checkout: 'chk_paid_ga4' } ] },
+			},
+		}
+	);
+	win.pmsInitialized = true;
+
+	await win.fetch( lineItemsUrl ).then( ( r ) => r.json() );
+	await win.fetch( checkoutUrl ).then( ( r ) => r.json() );
+	await flushMicrotasks();
+
+	check(
+		'6.8 GA4: gtag(event, purchase) feuert ohne send_to, mit transaction_id/value/currency/items',
+		win.gtagCalls.some( ( c ) => 'purchase' === c[ 1 ]
+			&& 'pms_sc_order_chk_paid_ga4' === c[ 2 ].transaction_id
+			&& 25 === c[ 2 ].value
+			&& 'EUR' === c[ 2 ].currency
+			&& undefined === c[ 2 ].send_to
+			&& Array.isArray( c[ 2 ].items ) && 1 === c[ 2 ].items.length )
+	);
+	check( '6.9 GA4: kein Google-Ads-Conversion-Aufruf ohne konfiguriertes Tag-ID/Label', ! win.gtagCalls.some( ( c ) => 'conversion' === c[ 1 ] ) );
+}
+
+{
+	// Keine ga4MeasurementId konfiguriert -> kein gtag(event, purchase),
+	// Google-Ads-Conversion feuert unabhängig davon weiterhin.
+	const checkoutUrl = 'https://example.com/wp-json/surecart/v1/checkouts/chk_paid_noga4';
+	const { window: win } = run(
+		{ googleEnabled: true, ga4MeasurementId: '', googleTagId: 'AW-1', scGoogleConversionLabel: 'LBL' },
+		{ fetchResponses: { [ checkoutUrl ]: { id: 'chk_paid_noga4', status: 'paid', total_amount: 1000, currency: 'eur' } } }
+	);
+	win.pmsInitialized = true;
+	await win.fetch( checkoutUrl ).then( ( r ) => r.json() );
+	await flushMicrotasks();
+	check( '6.10 Keine ga4MeasurementId konfiguriert -> kein gtag(event, purchase)', ! win.gtagCalls.some( ( c ) => 'purchase' === c[ 1 ] ) );
+	check( '6.11 Google-Ads-Conversion feuert unabhängig von GA4 weiterhin', win.gtagCalls.some( ( c ) => 'conversion' === c[ 1 ] ) );
 }
 
 /* ---------------------------------------------------------------------

@@ -203,7 +203,8 @@ class PMS_Frontend {
 		$any_platform =
 			( ! empty( $settings['pixel_enabled'] ) && ! empty( $settings['pixel_id'] ) ) ||
 			( PMS_Settings::is_pro() && ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) ) ||
-			( PMS_Settings::is_pro() && ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) );
+			( PMS_Settings::is_pro() && ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) ) ||
+			( PMS_Settings::is_pro() && '' !== trim( (string) ( $settings['ga4_measurement_id'] ?? '' ) ) );
 
 		if ( ! $any_platform ) {
 			self::$skip_reason = 'no_platform';
@@ -260,6 +261,19 @@ class PMS_Frontend {
 		return PMS_Settings::is_pro()
 			&& ! empty( self::$settings['tiktok_enabled'] )
 			&& ! empty( self::$settings['tiktok_pixel_id'] );
+	}
+
+	/**
+	 * GA4 ist seit v0.6.8 ein Pro-only-Feature, gleiches Defense-in-Depth-
+	 * Prinzip wie google_active()/tiktok_active() oben. Anders als Google Ads/
+	 * TikTok gibt es bewusst KEIN eigenes ga4_enabled-Bool -- die Measurement-
+	 * ID allein entscheidet (siehe PMS_Settings::get()-Doku).
+	 *
+	 * @return bool
+	 */
+	private static function ga4_active() {
+		return PMS_Settings::is_pro()
+			&& '' !== trim( (string) ( self::$settings['ga4_measurement_id'] ?? '' ) );
 	}
 
 	/**
@@ -376,11 +390,20 @@ class PMS_Frontend {
 			}
 		}
 
-		// Google Ads: Mit Consent Mode v2 immer sofort laden (Defaults = denied),
-		// ohne Consent Mode wie die anderen Plattformen verzögern.
-		if ( self::google_active() ) {
-			$tag_id   = preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['google_tag_id'] );
-			$gtag_src = 'https://www.googletagmanager.com/gtag/js?id=' . rawurlencode( $tag_id );
+		// Google Ads + GA4: teilen sich denselben gtag.js-Loader (seit v0.6.8,
+		// siehe build_google_js()) -- mit Consent Mode v2 immer sofort laden
+		// (Defaults = denied), ohne Consent Mode wie die anderen Plattformen
+		// verzögern. Aktiv, sobald MINDESTENS eine der beiden konfiguriert ist.
+		if ( self::google_active() || self::ga4_active() ) {
+			// Für den src-Query-Parameter reicht irgendeine der konfigurierten
+			// IDs (Google lädt darüber nur die gtag.js-Runtime, nicht ein
+			// bestimmtes Property) -- Google Ads hat Vorrang, rein weil es das
+			// länger etablierte Feature ist, funktional beliebig.
+			$id_for_src = self::google_active()
+				? (string) self::$settings['google_tag_id']
+				: (string) self::$settings['ga4_measurement_id'];
+			$tag_id     = preg_replace( '/[^A-Za-z0-9\-]+/', '', $id_for_src );
+			$gtag_src   = 'https://www.googletagmanager.com/gtag/js?id=' . rawurlencode( $tag_id );
 
 			if ( $consent_given ) {
 				$immediate_js .= self::build_google_js();
@@ -472,14 +495,27 @@ class PMS_Frontend {
 	}
 
 	/**
-	 * Google Ads (gtag.js) inkl. Consent Mode v2 Defaults und Conversions.
-	 * Die Consent-Defaults stehen bewusst VOR gtag('config').
+	 * Google Ads + GA4 (gtag.js) inkl. Consent Mode v2 Defaults und
+	 * Conversions. Die Consent-Defaults stehen bewusst VOR jedem gtag('config').
+	 *
+	 * Seit v0.6.8 gemeinsam mit GA4: beide Ziele teilen sich dieselbe
+	 * gtag.js-Runtime (ein einziger <script>-Loader, siehe print_scripts()),
+	 * bekommen aber JEWEILS ihren eigenen gtag('config', ...)-Aufruf --
+	 * exakt das von Google dokumentierte Mehrfach-Property-Muster. Ist nur
+	 * eines von beiden aktiv, wird der jeweils andere config-Aufruf schlicht
+	 * ausgelassen (kein leerer/kaputter Aufruf).
 	 *
 	 * @return string
 	 */
 	private static function build_google_js() {
-		$tag_id = preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['google_tag_id'] );
-		if ( '' === $tag_id ) {
+		$tag_id = self::google_active()
+			? preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['google_tag_id'] )
+			: '';
+		$ga4_id = self::ga4_active()
+			? preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['ga4_measurement_id'] )
+			: '';
+
+		if ( '' === $tag_id && '' === $ga4_id ) {
 			return '';
 		}
 
@@ -490,13 +526,24 @@ class PMS_Frontend {
 		}
 
 		$js .= "gtag('js',new Date());\n";
-		$js .= "gtag('config','" . esc_js( $tag_id ) . "');\n";
 
-		foreach ( self::$matched_events as $event ) {
-			if ( empty( $event['google_enabled'] ) || '' === $event['google_label'] ) {
-				continue;
+		if ( '' !== $tag_id ) {
+			$js .= "gtag('config','" . esc_js( $tag_id ) . "');\n";
+		}
+		if ( '' !== $ga4_id ) {
+			$js .= "gtag('config','" . esc_js( $ga4_id ) . "');\n";
+		}
+
+		// Conversion-Events gehören zu einer konkreten Google-Ads-Conversion-
+		// Aktion (send_to mit Conversion-Label) -- ein GA4-Property kennt dieses
+		// Konzept nicht, deshalb nur ausgeben, wenn Google Ads selbst aktiv ist.
+		if ( '' !== $tag_id ) {
+			foreach ( self::$matched_events as $event ) {
+				if ( empty( $event['google_enabled'] ) || '' === $event['google_label'] ) {
+					continue;
+				}
+				$js .= "gtag('event','conversion',{'send_to':'" . esc_js( $tag_id . '/' . $event['google_label'] ) . "'});\n";
 			}
-			$js .= "gtag('event','conversion',{'send_to':'" . esc_js( $tag_id . '/' . $event['google_label'] ) . "'});\n";
 		}
 
 		return $js;

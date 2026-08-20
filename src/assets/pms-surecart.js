@@ -581,6 +581,7 @@
 
 			if ( cfg.googleEnabled && 'function' === typeof window.gtag ) {
 				fireGoogleConversion( checkout, payload, eventId );
+				fireGA4Purchase( payload, eventId );
 			}
 
 			if ( cfg.tiktokEnabled && 'function' === typeof window.ttq ) {
@@ -642,6 +643,32 @@
 			fireWithParams();
 		} ).catch( function () {
 			fireWithParams();
+		} );
+	}
+
+	/**
+	 * GA4-Purchase (Standard-Ecommerce-Event "purchase"), seit v0.6.8 --
+	 * unabhängig von fireGoogleConversion() oben: KEIN send_to, deshalb ohne
+	 * Google-Ads-Conversion-Label auskommend (GA4 kennt dieses Konzept nicht,
+	 * siehe PMS_Frontend::build_google_js() für dieselbe Unterscheidung
+	 * serverseitig). transaction_id = dieselbe deterministische Event-ID wie
+	 * bei Meta/TikTok/Google Ads (eventId, "pms_sc_order_{Checkout-ID}") --
+	 * GA4 dedupliziert purchase-Events serverseitig anhand von
+	 * transaction_id, exakt derselbe Zweck wie Metas eventID.
+	 *
+	 * @param {Object} payload Meta-Payload aus buildPayloadFromLineItems() (value/currency/contents).
+	 * @param {string} eventId Deterministische Event-ID.
+	 */
+	function fireGA4Purchase( payload, eventId ) {
+		if ( ! cfg.ga4MeasurementId ) {
+			return;
+		}
+
+		window.gtag( 'event', 'purchase', {
+			transaction_id: eventId,
+			value: payload.value,
+			currency: payload.currency,
+			items: contentsToGoogleItems( payload.contents )
 		} );
 	}
 

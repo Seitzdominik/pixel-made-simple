@@ -2,10 +2,10 @@
 # Copyright (C) 2026 Dominik Seitz
 msgid ""
 msgstr ""
-"Project-Id-Version: Pixel Made Simple 0.6.7\n"
+"Project-Id-Version: Pixel Made Simple 0.6.8\n"
 "Report-Msgid-Bugs-To: https://sdv.design\n"
-"POT-Creation-Date: 2026-08-20 14:07+0000\n"
-"PO-Revision-Date: 2026-08-20 14:07+0000\n"
+"POT-Creation-Date: 2026-08-20 15:01+0000\n"
+"PO-Revision-Date: 2026-08-20 15:01+0000\n"
 "Last-Translator: Dominik Seitz <seitz.entertainment@gmail.com>\n"
 "Language-Team: German\n"
 "Language: de_DE\n"
@@ -79,8 +79,8 @@ msgid "Source"
 msgstr "Quelle"
 
 #: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/admin/class-pms-admin-event-log.php:90
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1426
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1615
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1444
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1633
 msgid "Status"
 msgstr "Status"
 
@@ -165,7 +165,7 @@ msgid "Sent"
 msgstr "Gesendet"
 
 #: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/admin/class-pms-admin-event-log.php:270
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1671
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1689
 #: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-tools.php:27
 #: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-tools.php:75
 msgid "You do not have permission to perform this action."
@@ -280,7 +280,7 @@ msgid "Advanced Tracking"
 msgstr "Erweitertes Tracking"
 
 #: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:454
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1240
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1258
 msgid "E-Commerce"
 msgstr "E-Commerce"
 
@@ -445,8 +445,8 @@ msgid "Shows a small bar at the bottom of the frontend with consent status, fire
 msgstr "Zeigt am unteren Rand des Frontends eine kleine Leiste mit Consent-Status, gefeuerten Events, Event-IDs, CAPI-Antwort und Match-Keys. Wird ausschließlich für eingeloggte Administratoren gerendert – reguläre Besucher erhalten kein zusätzliches Byte."
 
 #: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:702
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1167
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1372
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1185
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1390
 msgid "Save Settings"
 msgstr "Einstellungen speichern"
 
@@ -530,430 +530,442 @@ msgstr "Ein Schritt-für-Schritt-Video-Tutorial zur Einrichtung des Plugins folg
 msgid "Watch the tutorial on YouTube"
 msgstr "Zum Tutorial auf YouTube"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1014
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1020
 msgid "Global Options"
 msgstr "Globale Optionen"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1018
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1021
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1024
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1027
 msgid "Do not track administrators"
 msgstr "Administratoren nicht tracken"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1025
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1031
 msgid "Recommended: logged-in administrators trigger neither pixel nor server events."
 msgstr "Empfohlen: Eingeloggte Administratoren lösen weder Pixel- noch Server-Events aus."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1030
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1036
 msgid "Automatic cookie banner detection (GDPR)"
 msgstr "Automatische Cookie-Banner-Erkennung (DSGVO)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1033
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1039
 msgid "Enable automatic cookie banner detection"
 msgstr "Automatische Cookie-Banner-Erkennung aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1037
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1043
 msgid "Automatically detects installed cookie banners and blocks browser and CAPI events until consent is given. Supports Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies and any banner using the WP Consent API. Automatic blocking cannot be guaranteed for unlisted third-party banners. Sites without a cookie banner are never blocked."
 msgstr "Erkennt installierte Cookie-Banner automatisch und blockiert Browser- und CAPI-Events bis zur Einwilligung. Unterstützt u. a. Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies sowie alle Banner mit WP Consent API. Bei nicht gelisteten Drittanbieter-Bannern kann die automatische Blockierung nicht garantiert werden. Websites ohne Cookie-Banner werden niemals blockiert."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1040
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1428
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1573
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1046
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1446
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1591
 msgid "Platforms"
 msgstr "Plattformen"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1042
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1048
 msgid "Meta (Facebook)"
 msgstr "Meta (Facebook)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1042
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1048
 msgid "Enable Meta tracking"
 msgstr "Meta-Tracking aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1046
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1052
 msgid "Meta Pixel ID"
 msgstr "Meta Pixel ID"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1047
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1053
 msgid "Meta Events Manager → Data sources → your pixel → copy the ID shown below its name."
 msgstr "Meta Events Manager → Datenquellen → Dein Pixel → ID unter dem Namen kopieren."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1056
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1058
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1062
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1064
 msgid "Enable Conversions API"
 msgstr "Conversions API aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1059
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1065
 msgid "Additionally sends matched events to Meta server-side – deduplicated via the same event ID as in the browser."
 msgstr "Sendet gematchte Events zusätzlich serverseitig an Meta – dedupliziert über dieselbe Event-ID wie im Browser."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1064
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1070
 msgid "CAPI Access Token"
 msgstr "CAPI Access Token"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1065
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1071
 msgid "Meta Events Manager → Data sources → Settings → Conversions API → “Generate access token”."
 msgstr "Meta Events Manager → Datenquellen → Einstellungen → Conversions API → „Zugriffstoken generieren“."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1070
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1147
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1076
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1165
 msgid "Secret key. Used exclusively server-side and never rendered in the frontend."
 msgstr "Geheimschlüssel. Wird ausschließlich serverseitig verwendet und niemals im Frontend ausgegeben."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1075
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1081
 msgid "Test Event Code"
 msgstr "Test Event Code"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1076
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1082
 msgid "Meta Events Manager → Test events → copy the “Server events code”. Clear it again after testing!"
 msgstr "Meta Events Manager → Test-Events → „Code für Server-Events“ kopieren. Nach dem Testen wieder leeren!"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1082
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1088
 msgid "The test code is automatically deactivated after 12 hours to prevent accidental test tracking on a live site."
 msgstr "Der Test-Code wird nach 12 Stunden automatisch deaktiviert, um versehentliches Test-Tracking im Live-Betrieb zu verhindern."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1086
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1092
 msgid "Advanced Matching (email)"
 msgstr "Advanced Matching (E-Mail)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1088
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1094
 msgid "Enable Advanced Matching"
 msgstr "Advanced Matching aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1089
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1095
 msgid "Sends the email address of logged-in users to the Conversions API as a SHA-256 hash (better match quality). Mind data privacy."
 msgstr "Sendet bei eingeloggten Nutzern die E-Mail-Adresse als SHA-256-Hash an die Conversions API (bessere Zuordnungsqualität). Beachte den Datenschutz."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1096
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1155
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1102
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1173
 msgid "Google Ads"
 msgstr "Google Ads"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1096
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1102
 msgid "Enable Google Ads tracking"
 msgstr "Google Ads Tracking aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1100
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1106
 msgid "Google Tag ID"
 msgstr "Google Tag ID"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1101
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1107
 msgid "Google Ads → Tools & Settings → Google Tag → copy the ID (AW-XXXXX)."
 msgstr "Google Ads → Tools & Einstellungen → Google-Tag → ID kopieren (AW-XXXXX)."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1110
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1116
 msgid "Google Consent Mode v2 (default)"
 msgstr "Google Consent Mode v2 (Standard)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1112
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1118
 msgid "Enable Google Consent Mode v2 defaults"
 msgstr "Google Consent Mode v2 Defaults aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1113
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1119
 msgid "Sets ad_storage, ad_user_data, ad_personalization and analytics_storage to \"denied\" by default before the tag loads. Your consent banner then sends the consent update. Recommended for the EU."
 msgstr "Setzt ad_storage, ad_user_data, ad_personalization und analytics_storage vor dem Tag-Laden standardmäßig auf „denied“. Dein Consent-Banner sendet anschließend das Consent-Update. Empfohlen für die EU."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1119
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1160
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1124
+msgid "GA4 Measurement ID"
+msgstr "GA4 Measurement ID"
+
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1125
+msgid "Google Analytics → Admin → Data streams → your web stream → copy the Measurement ID."
+msgstr "Google Analytics → Verwaltung → Datenstreams → Dein Web-Datenstream → Measurement-ID kopieren."
+
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1131
+msgid "Optional, independent of Google Ads above. Reuses the same gtag.js loader – view_item, add_to_cart, begin_checkout and purchase from WooCommerce/SureCart tracking are picked up automatically once set."
+msgstr "Optional, unabhängig von Google Ads oben. Nutzt denselben gtag.js-Loader – view_item, add_to_cart, begin_checkout und purchase aus dem WooCommerce-/SureCart-Tracking werden automatisch mit erfasst, sobald hier ein Wert eingetragen ist."
+
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1137
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1178
 msgid "TikTok"
 msgstr "TikTok"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1119
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1137
 msgid "Enable TikTok Pixel"
 msgstr "TikTok Pixel aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1123
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1141
 msgid "TikTok Pixel ID"
 msgstr "TikTok Pixel ID"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1124
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1142
 msgid "TikTok Ads Manager → Assets → Events → Web events → copy the pixel ID."
 msgstr "TikTok Ads Manager → Assets → Events → Web-Events → Pixel-ID kopieren."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1133
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1151
 msgid "Enable Events API"
 msgstr "Events API aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1135
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1153
 msgid "Enable TikTok Events API"
 msgstr "TikTok Events API aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1136
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1154
 msgid "Additionally sends matched events to TikTok server-side. Currently used for WooCommerce Purchase tracking only (tab “E-Commerce”), deduplicated via the same event ID as in the browser."
 msgstr "Sendet gematchte Events zusätzlich serverseitig an TikTok. Aktuell nur für WooCommerce-Purchase-Tracking genutzt (Tab „E-Commerce“), dedupliziert über dieselbe Event-ID wie im Browser."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1141
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1159
 msgid "Events API Access Token"
 msgstr "Events API Access Token"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1142
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1160
 msgid "TikTok Events Manager → your pixel → Settings → Events API → Generate access token."
 msgstr "TikTok Events Manager → dein Pixel → Einstellungen → Events API → Zugriffstoken generieren."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1156
-msgid "Track conversions with Google Ads (gtag.js), including Google Consent Mode v2 defaults. Available in Pixel Made Simple Pro."
-msgstr "Trackt Conversions mit Google Ads (gtag.js) inklusive Google Consent Mode v2 Defaults. Verfügbar in Pixel Made Simple Pro."
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1174
+msgid "Track conversions with Google Ads and GA4 (gtag.js), including Google Consent Mode v2 defaults. Available in Pixel Made Simple Pro."
+msgstr "Trackt Conversions mit Google Ads und GA4 (gtag.js) inklusive Google Consent Mode v2 Defaults. Verfügbar in Pixel Made Simple Pro."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1161
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1179
 msgid "Track conversions with the TikTok Pixel using the official web events. Available in Pixel Made Simple Pro."
 msgstr "Trackt Conversions mit dem TikTok Pixel über die offiziellen Web-Events. Verfügbar in Pixel Made Simple Pro."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1245
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1263
 msgid "WooCommerce was not detected on this site. Once WooCommerce is activated, the tracking options will appear here."
 msgstr "WooCommerce wurde auf dieser Website nicht erkannt. Sobald WooCommerce aktiviert ist, erscheinen hier die Tracking-Optionen."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1249
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1297
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1267
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1315
 msgid "WooCommerce"
 msgstr "WooCommerce"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1249
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1267
 msgid "Enable WooCommerce tracking"
 msgstr "WooCommerce-Tracking aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1250
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1268
 msgid "Automatically tracks ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce, deduplicated via the same event ID as in the browser. Purchase additionally uses a server-side fallback for orders completed via external payment gateways that skip the order-received page."
 msgstr "Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für WooCommerce, dedupliziert über dieselbe Event-ID wie im Browser. Purchase nutzt zusätzlich einen serverseitigen Fallback für Bestellungen, die über externe Zahlungsanbieter abgeschlossen werden und dabei die Danke-Seite überspringen."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1254
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1322
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1272
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1340
 msgid "Product identifier"
 msgstr "Produktkennung"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1255
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1323
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1273
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1341
 msgid "Must match how your Meta catalog identifies products (content_id)."
 msgstr "Muss damit übereinstimmen, wie dein Meta-Katalog Produkte identifiziert (content_id)."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1259
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1327
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1277
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1345
 msgid "Product ID"
 msgstr "Produkt-ID"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1260
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1328
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1278
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1346
 msgid "SKU (falls back to Product ID when empty)"
 msgstr "SKU (Fallback auf Produkt-ID, wenn leer)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1266
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1334
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1284
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1352
 msgid "Purchase value"
 msgstr "Purchase-Wert"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1267
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1335
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1285
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1353
 msgid "Whether the Purchase event value includes tax (gross, the amount actually paid) or excludes it (net)."
 msgstr "Ob der Wert des Purchase-Events die Steuer enthält (brutto, der tatsächlich bezahlte Betrag) oder nicht (netto)."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1271
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1339
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1289
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1357
 msgid "Gross (incl. tax)"
 msgstr "Brutto (inkl. Steuer)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1272
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1340
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1290
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1358
 msgid "Net (excl. tax)"
 msgstr "Netto (exkl. Steuer)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1277
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1345
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1295
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1363
 msgid "Purchase Advanced Matching"
 msgstr "Purchase Advanced Matching"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1279
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1347
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1297
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1365
 msgid "Enable Purchase Advanced Matching"
 msgstr "Purchase Advanced Matching aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1280
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1298
 msgid "Sends hashed billing details from the order (email, phone, name, address) to the Conversions API for better match quality. Mind data privacy."
 msgstr "Sendet gehashte Rechnungsdaten der Bestellung (E-Mail, Telefon, Name, Adresse) für eine bessere Zuordnungsqualität an die Conversions API. Beachte den Datenschutz."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1285
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1353
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1303
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1371
 msgid "Google Ads conversion label (Purchase)"
 msgstr "Google Ads Conversion Label (Purchase)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1286
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1354
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1304
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1372
 msgid "Optional. Google Ads → Conversions → your Purchase action → \"Use tag\" → the part after the slash in send_to. Leave empty to skip the Google Ads Purchase conversion (ViewContent/AddToCart/InitiateCheckout are not affected)."
 msgstr "Optional. Google Ads → Conversions → deine Purchase-Aktion → „Use tag“ → der Teil nach dem Schrägstrich in send_to. Leer lassen, um die Google-Ads-Purchase-Conversion zu überspringen (ViewContent/AddToCart/InitiateCheckout sind davon nicht betroffen)."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1298
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1316
 msgid "Automatically track ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce — deduplicated via the same event ID as in the browser, with a server-side fallback for orders completed via external payment gateways. Available in Pixel Made Simple Pro."
 msgstr "Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für WooCommerce – dedupliziert über dieselbe Event-ID wie im Browser, mit serverseitigem Fallback für Bestellungen über externe Zahlungsanbieter. Verfügbar in Pixel Made Simple Pro."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1313
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1331
 msgid "SureCart was not detected on this site. Once SureCart is activated, the tracking options will appear here."
 msgstr "SureCart wurde auf dieser Website nicht erkannt. Sobald SureCart aktiviert ist, erscheinen hier die Tracking-Optionen."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1317
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1365
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1335
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1383
 msgid "SureCart"
 msgstr "SureCart"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1317
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1335
 msgid "Enable SureCart tracking"
 msgstr "SureCart-Tracking aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1318
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1336
 msgid "Automatically tracks ViewContent, AddToCart, InitiateCheckout and Purchase for SureCart, deduplicated via the same event ID as in the browser. Purchase additionally uses a server-side fallback for orders that reach a paid status outside the regular checkout confirmation (e.g. asynchronous payment methods)."
 msgstr "Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für SureCart, dedupliziert über dieselbe Event-ID wie im Browser. Purchase nutzt zusätzlich einen serverseitigen Fallback für Bestellungen, die außerhalb der regulären Checkout-Bestätigung einen bezahlten Status erreichen (z. B. asynchrone Zahlungsmethoden)."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1348
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1366
 msgid "Sends hashed billing details from the checkout (email, phone, name, address) to the Conversions API for better match quality. Mind data privacy."
 msgstr "Sendet gehashte Rechnungsdaten des Checkouts (E-Mail, Telefon, Name, Adresse) für eine bessere Zuordnungsqualität an die Conversions API. Beachte den Datenschutz."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1366
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1384
 msgid "Automatically track ViewContent, AddToCart, InitiateCheckout and Purchase for SureCart — deduplicated via the same event ID as in the browser, with a server-side fallback for orders that reach a paid status outside the regular checkout confirmation. Available in Pixel Made Simple Pro."
 msgstr "Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für SureCart – dedupliziert über dieselbe Event-ID wie im Browser, mit serverseitigem Fallback für Bestellungen, die außerhalb der regulären Checkout-Bestätigung einen bezahlten Status erreichen. Verfügbar in Pixel Made Simple Pro."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1392
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1410
 msgid "Custom Events"
 msgstr "Benutzerdefinierte Events"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1395
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1413
 msgid "Note: Use URL events ideally for thank-you and confirmation pages (e.g. /danke/, /kauf-erfolgreich/). For regular forms without a redirect, please use the automatic form tracking in tab “Advanced Tracking” to avoid duplicate counting."
 msgstr "Hinweis: Verwende URL-Events idealerweise für Danke- und Bestätigungsseiten (z. B. /danke/, /kauf-erfolgreich/). Für reguläre Formulare ohne Weiterleitung nutze bitte das automatische Formular-Tracking im Tab „Erweitertes Tracking“, um doppelte Zählungen zu vermeiden."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1403
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1421
 msgid "Enable all custom events"
 msgstr "Alle benutzerdefinierten Events aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1405
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1423
 msgid "Enable/disable all custom events"
 msgstr "Alle benutzerdefinierten Events aktivieren/deaktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1407
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1425
 msgid "Apply"
 msgstr "Übernehmen"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1411
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1429
 msgid "Custom events are currently disabled globally. The rules below will not fire."
 msgstr "Benutzerdefinierte Events sind derzeit global deaktiviert. Die Regeln unten werden nicht ausgelöst."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1417
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1651
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1435
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1669
 msgid "The free version includes up to 2 URL events."
 msgstr "Die kostenlose Version enthält bis zu 2 URL-Events."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1418
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1652
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1436
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1670
 msgid "Upgrade to Pro for unlimited events."
 msgstr "Upgrade auf Pro für unbegrenzt viele Events."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1427
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1445
 msgid "Name"
 msgstr "Name"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1429
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1447
 msgid "Trigger Condition (URL)"
 msgstr "Trigger-Bedingung (URL)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1430
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1448
 msgid "Actions"
 msgstr "Aktionen"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1436
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1454
 msgid "No events yet. Create your first event below."
 msgstr "Noch keine Events angelegt. Erstelle unten dein erstes Event."
 
 #. translators: %s: event name
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1451
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1469
 msgid "Enable event “%s”"
 msgstr "Event „%s“ aktivieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1455
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1473
 msgid "Toggle"
 msgstr "Umschalten"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1474
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1492
 msgid "Exact path:"
 msgstr "Exakter Pfad:"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1475
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1493
 msgid "URL contains:"
 msgstr "URL enthält:"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1482
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1500
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1489
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1507
 msgid "Really delete this event?"
 msgstr "Möchtest du dieses Event wirklich löschen?"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1490
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1508
 msgid "Delete"
 msgstr "Löschen"
 
 #. translators: %s: event name
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1535
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1553
 msgid "Edit event “%s”"
 msgstr "Event „%s“ bearbeiten"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1537
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1555
 msgid "Create New Event"
 msgstr "Neues Event erstellen"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1549
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1567
 msgid "Event Name (internal)"
 msgstr "Event-Name (intern)"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1553
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1571
 msgid "e.g. Lead magnet confirmation"
 msgstr "z. B. Lead Magnet Bestätigung"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1555
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1573
 msgid "With the “CustomEvent” type, this name is sent as the custom event name."
 msgstr "Beim Typ „CustomEvent“ wird dieser Name als Custom-Event-Name gesendet."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1560
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1578
 msgid "Trigger"
 msgstr "Trigger"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1563
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1581
 msgid "Exact path"
 msgstr "Exakter Pfad"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1564
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1582
 msgid "URL contains"
 msgstr "URL enthält"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1569
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1587
 msgid "“Exact path” compares only the URL path (case and trailing slash are ignored). “URL contains” checks the path including the query string."
 msgstr "„Exakter Pfad“ vergleicht nur den URL-Pfad (Groß-/Kleinschreibung und abschließender Slash werden ignoriert). „URL enthält“ prüft den Pfad inklusive Query-String."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1580
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1598
 msgid "Meta event type"
 msgstr "Meta Event-Typ"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1596
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1614
 msgid "Google Ads conversion label"
 msgstr "Google Ads Conversion Label"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1597
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1615
 msgid "Google Ads → Conversion goals → click the action → Tag setup → snippet → copy the label after the slash (AW-XXX/LABEL)."
 msgstr "Google Ads → Ziel-Conversions → Aktion anklicken → Tag-Einrichtung → Snippet → Label hinter dem Schrägstrich kopieren (AW-XXX/LABEL)."
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1604
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1622
 msgid "TikTok event type"
 msgstr "TikTok Event-Typ"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1617
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1618
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1635
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1636
 msgid "Event active"
 msgstr "Event aktiv"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1632
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1636
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1650
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1654
 msgid "Add Event"
 msgstr "Event hinzufügen"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1636
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1654
 msgid "Update Event"
 msgstr "Event aktualisieren"
 
-#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1645
+#: C:/Users/Seitz/Documents/Claude/lightweight_meta_pixel_and_capi_tracker/dev-tools/../src/includes/class-pms-admin.php:1663
 msgid "Cancel"
 msgstr "Abbrechen"
 

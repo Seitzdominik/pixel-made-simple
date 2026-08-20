@@ -2,7 +2,10 @@
 /**
  * Pro-Feature: WooCommerce Purchase-Tracking mit Server-Side-Fallback.
  * Seit v0.6.6 Multi-Platform: Meta (Pixel + CAPI), Google Ads (gtag.js
- * Conversion + Enhanced Conversions) und TikTok (Pixel + Events API).
+ * Conversion + Enhanced Conversions) und TikTok (Pixel + Events API). Seit
+ * v0.6.8 zusätzlich GA4 (gtag.js Standard-Event "purchase", siehe
+ * ga4_purchase_js()) -- eigenständig von Google Ads, funktioniert auch ohne
+ * konfigurierten Google-Ads-Tag.
  *
  * Zwei unabhängige Auslösewege für dasselbe Event, beide über eine
  * deterministische event_id (`pms_order_{$order_id}`, siehe event_id())
@@ -412,6 +415,15 @@ class PMS_Pro_Woo_Purchase {
 			$fire .= self::google_conversion_js( $order, $custom_data, $event_id, $settings );
 		}
 
+		// GA4 (seit v0.6.8): eigenständig von der Google-Ads-Conversion oben --
+		// die Ads-Conversion trägt ein explizites send_to (Conversion-Label),
+		// erreicht also NIE ein GA4-Property (siehe PMS_Frontend::build_google_js()
+		// für dieselbe Unterscheidung bei den URL-Events). Ein Shop kann GA4
+		// ohne Google Ads betreiben, deshalb eigene, unabhängige Prüfung.
+		if ( '' !== trim( (string) ( $settings['ga4_measurement_id'] ?? '' ) ) ) {
+			$fire .= self::ga4_purchase_js( $custom_data, $event_id );
+		}
+
 		if ( ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) ) {
 			$tiktok_params = array(
 				'content_type' => 'product',
@@ -493,6 +505,54 @@ class PMS_Pro_Woo_Purchase {
 		}
 
 		return "if('function'===typeof window.gtag){window.gtag('event','conversion'," . $payload . ");}";
+	}
+
+	/**
+	 * GA4 Standard-Ecommerce-Event "purchase", seit v0.6.8. Rein browserseitig
+	 * wie google_conversion_js() (dieselbe gtag()-Ladevoraussetzung), aber
+	 * bewusst OHNE send_to -- ein GA4-Property kennt keine Conversion-Labels.
+	 * Das Event geht stattdessen an jedes per gtag('config', ...) registrierte
+	 * Ziel, das mit einem Standard-Event wie "purchase" etwas anfängt (also
+	 * GA4-Properties; ein Google-Ads-Tag ignoriert es einfach).
+	 * transaction_id = dieselbe deterministische Event-ID wie bei Meta/TikTok/
+	 * Google Ads -- GA4 dedupliziert purchase-Events serverseitig anhand
+	 * dieses Felds, exakt derselbe Zweck wie Metas eventID.
+	 *
+	 * items[] nutzt dasselbe {item_id,price,quantity}-Schema wie
+	 * contentsToGoogleItems() in pms-woocommerce.js (view_item/add_to_cart/
+	 * begin_checkout) -- hier serverseitig nachgebaut, weil Purchase (anders
+	 * als die drei Browser-Events) aus $custom_data['contents'] kommt, nicht
+	 * aus einem Client-Payload.
+	 *
+	 * @param array  $custom_data Von build_order_custom_data().
+	 * @param string $event_id    Deterministische Event-ID (als transaction_id).
+	 * @return string JS-Fragment oder leerer String.
+	 */
+	private static function ga4_purchase_js( array $custom_data, $event_id ) {
+		$items = array_map(
+			static function ( $item ) {
+				return array(
+					'item_id'  => (string) $item['id'],
+					'price'    => (float) ( $item['item_price'] ?? 0 ),
+					'quantity' => (int) ( $item['quantity'] ?? 1 ),
+				);
+			},
+			$custom_data['contents']
+		);
+
+		$params = array(
+			'transaction_id' => $event_id,
+			'value'          => $custom_data['value'],
+			'currency'       => $custom_data['currency'],
+			'items'          => $items,
+		);
+
+		$payload = wp_json_encode( $params, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+		if ( ! is_string( $payload ) ) {
+			return '';
+		}
+
+		return "if('function'===typeof window.gtag){window.gtag('event','purchase'," . $payload . ");}";
 	}
 
 	/**
