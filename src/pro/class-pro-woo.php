@@ -110,6 +110,8 @@ class PMS_Pro_WooCommerce {
 		// "Requires at least: 6.0" im Plugin-Header).
 		wp_script_add_data( 'pms-woocommerce', 'strategy', 'defer' );
 
+		$settings = PMS_Settings::get();
+
 		wp_localize_script(
 			'pms-woocommerce',
 			'pms_woo_settings',
@@ -124,6 +126,19 @@ class PMS_Pro_WooCommerce {
 				// render_initiate_checkout_payload()) liest das Skript den
 				// aktuellen Warenkorb selbst über die WooCommerce Store API.
 				'storeCartUrl'  => rest_url( 'wc/store/v1/cart' ),
+				// Google Ads (gtag) und TikTok Pixel (ttq) sind seit v0.6.6
+				// zusätzliche Ziele für ViewContent/AddToCart/InitiateCheckout.
+				// pms-woocommerce.js prüft NICHT nur typeof window.gtag/ttq
+				// (könnte durch ein fremdes GTM/Tool zufällig existieren),
+				// sondern zusätzlich dieses Flag -- das eigene google_enabled/
+				// tiktok_enabled-Toggle muss respektiert werden, unabhängig
+				// davon, ob gtag/ttq aus anderen Gründen im Fenster existieren.
+				// gtag/ttq selbst werden bereits von class-pms-frontend.php
+				// geladen (dieselbe Bedingung), hier wird nichts neu enqueued.
+				// Kein zusätzlicher is_pro()-Check nötig: should_load() oben
+				// garantiert das bereits (Google/TikTok sind ohnehin Pro-only).
+				'googleEnabled' => ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ),
+				'tiktokEnabled' => ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ),
 			)
 		);
 	}

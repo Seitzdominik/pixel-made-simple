@@ -193,6 +193,7 @@ class PMS_Admin {
 			'google_enabled'       => array( 'type' => 'bool', 'pro_only' => true ),
 			'google_consent_mode'  => array( 'type' => 'bool', 'pro_only' => true ),
 			'tiktok_enabled'       => array( 'type' => 'bool', 'pro_only' => true ),
+			'tiktok_capi_enabled'  => array( 'type' => 'bool', 'pro_only' => true ),
 			'form_tracking'        => array( 'type' => 'bool', 'pro_only' => false ),
 			'form_exclude_system'  => array( 'type' => 'bool', 'pro_only' => false ),
 			'utm_passthrough'      => array( 'type' => 'bool', 'pro_only' => true ),
@@ -530,8 +531,10 @@ class PMS_Admin {
 				// anderen) Tab mitgeschickt: Der CAPI-Token soll ausschließlich
 				// im Tab "Allgemein" im Seitenquelltext auftauchen. Fehlt der
 				// Schlüssel im POST, behält PMS_Settings::sanitize_settings()
-				// den bisherigen Wert bei, statt ihn zu leeren.
+				// den bisherigen Wert bei, statt ihn zu leeren. Seit v0.6.6
+				// gilt dasselbe für den TikTok-Events-API-Token.
 				'capi_token',
+				'tiktok_access_token',
 			);
 			if ( PMS_Settings::is_pro() ) {
 				// Diese vier haben auf diesem Tab nur dann ein echtes Feld weiter
@@ -970,6 +973,12 @@ class PMS_Admin {
 				'test_event_code',
 				'test_code_created_at',
 				'hash_email',
+				// tiktok_access_token wird -- wie capi_token oben -- IMMER
+				// ausgenommen, unabhängig von is_pro() weiter unten: ein Secret
+				// darf nie als Hidden-Feld im Seitenquelltext landen, auch nicht
+				// auf einer Free-Installation mit einem Restwert aus einer
+				// früheren Pro-Phase (siehe preserve_hidden_settings()-Doku).
+				'tiktok_access_token',
 			);
 			if ( PMS_Settings::is_pro() ) {
 				// Google/TikTok haben auf DIESEM Tab nur dann noch echte Felder,
@@ -986,6 +995,10 @@ class PMS_Admin {
 				$general_skip[] = 'google_consent_mode';
 				$general_skip[] = 'tiktok_enabled';
 				$general_skip[] = 'tiktok_pixel_id';
+				$general_skip[] = 'tiktok_capi_enabled';
+				// tiktok_access_token steht NICHT hier, sondern schon oben in der
+				// unconditional-Liste (wie capi_token) -- ein Secret-Feld darf nie
+				// als Hidden-Feld erscheinen, unabhängig vom Pro-Status.
 			}
 			// WooCommerce-/Purchase-Keys (wc_tracking_enabled, wc_content_id_type,
 			// wc_purchase_value_type, wc_purchase_advanced_matching) haben auf
@@ -1114,6 +1127,24 @@ class PMS_Admin {
 								placeholder="C1234567890ABCDEFG" autocomplete="off" />
 						</td>
 					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Enable Events API', 'pixel-made-simple' ); ?></th>
+						<td>
+							<?php self::toggle( 'pms_settings[tiktok_capi_enabled]', ! empty( $s['tiktok_capi_enabled'] ), __( 'Enable TikTok Events API', 'pixel-made-simple' ), false, 'tiktok_capi_enabled' ); ?>
+							<p class="description"><?php esc_html_e( 'Additionally sends matched events to TikTok server-side. Currently used for WooCommerce Purchase tracking only (tab “E-Commerce”), deduplicated via the same event ID as in the browser.', 'pixel-made-simple' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="pms-tiktok-access-token"><?php esc_html_e( 'Events API Access Token', 'pixel-made-simple' ); ?></label>
+							<?php self::tip( __( 'TikTok Events Manager → your pixel → Settings → Events API → Generate access token.', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<textarea id="pms-tiktok-access-token" class="large-text code" rows="4" spellcheck="false" autocomplete="off"
+								name="pms_settings[tiktok_access_token]"><?php echo esc_textarea( $s['tiktok_access_token'] ); ?></textarea>
+							<p class="description"><?php esc_html_e( 'Secret key. Used exclusively server-side and never rendered in the frontend.', 'pixel-made-simple' ); ?></p>
+						</td>
+					</tr>
 				</table>
 				<?php self::accordion_close(); ?>
 			<?php else : ?>
@@ -1156,11 +1187,18 @@ class PMS_Admin {
 		<form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>">
 			<?php settings_fields( 'pms_settings_group' ); ?>
 			<?php
-			$ecommerce_skip = array();
-			// Echte Felder gibt es nur, wenn Pro UND WooCommerce beide zutreffen
+			// capi_token/tiktok_access_token haben auf DIESEM Tab nie ein echtes
+			// Feld -- trotzdem unconditional (nicht nur im is_pro()-Zweig unten)
+			// von preserve_hidden_settings() ausgenommen, exakt dasselbe
+			// Exposure-Minimierungs-Prinzip wie in render_general_tab() und
+			// render_advanced_tab(): ein Secret darf nie als Hidden-Feld im
+			// Seitenquelltext eines FREMDEN Tabs auftauchen.
+			$ecommerce_skip = array( 'capi_token', 'tiktok_access_token' );
+			// Die vier wc_*-Keys (und seit v0.6.6 wc_google_conversion_label)
+			// haben echte Felder nur, wenn Pro UND WooCommerce beide zutreffen
 			// (siehe unten) -- in jedem anderen Fall (Free, oder Pro ohne
 			// WooCommerce) zeigt dieser Tab stattdessen einen Teaser bzw.
-			// Hinweis-Card ohne echte Felder; dort MÜSSEN alle vier Keys
+			// Hinweis-Card ohne echte Felder; dort MÜSSEN diese Keys
 			// stattdessen ganz normal über preserve_hidden_settings() erhalten
 			// bleiben (dasselbe Muster wie überall sonst in diesem Plugin),
 			// sonst würde das Speichern dieses Formulars eine bereits gesetzte
@@ -1172,6 +1210,7 @@ class PMS_Admin {
 				$ecommerce_skip[] = 'wc_content_id_type';
 				$ecommerce_skip[] = 'wc_purchase_value_type';
 				$ecommerce_skip[] = 'wc_purchase_advanced_matching';
+				$ecommerce_skip[] = 'wc_google_conversion_label';
 			}
 			self::preserve_hidden_settings( $s, $ecommerce_skip );
 			?>
@@ -1217,6 +1256,15 @@ class PMS_Admin {
 						<td>
 							<?php self::toggle( 'pms_settings[wc_purchase_advanced_matching]', ! empty( $s['wc_purchase_advanced_matching'] ), __( 'Enable Purchase Advanced Matching', 'pixel-made-simple' ), false, 'wc_purchase_advanced_matching' ); ?>
 							<p class="description"><?php esc_html_e( 'Sends hashed billing details from the order (email, phone, name, address) to the Conversions API for better match quality. Mind data privacy.', 'pixel-made-simple' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="pms-wc-google-conversion-label"><?php esc_html_e( 'Google Ads conversion label (Purchase)', 'pixel-made-simple' ); ?></label>
+							<?php self::tip( __( 'Optional. Google Ads → Conversions → your Purchase action → "Use tag" → the part after the slash in send_to. Leave empty to skip the Google Ads Purchase conversion (ViewContent/AddToCart/InitiateCheckout are not affected).', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<input type="text" id="pms-wc-google-conversion-label" class="regular-text" name="pms_settings[wc_google_conversion_label]" value="<?php echo esc_attr( $s['wc_google_conversion_label'] ); ?>" placeholder="AbCdEfGhIjKlMnOp" />
 						</td>
 					</tr>
 				</table>

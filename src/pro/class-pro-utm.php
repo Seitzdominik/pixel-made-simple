@@ -50,6 +50,7 @@ class PMS_Pro_UTM {
 		'utm_term',
 		'fbclid',
 		'gclid',
+		'ttclid',
 	);
 
 	/**
@@ -58,9 +59,14 @@ class PMS_Pro_UTM {
 	 * gesendet (siehe custom_data()), da sie plattformspezifische Identifier
 	 * ohne Bedeutung für die jeweils andere Plattform sind.
 	 *
+	 * ttclid (seit v0.6.6) wird über ttclid() unten von PMS_Pro_Woo_Purchase
+	 * für die TikTok Events API gelesen -- derselbe Fallback-Gedanke wie bei
+	 * fbc() für Meta: WooCommerce-Server-Events (Purchase) haben keinen
+	 * eigenen Zugriff auf den ursprünglichen Klick, nur auf dieses Cookie.
+	 *
 	 * @var string[]
 	 */
-	private static $click_ids = array( 'fbclid', 'gclid' );
+	private static $click_ids = array( 'fbclid', 'gclid', 'ttclid' );
 
 	/**
 	 * Request-Cache.
@@ -262,6 +268,19 @@ class PMS_Pro_UTM {
 		$timestamp = ! empty( $data['ts'] ) ? (int) $data['ts'] * 1000 : (int) round( microtime( true ) * 1000 );
 
 		return 'fb.1.' . $timestamp . '.' . $data['fbclid'];
+	}
+
+	/**
+	 * Gespeicherte ttclid für die TikTok Events API (PMS_Pro_Woo_Purchase).
+	 * Anders als fbc() keine Formattransformation -- TikTok erwartet den
+	 * Klick-Parameter unverändert.
+	 *
+	 * @return string Leerer String, wenn keine ttclid vorliegt.
+	 */
+	public static function ttclid() {
+		$data = self::get();
+
+		return ! empty( $data['ttclid'] ) ? (string) $data['ttclid'] : '';
 	}
 
 	/**

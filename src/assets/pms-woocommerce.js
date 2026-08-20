@@ -2,11 +2,22 @@
  * Pixel Made Simple – WooCommerce-Tracking (ViewContent, AddToCart,
  * InitiateCheckout). Pro-only, siehe pro/class-pro-woo.php.
  *
+ * Seit v0.6.6 Multi-Platform: Meta (Pixel + CAPI, wie zuvor), Google Ads
+ * (gtag.js: view_item/add_to_cart/begin_checkout) und TikTok Pixel (ttq.track:
+ * ViewContent/AddToCart/InitiateCheckout) -- Google/TikTok NUR Browser-seitig
+ * für diese drei Events (kein Server-Dispatch, anders als Purchase, siehe
+ * pro/class-pro-woo-purchase.php). gtag/ttq werden NICHT von diesem Skript
+ * geladen -- class-pms-frontend.php lädt beide bereits auf jeder Seite, wenn
+ * google_enabled/tiktok_enabled aktiv sind; hier wird nur geprüft, ob sie
+ * existieren UND das jeweilige *Enabled-Flag gesetzt ist (siehe cfg.googleEnabled/
+ * cfg.tiktokEnabled, lokalisiert in class-pro-woo.php).
+ *
  * Cache-Sicherheit: ViewContent- und AddToCart-Nutzlasten enthalten NIE eine
  * serverseitig gebackene event_id (Cache-Gift auf vollständig gecachten
  * Produkt-/Archivseiten). Die event_id entsteht ausschließlich hier im
- * Browser (crypto.randomUUID()) und wird synchron für fbq() UND den
- * asynchronen CAPI-Request wiederverwendet, damit Meta beide Events dedupliziert.
+ * Browser (crypto.randomUUID()) und wird synchron für fbq()/ttq.track() UND
+ * den asynchronen Meta-CAPI-Request wiederverwendet, damit Meta (und TikTok,
+ * bei Purchase) Browser- und Server-Event dedupliziert.
  *
  * Consent-Queue: Ist beim Laden noch keine Marketing-Einwilligung erteilt
  * (Cookie-Banner blockiert noch), werden Events zwischengespeichert und erst
@@ -47,6 +58,17 @@
 		} catch ( e ) {
 			return null;
 		}
+	}
+
+	/**
+	 * contents[] (gemeinsames {id,quantity,item_price}-Format von Classic- und
+	 * Block-Checkout, siehe initClassicCheckout()/initBlockCheckout()) in
+	 * Google Ads' items[]-Schema übersetzen ({item_id,price,quantity}).
+	 */
+	function contentsToGoogleItems( contents ) {
+		return ( contents || [] ).map( function ( item ) {
+			return { item_id: String( item.id ), price: item.item_price || 0, quantity: item.quantity || 1 };
+		} );
 	}
 
 	/* -----------------------------------------------------------------
@@ -90,30 +112,46 @@
 	} );
 
 	/* -----------------------------------------------------------------
-	 * Gemeinsamer Dispatch: Browser-Pixel + asynchrone CAPI, identische
-	 * event_id für beide (siehe Datei-Kommentar oben).
+	 * Gemeinsamer Dispatch: Browser-Pixel(e) + asynchrone Meta-CAPI,
+	 * identische event_id für alle Ziele (siehe Datei-Kommentar oben).
+	 * Google Ads/TikTok sind seit v0.6.6 zusätzliche, unabhängige Ziele --
+	 * jedes Ziel prüft sein eigenes *Enabled-Flag UND die tatsächliche
+	 * Funktionsexistenz (fbq/gtag/ttq), bevor es feuert; das Fehlen eines
+	 * Ziels blockiert die anderen nicht.
 	 * ------------------------------------------------------------------- */
 
 	/**
-	 * @param {string}      eventName     'ViewContent' | 'AddToCart' | 'InitiateCheckout'.
-	 * @param {Object}      ajaxFields    Zusätzliche Felder für den AJAX-Request
-	 *                                    (z. B. product_id/variation_id/quantity).
-	 *                                    Der Server löst Preis/Name/Kategorie
-	 *                                    IMMER selbst neu auf, siehe class-pro-woo.php.
-	 * @param {Object|null} fbqCustomData Optionale, bereits angereicherte Daten
-	 *                                    für den Browser-Pixel-Aufruf (nur bei
-	 *                                    Events, deren Daten sicher serverseitig
-	 *                                    vorgerendert werden konnten).
+	 * @param {string}      eventName  'ViewContent' | 'AddToCart' | 'InitiateCheckout'
+	 *                                 (Meta-Namenskonvention -- Google/TikTok
+	 *                                 haben pro Aufrufer ihre eigenen Namen,
+	 *                                 siehe platforms.google.event/platforms.tiktok.event).
+	 * @param {Object} ajaxFields      Zusätzliche Felder für den AJAX-Request
+	 *                                 (z. B. product_id/variation_id/quantity).
+	 *                                 Der Server löst Preis/Name/Kategorie
+	 *                                 IMMER selbst neu auf, siehe class-pro-woo.php.
+	 *                                 Nur für die Meta-CAPI relevant -- Google/
+	 *                                 TikTok haben für diese drei Events (anders
+	 *                                 als Purchase) keinen Server-Dispatch.
+	 * @param {Object} platforms       { meta: Object|null, google: {event,params}|null, tiktok: {event,params}|null }.
 	 */
-	function sendTracking( eventName, ajaxFields, fbqCustomData ) {
+	function sendTracking( eventName, ajaxFields, platforms ) {
 		var eventId = uuid();
+		platforms = platforms || {};
 
 		function fire() {
 			var browserFired = false;
 
-			if ( 'function' === typeof window.fbq ) {
-				window.fbq( 'track', eventName, fbqCustomData || {}, { eventID: eventId } );
+			if ( platforms.meta && 'function' === typeof window.fbq ) {
+				window.fbq( 'track', eventName, platforms.meta, { eventID: eventId } );
 				browserFired = true;
+			}
+
+			if ( cfg.googleEnabled && platforms.google && 'function' === typeof window.gtag ) {
+				window.gtag( 'event', platforms.google.event, platforms.google.params );
+			}
+
+			if ( cfg.tiktokEnabled && platforms.tiktok && 'function' === typeof window.ttq ) {
+				window.ttq.track( platforms.tiktok.event, platforms.tiktok.params, { event_id: eventId } );
 			}
 
 			emit( 'pms:event', {
@@ -183,12 +221,37 @@
 			'ViewContent',
 			{ product_id: data.product_id, quantity: data.quantity || 1 },
 			{
-				content_ids: [ String( data.content_id ) ],
-				content_type: 'product',
-				content_name: data.content_name || '',
-				content_category: data.content_category || '',
-				value: data.value || 0,
-				currency: data.currency || ''
+				meta: {
+					content_ids: [ String( data.content_id ) ],
+					content_type: 'product',
+					content_name: data.content_name || '',
+					content_category: data.content_category || '',
+					value: data.value || 0,
+					currency: data.currency || ''
+				},
+				google: {
+					event: 'view_item',
+					params: {
+						currency: data.currency || '',
+						value: data.value || 0,
+						items: [ {
+							item_id: String( data.content_id ),
+							item_name: data.content_name || '',
+							price: data.value || 0,
+							quantity: data.quantity || 1
+						} ]
+					}
+				},
+				tiktok: {
+					event: 'ViewContent',
+					params: {
+						content_id: String( data.content_id ),
+						content_type: 'product',
+						content_name: data.content_name || '',
+						value: data.value || 0,
+						currency: data.currency || ''
+					}
+				}
 			}
 		);
 	}
@@ -204,18 +267,36 @@
 			return;
 		}
 
-		// Bewusst KEIN Preis/Name im Browser-Pixel-Aufruf: Anders als
-		// ViewContent/InitiateCheckout ist hier nichts sicher serverseitig
+		// Bewusst KEIN Preis/Name in KEINEM der Browser-Pixel-Aufrufe: Anders
+		// als ViewContent/InitiateCheckout ist hier nichts sicher serverseitig
 		// vorgerendert (Archiv-Button kennt nur product_id/quantity aus den
 		// data-Attributen von WooCommerce-Core). Der Server löst Preis/Name
-		// für die CAPI trotzdem selbst auf (siehe class-pro-woo.php).
+		// für die Meta-CAPI trotzdem selbst auf (siehe class-pro-woo.php);
+		// Google/TikTok haben für dieses Event keinen Server-Dispatch (siehe
+		// sendTracking()-Doku oben), bekommen also dauerhaft nur die schlanke
+		// Variante ohne value/currency.
 		sendTracking( 'AddToCart', {
 			product_id: productId,
 			variation_id: variationId || 0,
 			quantity: qty || 1
 		}, {
-			content_ids: [ String( productId ) ],
-			content_type: 'product'
+			meta: {
+				content_ids: [ String( productId ) ],
+				content_type: 'product'
+			},
+			google: {
+				event: 'add_to_cart',
+				params: {
+					items: [ { item_id: String( productId ), quantity: qty || 1 } ]
+				}
+			},
+			tiktok: {
+				event: 'AddToCart',
+				params: {
+					content_id: String( productId ),
+					content_type: 'product'
+				}
+			}
 		} );
 	}
 
@@ -287,12 +368,30 @@
 		}
 
 		sendTracking( 'InitiateCheckout', {}, {
-			content_ids: data.content_ids,
-			content_type: 'product',
-			value: data.value || 0,
-			currency: data.currency || '',
-			contents: data.contents || [],
-			num_items: data.num_items || 0
+			meta: {
+				content_ids: data.content_ids,
+				content_type: 'product',
+				value: data.value || 0,
+				currency: data.currency || '',
+				contents: data.contents || [],
+				num_items: data.num_items || 0
+			},
+			google: {
+				event: 'begin_checkout',
+				params: {
+					currency: data.currency || '',
+					value: data.value || 0,
+					items: contentsToGoogleItems( data.contents )
+				}
+			},
+			tiktok: {
+				event: 'InitiateCheckout',
+				params: {
+					content_type: 'product',
+					value: data.value || 0,
+					currency: data.currency || ''
+				}
+			}
 		} );
 
 		return true;
@@ -343,12 +442,30 @@
 				var value = ( cart.totals && cart.totals.total_price ) ? ( parseInt( cart.totals.total_price, 10 ) / divisor ) : 0;
 
 				sendTracking( 'InitiateCheckout', {}, {
-					content_ids: contentIds,
-					content_type: 'product',
-					value: value,
-					currency: currency,
-					contents: contents,
-					num_items: numItems
+					meta: {
+						content_ids: contentIds,
+						content_type: 'product',
+						value: value,
+						currency: currency,
+						contents: contents,
+						num_items: numItems
+					},
+					google: {
+						event: 'begin_checkout',
+						params: {
+							currency: currency,
+							value: value,
+							items: contentsToGoogleItems( contents )
+						}
+					},
+					tiktok: {
+						event: 'InitiateCheckout',
+						params: {
+							content_type: 'product',
+							value: value,
+							currency: currency
+						}
+					}
 				} );
 			} )
 			.catch( function () {

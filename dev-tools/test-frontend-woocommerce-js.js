@@ -136,7 +136,8 @@ function makeJQuery() {
  *
  * @param {Object} cfgOverrides window.pms_woo_settings.
  * @param {Object} domOverrides { elements, querySelectorResults, jquery,
- *                                hasConsent, autoTimeout, storeApiResponse, noFbq }.
+ *                                hasConsent, autoTimeout, storeApiResponse,
+ *                                noFbq, noGtag, noTtq }.
  * @return {Object} { window, document, jq } für Assertions/Trigger.
  */
 function run( cfgOverrides, domOverrides ) {
@@ -146,6 +147,8 @@ function run( cfgOverrides, domOverrides ) {
 	const winListeners = {};
 	const win = {
 		fbqCalls: [],
+		gtagCalls: [],
+		ttqCalls: [],
 		fetchCalls: [],
 		addEventListener( type, fn ) {
 			winListeners[ type ] = winListeners[ type ] || [];
@@ -163,6 +166,12 @@ function run( cfgOverrides, domOverrides ) {
 			nonce: 'test-nonce',
 			consentEvents: [],
 			storeCartUrl: 'https://example.com/wp-json/wc/store/v1/cart',
+			// Default false, wie im echten Betrieb (class-pro-woo.php liest
+			// google_enabled/tiktok_enabled aus den Plugin-Settings, dort
+			// beide standardmäßig aus) -- Tests, die gtag/ttq prüfen wollen,
+			// setzen diese Flags gezielt über cfgOverrides.
+			googleEnabled: false,
+			tiktokEnabled: false,
 		},
 		cfgOverrides
 	);
@@ -170,6 +179,25 @@ function run( cfgOverrides, domOverrides ) {
 	if ( ! domOverrides.noFbq ) {
 		win.fbq = function () {
 			win.fbqCalls.push( Array.prototype.slice.call( arguments ) );
+		};
+	}
+
+	if ( ! domOverrides.noGtag ) {
+		win.gtag = function () {
+			win.gtagCalls.push( Array.prototype.slice.call( arguments ) );
+		};
+	}
+
+	if ( ! domOverrides.noTtq ) {
+		// pms-woocommerce.js prüft bewusst 'function' === typeof window.ttq
+		// (nicht typeof window.ttq.track), weil TikToks echtes Pixel-SDK ttq
+		// als aufrufbare Funktion mit angehängten Methoden initialisiert
+		// (dasselbe Snippet-Muster wie fbq/analytics.js) -- der Stub muss
+		// dieselbe Form haben, sonst testet er einen Pfad, den es in der
+		// Realität nicht gibt.
+		win.ttq = function () {};
+		win.ttq.track = function () {
+			win.ttqCalls.push( Array.prototype.slice.call( arguments ) );
 		};
 	}
 
@@ -255,13 +283,25 @@ console.log( '\n=== 1. ViewContent: liest #pms-woo-view-content-data und feuert 
 	} );
 	payload.id = 'pms-woo-view-content-data';
 
-	const r = run( {}, { elements: [ payload ] } );
+	const r = run( { googleEnabled: true, tiktokEnabled: true }, { elements: [ payload ] } );
 
 	check( 'fbq(\'track\',\'ViewContent\', ...) wird genau einmal aufgerufen', 1 === r.window.fbqCalls.length );
 	const call = r.window.fbqCalls[ 0 ] || [];
 	check( 'fbq-Aufruf: Event-Name ist ViewContent', 'track' === call[ 0 ] && 'ViewContent' === call[ 1 ] );
 	check( 'fbq-Aufruf: enthält angereicherte Produktdaten (content_ids/value/currency)', call[ 2 ] && '55' === ( call[ 2 ].content_ids || [] )[ 0 ] && 19.99 === call[ 2 ].value && 'EUR' === call[ 2 ].currency );
 	check( 'fbq-Aufruf: eventID ist gesetzt (für CAPI-Dedup)', !! ( call[ 3 ] && call[ 3 ].eventID ) );
+
+	check( 'gtag(\'event\',\'view_item\', ...) wird genau einmal aufgerufen', 1 === r.window.gtagCalls.length );
+	const gCall = r.window.gtagCalls[ 0 ] || [];
+	check( 'gtag-Aufruf: Event-Name ist view_item', 'event' === gCall[ 0 ] && 'view_item' === gCall[ 1 ] );
+	check( 'gtag-Aufruf: items[] im Google-Schema (item_id/item_name/price/quantity)', gCall[ 2 ] && '55' === gCall[ 2 ].items[ 0 ].item_id && 'T-Shirt' === gCall[ 2 ].items[ 0 ].item_name && 19.99 === gCall[ 2 ].items[ 0 ].price );
+	check( 'gtag-Aufruf: value/currency auf oberster Ebene', gCall[ 2 ] && 19.99 === gCall[ 2 ].value && 'EUR' === gCall[ 2 ].currency );
+
+	check( 'ttq.track(\'ViewContent\', ...) wird genau einmal aufgerufen', 1 === r.window.ttqCalls.length );
+	const tCall = r.window.ttqCalls[ 0 ] || [];
+	check( 'ttq-Aufruf: Event-Name ist ViewContent', 'ViewContent' === tCall[ 0 ] );
+	check( 'ttq-Aufruf: content_id/value/currency gesetzt', tCall[ 1 ] && '55' === tCall[ 1 ].content_id && 19.99 === tCall[ 1 ].value && 'EUR' === tCall[ 1 ].currency );
+	check( 'ttq-Aufruf: dieselbe event_id wie im fbq()-Aufruf (plattformübergreifende Dedup)', tCall[ 2 ] && tCall[ 2 ].event_id === ( call[ 3 ] && call[ 3 ].eventID ) );
 
 	const body = ( r.window.fetchCalls[ 0 ] || {} ).body || '';
 	const params = new URLSearchParams( body );
@@ -283,7 +323,7 @@ console.log( '\n=== 1. ViewContent: liest #pms-woo-view-content-data und feuert 
 console.log( '\n=== 2. AddToCart: jQuery "added_to_cart" (Archiv-/Mini-Cart-Buttons) ===' );
 
 {
-	const r = run( {}, { jquery: true } );
+	const r = run( { googleEnabled: true, tiktokEnabled: true }, { jquery: true } );
 	const button = el( { tag: 'a', attrs: { 'data-product_id': '77', 'data-quantity': '2' } } );
 
 	r.jq.trigger( 'added_to_cart', {}, 'hash', [ button ] );
@@ -291,6 +331,14 @@ console.log( '\n=== 2. AddToCart: jQuery "added_to_cart" (Archiv-/Mini-Cart-Butt
 	check( 'fbq(\'track\',\'AddToCart\', ...) wird aufgerufen', 1 === r.window.fbqCalls.length );
 	const call = r.window.fbqCalls[ 0 ] || [];
 	check( 'AddToCart-Pixel: KEIN value/currency (Archiv-Button kennt keinen sicheren Preis)', call[ 2 ] && undefined === call[ 2 ].value && '77' === ( call[ 2 ].content_ids || [] )[ 0 ] );
+
+	check( 'gtag(\'event\',\'add_to_cart\', ...) wird aufgerufen', 1 === r.window.gtagCalls.length );
+	const gCall = r.window.gtagCalls[ 0 ] || [];
+	check( 'gtag AddToCart: items[] mit item_id/quantity, KEIN price (kein sicherer Preis im Archiv-Kontext)', gCall[ 2 ] && '77' === gCall[ 2 ].items[ 0 ].item_id && 2 === gCall[ 2 ].items[ 0 ].quantity && undefined === gCall[ 2 ].items[ 0 ].price );
+
+	check( 'ttq.track(\'AddToCart\', ...) wird aufgerufen', 1 === r.window.ttqCalls.length );
+	const tCall = r.window.ttqCalls[ 0 ] || [];
+	check( 'ttq AddToCart: content_id gesetzt, KEIN value', tCall[ 1 ] && '77' === tCall[ 1 ].content_id && undefined === tCall[ 1 ].value );
 
 	const body = ( r.window.fetchCalls[ 0 ] || {} ).body || '';
 	const params = new URLSearchParams( body );
@@ -318,13 +366,15 @@ console.log( '\n=== 3. AddToCart: form.cart-Submit (Simple + Variable Products) 
 	const qtyInput = el( { tag: 'input', name: 'quantity', value: '3' } );
 	const form = el( { tag: 'form', classes: [ 'cart' ], children: [ addButton, variationInput, qtyInput ] } );
 
-	const r = run( {}, {} );
+	const r = run( { googleEnabled: true, tiktokEnabled: true }, {} );
 	const submitHandlers = r.document._listeners.submit || [];
 	check( 'submit-Listener für form.cart wird registriert', submitHandlers.length > 0 );
 
 	submitHandlers[ 0 ]( { target: form } );
 
 	check( 'fbq(\'track\',\'AddToCart\') wird beim Absenden von form.cart gefeuert', 1 === r.window.fbqCalls.length );
+	check( 'gtag(\'event\',\'add_to_cart\') wird beim Absenden von form.cart gefeuert', 1 === r.window.gtagCalls.length );
+	check( 'ttq.track(\'AddToCart\') wird beim Absenden von form.cart gefeuert', 1 === r.window.ttqCalls.length );
 
 	const body = ( r.window.fetchCalls[ 0 ] || {} ).body || '';
 	const params = new URLSearchParams( body );
@@ -370,11 +420,20 @@ console.log( '\n=== 4. InitiateCheckout: Classic Checkout liest #pms-woo-checkou
 	} );
 	payload.id = 'pms-woo-checkout-data';
 
-	const r = run( {}, { elements: [ payload ] } );
+	const r = run( { googleEnabled: true, tiktokEnabled: true }, { elements: [ payload ] } );
 
 	check( 'fbq(\'track\',\'InitiateCheckout\') wird gefeuert', 1 === r.window.fbqCalls.length );
 	const call = r.window.fbqCalls[ 0 ] || [];
 	check( 'InitiateCheckout-Pixel: enthält beide content_ids + Gesamtwert', call[ 2 ] && 2 === ( call[ 2 ].content_ids || [] ).length && 59.98 === call[ 2 ].value );
+
+	check( 'gtag(\'event\',\'begin_checkout\') wird gefeuert', 1 === r.window.gtagCalls.length );
+	const gCall = r.window.gtagCalls[ 0 ] || [];
+	check( 'gtag begin_checkout: contents[] ins Google-items[]-Schema übersetzt (item_id/price/quantity)', gCall[ 2 ] && 2 === gCall[ 2 ].items.length && '10' === gCall[ 2 ].items[ 0 ].item_id && 39.99 === gCall[ 2 ].items[ 0 ].price );
+	check( 'gtag begin_checkout: value/currency aus der Nutzlast', gCall[ 2 ] && 59.98 === gCall[ 2 ].value && 'EUR' === gCall[ 2 ].currency );
+
+	check( 'ttq.track(\'InitiateCheckout\') wird gefeuert', 1 === r.window.ttqCalls.length );
+	const tCall = r.window.ttqCalls[ 0 ] || [];
+	check( 'ttq InitiateCheckout: value/currency gesetzt (kein eigenes contents[]-Feld im TikTok-Schema)', tCall[ 1 ] && 59.98 === tCall[ 1 ].value && 'EUR' === tCall[ 1 ].currency );
 
 	const body = ( r.window.fetchCalls[ 0 ] || {} ).body || '';
 	const params = new URLSearchParams( body );
@@ -402,7 +461,7 @@ console.log( '\n=== 5. InitiateCheckout: Block-Checkout liest die WooCommerce St
 	};
 
 	const r = run(
-		{},
+		{ googleEnabled: true, tiktokEnabled: true },
 		{
 			querySelectorResults: { '.wp-block-woocommerce-checkout': blockRoot },
 			storeApiResponse: storeApiResponse,
@@ -418,6 +477,15 @@ console.log( '\n=== 5. InitiateCheckout: Block-Checkout liest die WooCommerce St
 	check( 'Minor-Unit-Preis wird korrekt zurückgerechnet (1999 Cent -> 19.99)', call[ 2 ] && 19.99 === call[ 2 ].contents[ 0 ].item_price );
 	check( 'Minor-Unit-Gesamtwert wird korrekt zurückgerechnet (3998 Cent -> 39.98)', call[ 2 ] && 39.98 === call[ 2 ].value );
 	check( 'currency aus currency_code', call[ 2 ] && 'EUR' === call[ 2 ].currency );
+
+	check( 'gtag(\'event\',\'begin_checkout\') wird nach Auflösen der Store API gefeuert', 1 === r.window.gtagCalls.length );
+	const gCall = r.window.gtagCalls[ 0 ] || [];
+	check( 'gtag begin_checkout (Block-Checkout): Minor-Unit-Preis korrekt in items[].price zurückgerechnet', gCall[ 2 ] && 19.99 === gCall[ 2 ].items[ 0 ].price );
+	check( 'gtag begin_checkout (Block-Checkout): Minor-Unit-Gesamtwert korrekt zurückgerechnet', gCall[ 2 ] && 39.98 === gCall[ 2 ].value );
+
+	check( 'ttq.track(\'InitiateCheckout\') wird nach Auflösen der Store API gefeuert', 1 === r.window.ttqCalls.length );
+	const tCall = r.window.ttqCalls[ 0 ] || [];
+	check( 'ttq InitiateCheckout (Block-Checkout): Minor-Unit-Gesamtwert korrekt zurückgerechnet', tCall[ 1 ] && 39.98 === tCall[ 1 ].value );
 }
 
 {
@@ -473,6 +541,45 @@ console.log( '\n=== 6. Consent-Queue: Events werden bei fehlendem Consent zurüc
 
 	const r = run( {}, { elements: [ payload ], hasConsent: true } );
 	check( 'Mit sofortigem Consent: Event feuert ohne Verzögerung', 1 === r.window.fbqCalls.length );
+}
+
+/* ---------------------------------------------------------------------
+ * 7. Google Ads & TikTok: Enabled-Flag-Gating
+ * ------------------------------------------------------------------- */
+
+console.log( '\n=== 7. Google Ads & TikTok: Enabled-Flag-Gating ===' );
+
+{
+	// Default-cfg (googleEnabled/tiktokEnabled=false, siehe run()): gtag/ttq
+	// existieren im Fenster, dürfen aber NICHT aufgerufen werden -- das
+	// eigene Einstellungs-Flag muss unabhängig von einem fremden GTM/Tool,
+	// das gtag/ttq zufällig ebenfalls definiert, respektiert werden.
+	const payload = el( {
+		tag: 'script',
+		textContent: JSON.stringify( { product_id: 1, content_id: '1', content_name: 'X', content_category: '', value: 1, currency: 'EUR', quantity: 1 } ),
+	} );
+	payload.id = 'pms-woo-view-content-data';
+
+	const r = run( {}, { elements: [ payload ] } );
+
+	check( 'googleEnabled=false: gtag() wird NICHT aufgerufen, obwohl window.gtag existiert', 0 === r.window.gtagCalls.length );
+	check( 'tiktokEnabled=false: ttq.track() wird NICHT aufgerufen, obwohl window.ttq existiert', 0 === r.window.ttqCalls.length );
+	check( 'Meta-Pixel feuert unabhängig vom Google/TikTok-Gating weiterhin', 1 === r.window.fbqCalls.length );
+}
+
+{
+	// Umgekehrt: Flags an, aber window.gtag/window.ttq existieren nicht (z. B.
+	// weil class-pms-frontend.php sie aus einem anderen Grund nicht geladen
+	// hat) -- darf nicht crashen, Meta bleibt unberührt.
+	const payload = el( {
+		tag: 'script',
+		textContent: JSON.stringify( { product_id: 1, content_id: '1', content_name: 'X', content_category: '', value: 1, currency: 'EUR', quantity: 1 } ),
+	} );
+	payload.id = 'pms-woo-view-content-data';
+
+	const r = run( { googleEnabled: true, tiktokEnabled: true }, { elements: [ payload ], noGtag: true, noTtq: true } );
+
+	check( 'Fehlendes window.gtag/window.ttq: kein Crash, Meta-Pixel feuert weiterhin', 1 === r.window.fbqCalls.length );
 }
 
 }

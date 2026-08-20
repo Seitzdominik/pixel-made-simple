@@ -1,6 +1,8 @@
 <?php
 /**
  * Pro-Feature: WooCommerce Purchase-Tracking mit Server-Side-Fallback.
+ * Seit v0.6.6 Multi-Platform: Meta (Pixel + CAPI), Google Ads (gtag.js
+ * Conversion + Enhanced Conversions) und TikTok (Pixel + Events API).
  *
  * Zwei unabhängige Auslösewege für dasselbe Event, beide über eine
  * deterministische event_id (`pms_order_{$order_id}`, siehe event_id())
@@ -11,16 +13,21 @@
  * hier kein Cache-Risiko (die Danke-Seite ist ohnehin pro Bestellung
  * einmalig und wird von WooCommerce selbst nie gecacht).
  *
- * 1. **Danke-Seite** (`woocommerce_thankyou`): synchroner Pfad. Rendert den
- *    Browser-Pixel-Call inline (respektiert Consent genau wie die Basis-
- *    Skripte in class-pms-frontend.php) UND löst im selben Request den
- *    CAPI-Versand aus.
+ * 1. **Danke-Seite** (`woocommerce_thankyou`): synchroner Pfad. Rendert die
+ *    Browser-Pixel-Calls ALLER aktiven Plattformen inline (respektiert
+ *    Consent genau wie die Basis-Skripte in class-pms-frontend.php, siehe
+ *    print_pixel_scripts()) UND löst im selben Request den Meta-CAPI- sowie
+ *    den TikTok-Events-API-Versand aus. Google Ads hat KEINEN Server-Pfad
+ *    (Enhanced Conversions via gtag.js ist rein browserseitig, siehe
+ *    google_conversion_js() -- ein "Server-Side-Fallback" ist für Google
+ *    daher strukturell nicht möglich, nur für Meta/TikTok).
  * 2. **Server-Side-Fallback** (`woocommerce_payment_complete` sowie
- *    `woocommerce_order_status_completed`/`_processing`): reiner CAPI-Pfad
- *    ohne Browser-Komponente -- fängt Bestellungen ab, bei denen der Kunde
- *    nach der Zahlung nicht auf die Danke-Seite zurückkehrt (externe
- *    Payment-Gateways wie PayPal/Klarna, die teils direkt weiterleiten).
- *    Greift nur, wenn Weg 1 diese Bestellung noch nicht markiert hat.
+ *    `woocommerce_order_status_completed`/`_processing`): reiner API-Pfad
+ *    ohne Browser-Komponente (Meta-CAPI + TikTok-Events-API) -- fängt
+ *    Bestellungen ab, bei denen der Kunde nach der Zahlung nicht auf die
+ *    Danke-Seite zurückkehrt (externe Payment-Gateways wie PayPal/Klarna,
+ *    die teils direkt weiterleiten). Greift nur, wenn Weg 1 diese Bestellung
+ *    noch nicht markiert hat.
  *
  * Dedup-Flag: `_pms_purchase_tracked` als Order-Meta über die WC_Order-
  * eigene CRUD-API (get_meta()/update_meta_data()+save()), NICHT über
@@ -28,7 +35,20 @@
  * High-Performance Order Storage (HPOS) nicht mehr zwingend als wp_posts-
  * Zeile vor, raw post-meta-Funktionen würden dort auf die falsche/eine gar
  * nicht existierende ID zugreifen. Dieselbe "native WC-CRUD statt Rohzugriff"
- * -Regel wie bei den Produktdaten in class-pro-woo-product-data.php.
+ * -Regel wie bei den Produktdaten in class-pro-woo-product-data.php. EIN
+ * Flag für alle drei Plattformen zusammen (keine Pro-Plattform-Granularität)
+ * -- dieselbe "eine Bestellung = ein Bearbeitungsversuch"-Vereinfachung wie
+ * schon vor der Multi-Platform-Erweiterung.
+ *
+ * **Unverifiziert gegen echte Google-/TikTok-Testdaten:** Die genauen
+ * Feld-/Hash-Anforderungen von Google Enhanced Conversions (welche
+ * address-Unterfelder gehasht werden, E.164-Telefonformat) und der TikTok
+ * Events API v1.3 basieren auf offizieller Dokumentation, wurden aber -- im
+ * Unterschied zur Meta-Integration -- noch nie gegen echte Testdaten im
+ * Google-Ads- bzw. TikTok-Events-Manager geprüft. Dieselbe Vorsicht gilt wie
+ * beim `test_event_code`-Fund in der Vor-Rebrand-Ära (siehe „Test Event Code
+ * bleibt CAPI-only" in CLAUDE.md): vor Live-Verlass auf die Diagnose-Tools
+ * beider Plattformen gegenprüfen.
  *
  * @package Pixel_Made_Simple
  */
@@ -119,8 +139,9 @@ class PMS_Pro_Woo_Purchase {
 			return;
 		}
 
-		self::print_pixel_script( self::event_id( $order->get_id() ), $custom_data );
+		self::print_pixel_scripts( $order, $custom_data );
 		self::dispatch_capi( $order, $custom_data );
+		self::dispatch_tiktok_capi( $order, $custom_data );
 		self::mark_tracked( $order );
 	}
 
@@ -150,6 +171,7 @@ class PMS_Pro_Woo_Purchase {
 		}
 
 		self::dispatch_capi( $order, $custom_data );
+		self::dispatch_tiktok_capi( $order, $custom_data );
 		self::mark_tracked( $order );
 	}
 
@@ -349,13 +371,18 @@ class PMS_Pro_Woo_Purchase {
 	}
 
 	/**
-	 * Browser-Pixel-Aufruf auf der Danke-Seite ausgeben. Direktes Echo, KEIN
-	 * add_action('wp_head', ...) -- woocommerce_thankyou feuert innerhalb des
-	 * Seiten-BODY (WooCommerce-Template checkout/thankyou.php), also lange
-	 * NACHDEM wp_head bereits vollständig durchlaufen ist; ein hier
-	 * registrierter wp_head-Callback würde für diesen Request nie mehr
-	 * aufgerufen. Ein <script>-Tag mitten im Body ist unproblematisch (Skripte
-	 * müssen nicht im <head> stehen).
+	 * Browser-Pixel-Aufrufe ALLER aktiven Plattformen auf der Danke-Seite
+	 * ausgeben (Meta fbq, Google gtag-Conversion inkl. Enhanced Conversions,
+	 * TikTok ttq.track) -- ein einzelner kombinierter Block statt drei
+	 * separater Skript-Tags, damit auch nur EIN window.pmsInitialized-Poll
+	 * nötig ist (siehe unten).
+	 *
+	 * Direktes Echo, KEIN add_action('wp_head', ...) -- woocommerce_thankyou
+	 * feuert innerhalb des Seiten-BODY (WooCommerce-Template
+	 * checkout/thankyou.php), also lange NACHDEM wp_head bereits vollständig
+	 * durchlaufen ist; ein hier registrierter wp_head-Callback würde für
+	 * diesen Request nie mehr aufgerufen. Ein <script>-Tag mitten im Body ist
+	 * unproblematisch (Skripte müssen nicht im <head> stehen).
 	 *
 	 * Wartet -- statt Consent-Logik hier ein zweites Mal nachzubauen -- auf
 	 * denselben globalen window.pmsInitialized-Guard, den
@@ -365,23 +392,51 @@ class PMS_Pro_Woo_Purchase {
 	 * Zeitpunkt bereits gerendert ist, existiert dieser Guard (falls er
 	 * überhaupt gesetzt wird) längst, wenn dieses Skript läuft.
 	 *
-	 * @param string $event_id    Deterministische Event-ID.
-	 * @param array  $custom_data Von build_order_custom_data().
+	 * @param WC_Order $order       Bestellung.
+	 * @param array    $custom_data Von build_order_custom_data().
 	 * @return void
 	 */
-	private static function print_pixel_script( $event_id, array $custom_data ) {
+	private static function print_pixel_scripts( WC_Order $order, array $custom_data ) {
 		$settings = PMS_Settings::get();
+		$event_id = self::event_id( $order->get_id() );
+		$fire     = '';
 
-		if ( empty( $settings['pixel_enabled'] ) || empty( $settings['pixel_id'] ) ) {
-			return; // Kein Meta-Pixel aktiv -- nur CAPI trackt (siehe dispatch_capi()).
+		if ( ! empty( $settings['pixel_enabled'] ) && ! empty( $settings['pixel_id'] ) ) {
+			$payload = wp_json_encode( $custom_data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+			if ( is_string( $payload ) ) {
+				$fire .= "if('function'===typeof window.fbq){window.fbq('track','Purchase'," . $payload . ",{eventID:'" . esc_js( $event_id ) . "'});}";
+			}
 		}
 
-		$payload = wp_json_encode( $custom_data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
-		if ( ! is_string( $payload ) ) {
+		if ( ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) ) {
+			$fire .= self::google_conversion_js( $order, $custom_data, $event_id, $settings );
+		}
+
+		if ( ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) ) {
+			$tiktok_params = array(
+				'content_type' => 'product',
+				'contents'     => array_map(
+					static function ( $item ) {
+						return array(
+							'content_id' => $item['id'],
+							'quantity'   => $item['quantity'],
+							'price'      => $item['item_price'],
+						);
+					},
+					$custom_data['contents']
+				),
+				'value'        => $custom_data['value'],
+				'currency'     => $custom_data['currency'],
+			);
+			$payload = wp_json_encode( $tiktok_params, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+			if ( is_string( $payload ) ) {
+				$fire .= "if('function'===typeof window.ttq){window.ttq.track('CompletePayment'," . $payload . ",{event_id:'" . esc_js( $event_id ) . "'});}";
+			}
+		}
+
+		if ( '' === $fire ) {
 			return;
 		}
-
-		$fire = "if('function'===typeof window.fbq){window.fbq('track','Purchase'," . $payload . ",{eventID:'" . esc_js( $event_id ) . "'});}";
 
 		wp_print_inline_script_tag(
 			'(function(){function f(){if(window.pmsInitialized){' . $fire . 'return true;}return false;}'
@@ -389,6 +444,277 @@ class PMS_Pro_Woo_Purchase {
 			// Sicherheitsnetz: nach 30s aufgeben (z. B. dauerhaft
 			// verweigerter Consent), statt endlos zu pollen.
 			. 'setTimeout(function(){clearInterval(iv);},30000);}})();'
+		);
+	}
+
+	/**
+	 * Google Ads gtag-Conversion inkl. optionaler Enhanced Conversions.
+	 * Rein browserseitig (siehe Klassen-Doku oben, warum Google keinen
+	 * Server-Pfad hat) -- gtag() selbst existiert nur, wenn
+	 * class-pms-frontend.php es auf dieser Seite bereits initialisiert hat
+	 * (google_enabled, dieselbe Bedingung wie hier), das Purchase-Skript
+	 * fügt nur den Conversion-Aufruf hinzu.
+	 *
+	 * Kein Label konfiguriert -> kein Aufruf, dieselbe Regel wie bei
+	 * Google-Ads-URL-Events (PMS_Settings::sanitize_event(): "Google braucht
+	 * zwingend ein Conversion Label").
+	 *
+	 * @param WC_Order $order       Bestellung.
+	 * @param array    $custom_data Von build_order_custom_data().
+	 * @param string   $event_id    Deterministische Event-ID (als transaction_id).
+	 * @param array    $settings    Plugin-Einstellungen.
+	 * @return string JS-Fragment oder leerer String.
+	 */
+	private static function google_conversion_js( WC_Order $order, array $custom_data, $event_id, array $settings ) {
+		$label = trim( (string) ( $settings['wc_google_conversion_label'] ?? '' ) );
+		if ( '' === $label ) {
+			return '';
+		}
+
+		$tag_id = preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) $settings['google_tag_id'] );
+
+		$params = array(
+			'send_to'        => $tag_id . '/' . $label,
+			'value'          => $custom_data['value'],
+			'currency'       => $custom_data['currency'],
+			'transaction_id' => $event_id,
+		);
+
+		if ( ! empty( $settings['wc_purchase_advanced_matching'] ) ) {
+			$user_data = self::build_google_user_data( $order );
+			if ( ! empty( $user_data ) ) {
+				$params['user_data'] = $user_data;
+			}
+		}
+
+		$payload = wp_json_encode( $params, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+		if ( ! is_string( $payload ) ) {
+			return '';
+		}
+
+		return "if('function'===typeof window.gtag){window.gtag('event','conversion'," . $payload . ");}";
+	}
+
+	/**
+	 * Gehashte/strukturierte Bestelldaten für Google Enhanced Conversions
+	 * (gtag.js `user_data`-Objekt). Getrennt von build_order_user_data()
+	 * (Meta-Format em/ph/fn/…) -- Google verlangt eigene Schlüsselnamen und
+	 * eine ANDERE Telefonnormalisierung (E.164 mit führendem "+" statt Metas
+	 * führende-Null-Entfernung ohne "+", siehe hash_google_phone()), Metas
+	 * bereits gehashte Werte sind hier deshalb NICHT wiederverwendbar.
+	 *
+	 * city/region/postal_code/country werden laut Google-Dokumentation
+	 * UNGEHASHT übergeben (nur first_name/last_name/street sind Hash-Felder,
+	 * genau wie email/phone_number) -- siehe Klassen-Doku oben zur
+	 * fehlenden Live-Verifikation dieses Details.
+	 *
+	 * @param WC_Order $order Bestellung.
+	 * @return array
+	 */
+	private static function build_google_user_data( WC_Order $order ) {
+		$user_data = array();
+
+		$email = PMS_CAPI::hash_email( $order->get_billing_email() );
+		if ( '' !== $email ) {
+			$user_data['email'] = $email;
+		}
+
+		$phone = self::hash_google_phone( $order->get_billing_phone() );
+		if ( '' !== $phone ) {
+			$user_data['phone_number'] = $phone;
+		}
+
+		$address = array();
+
+		$first_name = PMS_CAPI::hash_field( $order->get_billing_first_name() );
+		if ( '' !== $first_name ) {
+			$address['first_name'] = $first_name;
+		}
+
+		$last_name = PMS_CAPI::hash_field( $order->get_billing_last_name() );
+		if ( '' !== $last_name ) {
+			$address['last_name'] = $last_name;
+		}
+
+		$street = PMS_CAPI::hash_field( $order->get_billing_address_1() );
+		if ( '' !== $street ) {
+			$address['street'] = $street;
+		}
+
+		$city = sanitize_text_field( (string) $order->get_billing_city() );
+		if ( '' !== $city ) {
+			$address['city'] = $city;
+		}
+
+		$state = sanitize_text_field( (string) $order->get_billing_state() );
+		if ( '' !== $state ) {
+			$address['region'] = $state;
+		}
+
+		$postcode = sanitize_text_field( (string) $order->get_billing_postcode() );
+		if ( '' !== $postcode ) {
+			$address['postal_code'] = $postcode;
+		}
+
+		$country = sanitize_text_field( (string) $order->get_billing_country() );
+		if ( '' !== $country ) {
+			$address['country'] = $country;
+		}
+
+		if ( ! empty( $address ) ) {
+			// Google erwartet ein Array von Adress-Objekten (mehrere Adressen
+			// pro Conversion sind zulässig) -- hier immer genau eines.
+			$user_data['address'] = array( $address );
+		}
+
+		return $user_data;
+	}
+
+	/**
+	 * Telefonnummer für Google Enhanced Conversions hashen: E.164-Format
+	 * (führendes "+", Ziffern) statt Metas führende-Null-Entfernung. Nutzt
+	 * dieselbe pms_normalize_phone-Filterkette wie PMS_CAPI::hash_phone(),
+	 * damit eine site-spezifische Landesvorwahl-Ergänzung (siehe dortige
+	 * Doku) für beide Plattformen konsistent greift -- nur der letzte
+	 * Formatierungsschritt (führendes "+") unterscheidet sich.
+	 *
+	 * @param string $raw Rohwert.
+	 * @return string SHA-256-Hash oder leerer String.
+	 */
+	private static function hash_google_phone( $raw ) {
+		$digits = preg_replace( '/\D+/', '', substr( (string) $raw, 0, 32 ) );
+		if ( '' === $digits ) {
+			return '';
+		}
+
+		$digits = preg_replace( '/^0+/', '', $digits );
+		/** Dokumentiert in class-pms-capi.php::hash_phone() */
+		$digits = (string) apply_filters( 'pms_normalize_phone', $digits, $raw );
+
+		if ( strlen( $digits ) < 6 ) {
+			return '';
+		}
+
+		return PMS_CAPI::hash_field( '+' . $digits );
+	}
+
+	/**
+	 * TikTok Events API (server-seitig, analog zu PMS_CAPI::send_events()
+	 * für Meta, aber TikTok-spezifisch -- siehe Klassen-Doku "Isolation":
+	 * kein zweiter Aufrufer existiert aktuell, eine eigene Klasse wäre
+	 * verfrühte Abstraktion). Respektiert denselben Consent-Gate wie Meta.
+	 *
+	 * Bewusst OHNE Event-Log-Eintrag (anders als PMS_CAPI::send_events()) --
+	 * das Event-Log-Schema/UI ist auf den Meta-Sprachgebrauch zugeschnitten
+	 * (source-Werte 'capi'/'both'/'browser'); eine vierte source würde auch
+	 * PMS_Admin_Event_Log::render_row() anfassen müssen. Bewusster Scope-Cut
+	 * dieser Session, siehe „Bekannte Trade-offs" in CLAUDE.md.
+	 *
+	 * @param WC_Order $order       Bestellung.
+	 * @param array    $custom_data Von build_order_custom_data().
+	 * @return void
+	 */
+	private static function dispatch_tiktok_capi( WC_Order $order, array $custom_data ) {
+		$settings = PMS_Settings::get();
+
+		if ( empty( $settings['tiktok_enabled'] ) || empty( $settings['tiktok_pixel_id'] )
+			|| empty( $settings['tiktok_capi_enabled'] ) || empty( $settings['tiktok_access_token'] ) ) {
+			return;
+		}
+
+		// DSGVO: dieselbe Marketing-Einwilligungsprüfung wie
+		// PMS_CAPI::send_events() für Meta -- kein Sonderfall für
+		// Server-zu-Server-Kontexte (siehe Klassen-Doku "Bekannte
+		// Trade-offs" in CLAUDE.md für die ausführliche Begründung anhand
+		// des Meta-Pendants).
+		if ( class_exists( 'PMS_Consent' ) && ! PMS_Consent::has_marketing_consent() ) {
+			return;
+		}
+
+		$user = array();
+
+		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
+			$ip = filter_var( wp_unslash( $_SERVER['REMOTE_ADDR'] ), FILTER_VALIDATE_IP ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validierung via filter_var.
+			if ( $ip ) {
+				$user['ip'] = $ip;
+			}
+		}
+		if ( ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+			$user['user_agent'] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) );
+		}
+
+		if ( ! empty( $settings['wc_purchase_advanced_matching'] ) ) {
+			$email = PMS_CAPI::hash_email( $order->get_billing_email() );
+			if ( '' !== $email ) {
+				$user['email'] = $email;
+			}
+			$phone = PMS_CAPI::hash_phone( $order->get_billing_phone() );
+			if ( '' !== $phone ) {
+				$user['phone'] = $phone;
+			}
+		}
+
+		// ttclid aus dem Attribution-Cookie (PMS_Pro_UTM, seit v0.6.6) --
+		// nur verfügbar, wenn UTM-Passthrough aktiv ist UND der Besucher
+		// tatsächlich über einen TikTok-Klick kam, siehe dortige Doku.
+		if ( class_exists( 'PMS_Pro_UTM' ) ) {
+			$ttclid = PMS_Pro_UTM::ttclid();
+			if ( '' !== $ttclid ) {
+				$user['ttclid'] = $ttclid;
+			}
+		}
+
+		$properties = array(
+			'content_type' => 'product',
+			'contents'     => array_map(
+				static function ( $item ) {
+					return array(
+						'content_id' => $item['id'],
+						'quantity'   => $item['quantity'],
+						'price'      => $item['item_price'],
+					);
+				},
+				$custom_data['contents']
+			),
+			'value'        => $custom_data['value'],
+			'currency'     => $custom_data['currency'],
+		);
+
+		$body = array(
+			'event_source'    => 'web',
+			'event_source_id' => preg_replace( '/[^A-Za-z0-9]+/', '', (string) $settings['tiktok_pixel_id'] ),
+			'data'            => array(
+				array(
+					'event'      => 'CompletePayment',
+					'event_time' => time(),
+					'event_id'   => self::event_id( $order->get_id() ),
+					'user'       => $user,
+					'properties' => $properties,
+					'page'       => array( 'url' => $order->get_checkout_order_received_url() ),
+				),
+			),
+		);
+
+		/**
+		 * Für Debugging auf blockierend schalten, analog zu
+		 * pms_capi_blocking für Meta (class-pms-capi.php).
+		 *
+		 * @param bool $blocking Standard: false (fire-and-forget).
+		 */
+		$blocking = (bool) apply_filters( 'pms_tiktok_capi_blocking', false );
+
+		wp_remote_post(
+			'https://business-api.tiktok.com/open_api/v1.3/event/track/',
+			array(
+				'timeout'   => $blocking ? 5 : 2,
+				'blocking'  => $blocking,
+				'headers'   => array(
+					'Content-Type' => 'application/json',
+					'Access-Token' => (string) $settings['tiktok_access_token'],
+				),
+				'body'      => wp_json_encode( $body ),
+				'sslverify' => true,
+			)
 		);
 	}
 }

@@ -135,9 +135,13 @@ class PMS_Settings {
 			'google_enabled'      => 0,
 			'google_tag_id'       => '',
 			'google_consent_mode' => 1,
-			// TikTok.
+			// TikTok. tiktok_capi_enabled/tiktok_access_token spiegeln
+			// capi_enabled/capi_token für Meta (Events API, seit v0.6.6 nur
+			// für WooCommerce-Purchase genutzt, siehe pro/class-pro-woo-purchase.php).
 			'tiktok_enabled'      => 0,
 			'tiktok_pixel_id'     => '',
+			'tiktok_capi_enabled' => 0,
+			'tiktok_access_token' => '',
 			// Erweiterte Tracking-Features. Privacy-by-Default: Formular-Grabber
 			// und UTM-Attribution sind bei Neuinstallation bewusst DEAKTIVIERT,
 			// da sie zusätzliche personenbezogene Daten (Formularinhalte,
@@ -167,6 +171,11 @@ class PMS_Settings {
 			// form_tracking/utm_passthrough oben.
 			'wc_purchase_value_type'        => 'gross',
 			'wc_purchase_advanced_matching' => 0,
+			// Google Ads Purchase-Conversion-Label (Tab "E-Commerce", seit
+			// v0.6.6) -- eigenständig von den PER-EVENT google_label-Werten
+			// der URL-Events-Tabelle (siehe sanitize_event()), da eine
+			// Bestellung kein konfiguriertes Custom Event ist.
+			'wc_google_conversion_label'    => '',
 		);
 
 		$settings = get_option( self::OPTION_SETTINGS, array() );
@@ -207,6 +216,14 @@ class PMS_Settings {
 			? trim( sanitize_textarea_field( (string) $input['capi_token'] ) )
 			: $old_token;
 
+		// Dasselbe Erhalt-bei-fehlendem-Schlüssel-Muster für den TikTok-
+		// Events-API-Token (nur auf Tab "Allgemein" ein echtes Feld, siehe
+		// render_general_tab()).
+		$old_tiktok_token  = is_array( $old ) ? (string) ( $old['tiktok_access_token'] ?? '' ) : '';
+		$tiktok_access_token = array_key_exists( 'tiktok_access_token', $input )
+			? trim( sanitize_textarea_field( (string) $input['tiktok_access_token'] ) )
+			: $old_tiktok_token;
+
 		return array(
 			'exclude_admins'       => empty( $input['exclude_admins'] ) ? 0 : 1,
 			'consent_detection'    => empty( $input['consent_detection'] ) ? 0 : 1,
@@ -222,6 +239,8 @@ class PMS_Settings {
 			'google_consent_mode'  => empty( $input['google_consent_mode'] ) ? 0 : 1,
 			'tiktok_enabled'       => empty( $input['tiktok_enabled'] ) ? 0 : 1,
 			'tiktok_pixel_id'      => preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['tiktok_pixel_id'] ?? '' ) ),
+			'tiktok_capi_enabled'  => empty( $input['tiktok_capi_enabled'] ) ? 0 : 1,
+			'tiktok_access_token'  => $tiktok_access_token,
 			'form_tracking'        => empty( $input['form_tracking'] ) ? 0 : 1,
 			'form_event_type'      => in_array( (string) ( $input['form_event_type'] ?? '' ), self::form_event_types(), true )
 				? (string) $input['form_event_type']
@@ -242,6 +261,10 @@ class PMS_Settings {
 			'wc_content_id_type'             => 'sku' === (string) ( $input['wc_content_id_type'] ?? '' ) ? 'sku' : 'id',
 			'wc_purchase_value_type'         => 'net' === (string) ( $input['wc_purchase_value_type'] ?? '' ) ? 'net' : 'gross',
 			'wc_purchase_advanced_matching'  => empty( $input['wc_purchase_advanced_matching'] ) ? 0 : 1,
+			// Dieselbe Zeichen-Whitelist wie beim per-Event google_label in
+			// sanitize_event() -- Google-Conversion-Labels sind alphanumerisch
+			// plus Unterstrich/Bindestrich.
+			'wc_google_conversion_label'     => preg_replace( '/[^A-Za-z0-9_\-]+/', '', (string) ( $input['wc_google_conversion_label'] ?? '' ) ),
 		);
 	}
 

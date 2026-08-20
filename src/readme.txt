@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.5
+Stable tag: 0.6.6
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -90,6 +90,11 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.6 =
+* Neu (Pro): **Google Ads Enhanced Conversions & TikTok Events API für WooCommerce.** Das bestehende WooCommerce-Tracking (seit 0.6.4) sendet `ViewContent`/`AddToCart`/`InitiateCheckout` jetzt zusätzlich an Google Ads (`gtag`) und TikTok Pixel (`ttq.track`), sofern die jeweilige Plattform aktiv ist – dieselbe Event-ID wie beim Meta-Pixel-Aufruf sorgt für plattformübergreifende Deduplizierung. `Purchase` auf der Danke-Seite feuert zusätzlich eine Google-Ads-Conversion (optionales eigenes Conversion-Label auf Tab „E-Commerce", da ein Store i. d. R. ein eigenes Label für den Kauf-Abschluss nutzt) inkl. optionaler Enhanced Conversions (gehashte Rechnungsdaten, sofern Purchase Advanced Matching aktiv ist) sowie einen echten Server-seitigen TikTok-Events-API-Request (neuer Toggle „Enable Events API" + Access Token auf Tab „Allgemein" in der TikTok-Box) – beide nutzen dieselbe deterministische Event-ID (`pms_order_{Bestell-ID}`) wie der bestehende Meta-CAPI-Versand. Google Ads hat bewusst keinen Server-seitigen Pfad (Enhanced Conversions ist bei Google rein Browser-seitig über `gtag`). Nur in Pixel Made Simple Pro.
+* Hinweis: Die genauen Feld-/Hash-Anforderungen von Google Enhanced Conversions und der TikTok Events API wurden anhand der offiziellen Dokumentation umgesetzt, aber – anders als die Meta-Integration – noch nicht gegen echte Testdaten im Google-Ads- bzw. TikTok-Events-Manager verifiziert. Vor einem produktiven Einsatz empfiehlt sich ein Testlauf mit den jeweiligen Diagnose-Tools beider Plattformen.
+* Intern: TikTok-Events-API-Requests werden bewusst nicht im Event Log protokolliert (dessen Schema ist auf Meta-Sprachgebrauch zugeschnitten) – Debugging läuft über die Diagnose-Tools von Google Ads/TikTok selbst. `dev-tools/test-suite.php` und `dev-tools/test-frontend-woocommerce-js.js` decken die neue Payload-Generierung, das Conversion-Label-Sanitizing und die neuen Browser-Events ab (339 → 384 PHP-Tests, 36 → 64 Tests im WooCommerce-JS-Harness).
 
 = 0.6.5 =
 * Admin-Oberfläche weiter aufgeräumt: „Event Log" und „Import / Export" sind seit 0.6.4 eigene Einträge in der WordPress-Seitenleiste – ihre Reiter in der oberen Tab-Leiste der Haupt-Einstellungsseite waren damit eine reine Dopplung und wurden entfernt. Die obere Leiste zeigt jetzt nur noch „Allgemein", „URL-Events", „Erweitertes Tracking" und „E-Commerce". Alte Lesezeichen/Links auf `?tab=log` bzw. `?tab=tools` funktionieren unverändert weiter.

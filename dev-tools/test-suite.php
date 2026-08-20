@@ -2,7 +2,7 @@
 /**
  * Funktionaler Test-Harness für Pixel Made Simple.
  * Stubbt die benötigten WordPress-Funktionen und testet die echte Plugin-Logik
- * per require – kein echtes WordPress nötig. Stand: v0.6.4, 312 Tests.
+ * per require – kein echtes WordPress nötig. Stand: v0.6.6, 384 Tests.
  *
  * Für die rein clientseitige Logik in assets/frontend.js (UTM-Form-Fill),
  * die hier nicht erreichbar ist, siehe das analoge Node-Pendant
@@ -437,6 +437,7 @@ class WC_Order {
 				'billing_phone'      => '',
 				'billing_first_name' => '',
 				'billing_last_name'  => '',
+				'billing_address_1' => '',
 				'billing_city'       => '',
 				'billing_state'      => '',
 				'billing_postcode'   => '',
@@ -478,6 +479,9 @@ class WC_Order {
 	}
 	public function get_billing_last_name() {
 		return $this->data['billing_last_name'];
+	}
+	public function get_billing_address_1() {
+		return $this->data['billing_address_1'];
 	}
 	public function get_billing_city() {
 		return $this->data['billing_city'];
@@ -554,7 +558,7 @@ function reset_attribution() {
 	$p = new ReflectionProperty( 'PMS_Pro_UTM', 'cache' );
 	$p->setValue( null, null );
 	unset( $_COOKIE['pms_attribution'] );
-	foreach ( array( 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid' ) as $k ) {
+	foreach ( array( 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid', 'ttclid' ) as $k ) {
 		unset( $_GET[ $k ] );
 	}
 }
@@ -1749,6 +1753,7 @@ function make_test_order( $overrides = array() ) {
 		'billing_phone'      => '+49 176 1234567',
 		'billing_first_name' => 'Erika',
 		'billing_last_name'  => 'Musterfrau',
+		'billing_address_1'  => 'Musterstraße 1',
 		'billing_city'       => 'New York',
 		'billing_state'      => 'NY',
 		'billing_postcode'   => '10001',
@@ -2036,6 +2041,7 @@ PMS_Admin::render_page();
 $ecommerce_output = ob_get_clean();
 check( 'tab=ecommerce rendert die WooCommerce-Accordion (Pro+WooCommerce-Zweig), nicht den "nicht erkannt"-Hinweis', false !== strpos( $ecommerce_output, 'Enable WooCommerce tracking' ) && false === strpos( $ecommerce_output, 'was not detected' ) );
 check( 'tab=ecommerce ist in der Leiste als aktiv markiert', false !== strpos( extract_nav( $ecommerce_output ), 'nav-tab-active' ) );
+check( 'tab=ecommerce (seit v0.6.6) rendert das Google-Ads-Conversion-Label-Feld', false !== strpos( $ecommerce_output, 'pms_settings[wc_google_conversion_label]' ) );
 
 unset( $_GET['tab'], $_GET['page'] );
 $GLOBALS['stub']['registered_menu_pages']    = array();
@@ -2044,6 +2050,205 @@ $GLOBALS['stub']['current_user_can']         = false;
 $GLOBALS['stub']['enqueued_scripts']         = array();
 $GLOBALS['stub']['options']['pms_settings']  = array();
 $GLOBALS['stub']['options']['pms_events']    = array();
+
+echo "\n=== 22. Multi-Platform-Erweiterung (v0.6.6): Google Ads Enhanced Conversions & TikTok Events API ===\n";
+
+/* --- 22a. PMS_Settings::sanitize_settings(): tiktok_access_token (Erhalt-Muster wie capi_token),
+ * tiktok_capi_enabled, wc_google_conversion_label --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'tiktok_access_token' => 'BESTEHENDES-TOKEN' );
+$out_no_key = PMS_Settings::sanitize_settings( array( 'form_tracking' => '1' ) );
+check( 'tiktok_access_token bleibt erhalten, wenn der Schlüssel im Input fehlt (z. B. anderer Tab)', 'BESTEHENDES-TOKEN' === $out_no_key['tiktok_access_token'] );
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'tiktok_access_token' => 'BESTEHENDES-TOKEN' );
+$out_cleared = PMS_Settings::sanitize_settings( array( 'tiktok_access_token' => '' ) );
+check( 'tiktok_access_token wird geleert, wenn explizit ein Leerstring übergeben wird (Tab "Allgemein")', '' === $out_cleared['tiktok_access_token'] );
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'tiktok_access_token' => 'ALT' );
+$out_new = PMS_Settings::sanitize_settings( array( 'tiktok_access_token' => 'NEUER-TOKEN' ) );
+check( 'tiktok_access_token wird überschrieben, wenn ein neuer Wert übergeben wird', 'NEUER-TOKEN' === $out_new['tiktok_access_token'] );
+
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+check( 'tiktok_capi_enabled: "1" im Input -> 1', 1 === PMS_Settings::sanitize_settings( array( 'tiktok_capi_enabled' => '1' ) )['tiktok_capi_enabled'] );
+check( 'tiktok_capi_enabled: fehlt im Input -> 0', 0 === PMS_Settings::sanitize_settings( array() )['tiktok_capi_enabled'] );
+
+check( 'wc_google_conversion_label: Default ist leer', '' === PMS_Settings::sanitize_settings( array() )['wc_google_conversion_label'] );
+check( 'wc_google_conversion_label: alphanumerisch + _- bleibt erhalten, Leerzeichen entfernt (Whitelist wie beim per-Event google_label)', 'AbC-123_xyz' === PMS_Settings::sanitize_settings( array( 'wc_google_conversion_label' => ' AbC-123_xyz ' ) )['wc_google_conversion_label'] );
+check( 'wc_google_conversion_label: Markup/Sonderzeichen werden entfernt (XSS-Schutz)', 'scriptalert1scriptabc' === PMS_Settings::sanitize_settings( array( 'wc_google_conversion_label' => '<script>alert(1)</script>abc' ) )['wc_google_conversion_label'] );
+
+/* --- 22b. Google Ads: google_conversion_js() -- Conversion-Aufruf, Label-Gating, Enhanced Conversions --- */
+
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled'           => 1,
+		'wc_purchase_value_type'        => 'gross',
+		'wc_purchase_advanced_matching' => 0,
+		'google_enabled'                => 1,
+		'google_tag_id'                 => 'AW-123456789',
+		'wc_google_conversion_label'    => 'AbCdEfGh',
+	)
+);
+
+$g_order    = make_test_order( array( 'id' => 2001 ) );
+$g_custom   = call_private( 'PMS_Pro_Woo_Purchase', 'build_order_custom_data', $g_order );
+$g_settings = $GLOBALS['stub']['options']['pms_settings'];
+$g_js       = call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, 'pms_order_2001', $g_settings );
+
+check( 'google_conversion_js(): gtag-Conversion-Aufruf enthalten', false !== strpos( $g_js, "window.gtag('event','conversion'" ) );
+check( 'google_conversion_js(): send_to kombiniert Tag-ID und Label', false !== strpos( $g_js, '"send_to":"AW-123456789\/AbCdEfGh"' ) );
+check( 'google_conversion_js(): transaction_id ist die deterministische Event-ID', false !== strpos( $g_js, '"transaction_id":"pms_order_2001"' ) );
+check( 'google_conversion_js(): value/currency aus custom_data', false !== strpos( $g_js, '"value":55' ) && false !== strpos( $g_js, '"currency":"EUR"' ) );
+check( 'google_conversion_js(): ohne aktivierte Advanced Matching kein user_data', false === strpos( $g_js, 'user_data' ) );
+
+$g_settings_no_label                               = $g_settings;
+$g_settings_no_label['wc_google_conversion_label']  = '';
+check( 'google_conversion_js(): leeres Label -> kein Aufruf (dieselbe Regel wie bei Google-URL-Events)', '' === call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, 'pms_order_2001', $g_settings_no_label ) );
+
+$g_settings_am                                   = $g_settings;
+$g_settings_am['wc_purchase_advanced_matching']  = 1;
+$g_js_am = call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, 'pms_order_2001', $g_settings_am );
+check( 'google_conversion_js(): mit Advanced Matching ist user_data enthalten', false !== strpos( $g_js_am, 'user_data' ) );
+
+/* --- 22c. hash_google_phone(): E.164-Format, bewusst abweichend von Metas hash_phone() --- */
+
+check( 'hash_google_phone(): E.164 mit führendem "+" (Metas hash_phone() hat kein "+")', PMS_CAPI::hash_field( '+491761234567' ) === call_private( 'PMS_Pro_Woo_Purchase', 'hash_google_phone', '+49 176 1234567' ) );
+check( 'hash_google_phone(): führende Null wird entfernt (wie bei Metas hash_phone())', call_private( 'PMS_Pro_Woo_Purchase', 'hash_google_phone', '0176 1234567' ) === call_private( 'PMS_Pro_Woo_Purchase', 'hash_google_phone', '176 1234567' ) );
+check( 'hash_google_phone(): Ergebnis unterscheidet sich von Metas hash_phone() (unterschiedliche Normalisierung)', PMS_CAPI::hash_phone( '+49 176 1234567' ) !== call_private( 'PMS_Pro_Woo_Purchase', 'hash_google_phone', '+49 176 1234567' ) );
+check( 'hash_google_phone(): zu kurz -> leerer String', '' === call_private( 'PMS_Pro_Woo_Purchase', 'hash_google_phone', '123' ) );
+check( 'hash_google_phone(): leerer Wert -> leerer String', '' === call_private( 'PMS_Pro_Woo_Purchase', 'hash_google_phone', '' ) );
+
+/* --- 22d. build_google_user_data(): Enhanced-Conversions-Objekt -- email/phone/fn/ln/street
+ * gehasht, city/region/postal_code/country laut Google-Doku im Klartext (siehe Klassen-Doku,
+ * unverifiziert gegen echte Testdaten). --- */
+
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_advanced_matching'] = 1;
+$g_user_data = call_private( 'PMS_Pro_Woo_Purchase', 'build_google_user_data', $g_order );
+
+check( 'build_google_user_data(): email gehasht (Metas hash_email(), wiederverwendet)', PMS_CAPI::hash_email( 'kunde@example.com' ) === $g_user_data['email'] );
+check( 'build_google_user_data(): phone_number im E.164-Hash-Format', call_private( 'PMS_Pro_Woo_Purchase', 'hash_google_phone', '+49 176 1234567' ) === $g_user_data['phone_number'] );
+check( 'build_google_user_data(): address ist ein Array mit genau einem Objekt', 1 === count( $g_user_data['address'] ) );
+check( 'build_google_user_data(): first_name/last_name/street sind gehasht', PMS_CAPI::hash_field( 'Erika' ) === $g_user_data['address'][0]['first_name'] && PMS_CAPI::hash_field( 'Musterfrau' ) === $g_user_data['address'][0]['last_name'] && PMS_CAPI::hash_field( 'Musterstraße 1' ) === $g_user_data['address'][0]['street'] );
+check( 'build_google_user_data(): city/region/postal_code/country bleiben Klartext (nur first_name/last_name/street/email/phone sind Hash-Felder)', 'New York' === $g_user_data['address'][0]['city'] && 'NY' === $g_user_data['address'][0]['region'] && '10001' === $g_user_data['address'][0]['postal_code'] && 'US' === $g_user_data['address'][0]['country'] );
+
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_advanced_matching'] = 0;
+check( 'build_google_user_data(): ohne Advanced Matching dennoch aufrufbar (Gating sitzt in google_conversion_js(), nicht hier) -- email weiterhin enthalten', '' !== call_private( 'PMS_Pro_Woo_Purchase', 'build_google_user_data', $g_order )['email'] );
+
+/* --- 22e. TikTok Events API: dispatch_tiktok_capi() via track_thankyou() (Ende-zu-Ende,
+ * derselbe Aufbau wie 19g) --- */
+
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled'            => 1,
+		'capi_enabled'                   => 0, // Meta bewusst aus, damit nur der TikTok-Request in captured_posts landet.
+		'consent_detection'              => 0, // Consent gilt als erteilt (kein Banner-Plugin aktiv).
+		'tiktok_enabled'                 => 1,
+		'tiktok_pixel_id'                => 'ABCD1234',
+		'tiktok_capi_enabled'            => 1,
+		'tiktok_access_token'            => 'tt-secret-token',
+		'wc_purchase_advanced_matching'  => 0,
+	)
+);
+
+$tt_order = make_test_order( array( 'id' => 2101 ) );
+$GLOBALS['stub']['captured_posts'] = array();
+
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order->get_id() );
+ob_end_clean();
+
+check( 'dispatch_tiktok_capi(): löst genau einen Request an die TikTok Events API aus', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+$tt_call = $GLOBALS['stub']['captured_posts'][0];
+check( 'dispatch_tiktok_capi(): URL ist der TikTok-Events-API-Endpoint (v1.3)', 'https://business-api.tiktok.com/open_api/v1.3/event/track/' === $tt_call['url'] );
+check( 'dispatch_tiktok_capi(): Access-Token-Header gesetzt', 'tt-secret-token' === $tt_call['args']['headers']['Access-Token'] );
+
+$tt_body = json_decode( $tt_call['args']['body'], true );
+check( 'dispatch_tiktok_capi(): event_source ist "web"', 'web' === $tt_body['event_source'] );
+check( 'dispatch_tiktok_capi(): event_source_id ist die bereinigte Pixel-ID', 'ABCD1234' === $tt_body['event_source_id'] );
+check( 'dispatch_tiktok_capi(): event ist "CompletePayment"', 'CompletePayment' === $tt_body['data'][0]['event'] );
+check( 'dispatch_tiktok_capi(): event_id ist dieselbe deterministische ID wie bei Meta/Browser', 'pms_order_2101' === $tt_body['data'][0]['event_id'] );
+check( 'dispatch_tiktok_capi(): properties.value/currency aus custom_data', 55 === $tt_body['data'][0]['properties']['value'] && 'EUR' === $tt_body['data'][0]['properties']['currency'] );
+check( 'dispatch_tiktok_capi(): properties.contents enthält beide Positionen mit content_id/quantity/price', 2 === count( $tt_body['data'][0]['properties']['contents'] ) && '501' === $tt_body['data'][0]['properties']['contents'][0]['content_id'] );
+check( 'dispatch_tiktok_capi(): ohne Advanced Matching kein email/phone im user-Objekt', ! isset( $tt_body['data'][0]['user']['email'] ) && ! isset( $tt_body['data'][0]['user']['phone'] ) );
+check( 'dispatch_tiktok_capi(): ohne ttclid-Cookie kein ttclid im user-Objekt', ! isset( $tt_body['data'][0]['user']['ttclid'] ) );
+
+// Advanced Matching an -> email/phone gehasht im user-Objekt (Metas hash_email()/hash_phone(), wiederverwendet).
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_advanced_matching'] = 1;
+$GLOBALS['stub']['captured_posts'] = array();
+$tt_order2 = make_test_order( array( 'id' => 2102 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order2->get_id() );
+ob_end_clean();
+$tt_body2 = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'], true );
+check( 'dispatch_tiktok_capi(): mit Advanced Matching ist email gehasht enthalten', PMS_CAPI::hash_email( 'kunde@example.com' ) === $tt_body2['data'][0]['user']['email'] );
+check( 'dispatch_tiktok_capi(): mit Advanced Matching ist phone gehasht enthalten', PMS_CAPI::hash_phone( '+49 176 1234567' ) === $tt_body2['data'][0]['user']['phone'] );
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_advanced_matching'] = 0;
+
+// ttclid aus dem Attribution-Cookie (PMS_Pro_UTM::ttclid()).
+reset_attribution();
+$_COOKIE['pms_attribution'] = json_encode( array( 'ttclid' => 'TTCLID-XYZ', 'ts' => 1700000000 ) );
+$GLOBALS['stub']['options']['pms_settings']['utm_passthrough'] = 1;
+$GLOBALS['stub']['captured_posts'] = array();
+$tt_order3 = make_test_order( array( 'id' => 2103 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order3->get_id() );
+ob_end_clean();
+$tt_body3 = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'], true );
+check( 'dispatch_tiktok_capi(): ttclid aus dem Attribution-Cookie landet im user-Objekt', 'TTCLID-XYZ' === $tt_body3['data'][0]['user']['ttclid'] );
+reset_attribution();
+$GLOBALS['stub']['options']['pms_settings']['utm_passthrough'] = 0;
+
+// Gating: fehlender Access-Token -> kein Request.
+$GLOBALS['stub']['options']['pms_settings']['tiktok_access_token'] = '';
+$GLOBALS['stub']['captured_posts'] = array();
+$tt_order4 = make_test_order( array( 'id' => 2104 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order4->get_id() );
+ob_end_clean();
+check( 'dispatch_tiktok_capi(): fehlender Access-Token -> kein Request', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+$GLOBALS['stub']['options']['pms_settings']['tiktok_access_token'] = 'tt-secret-token';
+
+// Gating: tiktok_capi_enabled aus -> kein Request (der Browser-Pixel bliebe unabhängig davon aktiv).
+$GLOBALS['stub']['options']['pms_settings']['tiktok_capi_enabled'] = 0;
+$GLOBALS['stub']['captured_posts'] = array();
+$tt_order5 = make_test_order( array( 'id' => 2105 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order5->get_id() );
+ob_end_clean();
+check( 'dispatch_tiktok_capi(): tiktok_capi_enabled aus -> kein Request', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+$GLOBALS['stub']['options']['pms_settings']['tiktok_capi_enabled'] = 1;
+
+// Consent-Gating: derselbe Fail-closed-Grundsatz wie bei Meta CAPI (Abschnitt 16). Die WP-
+// Consent-API hat in evaluate() höchste Priorität (siehe Abschnitt 6) und ist seit dort für
+// den Rest des Prozesses als Stub aktiv ($GLOBALS['stub']['wp_consent'], Default seit
+// Abschnitt 6 wieder "true") -- der einfachste deterministische Weg, hier "kein Consent"
+// nachzustellen, ist deshalb dieses Flag, statt Banner-Cookie-Zustände nachzubauen, die von
+// der WP-Consent-API ohnehin überstimmt würden. consent_detection muss dafür an sein, sonst
+// greift has_marketing_consent()'s "Erkennung aus -> true"-Fast-Path VOR jeder Prüfung.
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 1;
+$GLOBALS['stub']['wp_consent'] = false;
+reset_consent_cache();
+check( 'Testaufbau: WP-Consent-API verweigert -> Consent false (Vorbedingung für den folgenden Gating-Test)', false === PMS_Consent::has_marketing_consent() );
+
+$GLOBALS['stub']['captured_posts'] = array();
+$tt_order6 = make_test_order( array( 'id' => 2106 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order6->get_id() );
+ob_end_clean();
+check( 'dispatch_tiktok_capi(): kein Marketing-Consent -> kein Request (derselbe Fail-closed-Grundsatz wie bei Meta CAPI)', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 0;
+$GLOBALS['stub']['wp_consent'] = true;
+reset_consent_cache();
+
+$GLOBALS['stub']['captured_posts']          = array();
+$GLOBALS['stub']['wc_orders']               = array();
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array();
 
 echo "\n==============================\n";
 echo 'Ergebnis: ' . $GLOBALS['t_pass'] . ' bestanden, ' . $GLOBALS['t_fail'] . " fehlgeschlagen\n";
