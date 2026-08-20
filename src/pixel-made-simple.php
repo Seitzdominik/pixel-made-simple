@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Lightweight, high-performance tracking for Meta Pixel & Conversions API, Google Ads (Consent Mode v2) and TikTok Pixel – with URL-based multi-platform events and clean event deduplication.
- * Version:           0.6.6
+ * Version:           0.6.7
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -55,7 +55,7 @@ if ( defined( 'PMS_IS_PRO' ) && true === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', false );
-define( 'PMS_VERSION', '0.6.6' );
+define( 'PMS_VERSION', '0.6.7' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

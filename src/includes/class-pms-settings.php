@@ -176,6 +176,18 @@ class PMS_Settings {
 			// der URL-Events-Tabelle (siehe sanitize_event()), da eine
 			// Bestellung kein konfiguriertes Custom Event ist.
 			'wc_google_conversion_label'    => '',
+			// SureCart-Tracking (Pro-only, seit v0.6.7, siehe
+			// pro/class-pro-surecart.php) -- zweite E-Commerce-Integration
+			// neben WooCommerce, identisches Schlüssel-Schema (Content-ID-
+			// Modus, Purchase-Value-Modus, Advanced Matching, eigenes
+			// Google-Ads-Conversion-Label für Purchase). Nur wirksam, wenn
+			// SureCart selbst aktiv ist -- die Klasse initialisiert sich
+			// sonst gar nicht erst (siehe dortiger Guard).
+			'sc_tracking_enabled'           => 0,
+			'sc_content_id_type'            => 'id',
+			'sc_purchase_value_type'        => 'gross',
+			'sc_purchase_advanced_matching' => 0,
+			'sc_google_conversion_label'    => '',
 		);
 
 		$settings = get_option( self::OPTION_SETTINGS, array() );
@@ -265,6 +277,13 @@ class PMS_Settings {
 			// sanitize_event() -- Google-Conversion-Labels sind alphanumerisch
 			// plus Unterstrich/Bindestrich.
 			'wc_google_conversion_label'     => preg_replace( '/[^A-Za-z0-9_\-]+/', '', (string) ( $input['wc_google_conversion_label'] ?? '' ) ),
+			// SureCart -- identisches Sanitizing-Muster wie die wc_*-Zeilen
+			// direkt darüber, siehe get()-Doku oben.
+			'sc_tracking_enabled'            => empty( $input['sc_tracking_enabled'] ) ? 0 : 1,
+			'sc_content_id_type'             => 'sku' === (string) ( $input['sc_content_id_type'] ?? '' ) ? 'sku' : 'id',
+			'sc_purchase_value_type'         => 'net' === (string) ( $input['sc_purchase_value_type'] ?? '' ) ? 'net' : 'gross',
+			'sc_purchase_advanced_matching'  => empty( $input['sc_purchase_advanced_matching'] ) ? 0 : 1,
+			'sc_google_conversion_label'     => preg_replace( '/[^A-Za-z0-9_\-]+/', '', (string) ( $input['sc_google_conversion_label'] ?? '' ) ),
 		);
 	}
 
@@ -290,6 +309,29 @@ class PMS_Settings {
 	public static function wc_purchase_value_type() {
 		$settings = self::get();
 		return 'net' === (string) ( $settings['wc_purchase_value_type'] ?? 'gross' ) ? 'net' : 'gross';
+	}
+
+	/**
+	 * Konfigurierter SureCart content_id-Modus -- SureCart-Pendant zu
+	 * wc_content_id_type() oben, für
+	 * PMS_Pro_SureCart_Product_Data::resolve_content_id().
+	 *
+	 * @return string 'id' oder 'sku'.
+	 */
+	public static function sc_content_id_type() {
+		$settings = self::get();
+		return 'sku' === (string) ( $settings['sc_content_id_type'] ?? 'id' ) ? 'sku' : 'id';
+	}
+
+	/**
+	 * Konfigurierter Modus für den SureCart-Purchase-"value" -- SureCart-
+	 * Pendant zu wc_purchase_value_type() oben.
+	 *
+	 * @return string 'gross' oder 'net'.
+	 */
+	public static function sc_purchase_value_type() {
+		$settings = self::get();
+		return 'net' === (string) ( $settings['sc_purchase_value_type'] ?? 'gross' ) ? 'net' : 'gross';
 	}
 
 	/**

@@ -137,7 +137,6 @@ $de = array(
 	'General' => 'Allgemein',
 	'URL Events' => 'URL-Events',
 	'Advanced Tracking' => 'Erweitertes Tracking',
-	'Tools' => 'Werkzeuge',
 	// v0.5.0: Feature 1–3 (Erweiterte Tracking-Features)
 	'Advanced Tracking Features' => 'Erweiterte Tracking-Features',
 	'Automatic form lead tracking' => 'Automatisches Formular-Lead-Tracking',
@@ -327,6 +326,42 @@ $de = array(
 	'Error' => 'Fehler',
 	'Sent' => 'Gesendet',
 	'Event log cleared.' => 'Event Log geleert.',
+	// v0.6.4/v0.6.5: E-Commerce-Tab, WooCommerce-Tracking + Import/Export-Umbenennung
+	// (ersetzt die frühere 'Tools' => 'Werkzeuge'-Zeile, der Tab-Slug blieb 'tools',
+	// nur das UI-Label wurde umbenannt, siehe CLAUDE.md)
+	'Import / Export' => 'Import / Export',
+	'E-Commerce' => 'E-Commerce',
+	'WooCommerce was not detected on this site. Once WooCommerce is activated, the tracking options will appear here.' => 'WooCommerce wurde auf dieser Website nicht erkannt. Sobald WooCommerce aktiviert ist, erscheinen hier die Tracking-Optionen.',
+	'WooCommerce' => 'WooCommerce',
+	'Enable WooCommerce tracking' => 'WooCommerce-Tracking aktivieren',
+	'Automatically tracks ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce, deduplicated via the same event ID as in the browser. Purchase additionally uses a server-side fallback for orders completed via external payment gateways that skip the order-received page.' => 'Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für WooCommerce, dedupliziert über dieselbe Event-ID wie im Browser. Purchase nutzt zusätzlich einen serverseitigen Fallback für Bestellungen, die über externe Zahlungsanbieter abgeschlossen werden und dabei die Danke-Seite überspringen.',
+	'Product identifier' => 'Produktkennung',
+	'Must match how your Meta catalog identifies products (content_id).' => 'Muss damit übereinstimmen, wie dein Meta-Katalog Produkte identifiziert (content_id).',
+	'Product ID' => 'Produkt-ID',
+	'SKU (falls back to Product ID when empty)' => 'SKU (Fallback auf Produkt-ID, wenn leer)',
+	'Purchase value' => 'Purchase-Wert',
+	'Whether the Purchase event value includes tax (gross, the amount actually paid) or excludes it (net).' => 'Ob der Wert des Purchase-Events die Steuer enthält (brutto, der tatsächlich bezahlte Betrag) oder nicht (netto).',
+	'Gross (incl. tax)' => 'Brutto (inkl. Steuer)',
+	'Net (excl. tax)' => 'Netto (exkl. Steuer)',
+	'Purchase Advanced Matching' => 'Purchase Advanced Matching',
+	'Enable Purchase Advanced Matching' => 'Purchase Advanced Matching aktivieren',
+	'Sends hashed billing details from the order (email, phone, name, address) to the Conversions API for better match quality. Mind data privacy.' => 'Sendet gehashte Rechnungsdaten der Bestellung (E-Mail, Telefon, Name, Adresse) für eine bessere Zuordnungsqualität an die Conversions API. Beachte den Datenschutz.',
+	'Automatically track ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce — deduplicated via the same event ID as in the browser, with a server-side fallback for orders completed via external payment gateways. Available in Pixel Made Simple Pro.' => 'Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für WooCommerce – dedupliziert über dieselbe Event-ID wie im Browser, mit serverseitigem Fallback für Bestellungen über externe Zahlungsanbieter. Verfügbar in Pixel Made Simple Pro.',
+	// v0.6.6: Google Ads Enhanced Conversions & TikTok Events API (Purchase)
+	'Enable Events API' => 'Events API aktivieren',
+	'Enable TikTok Events API' => 'TikTok Events API aktivieren',
+	'Additionally sends matched events to TikTok server-side. Currently used for WooCommerce Purchase tracking only (tab “E-Commerce”), deduplicated via the same event ID as in the browser.' => 'Sendet gematchte Events zusätzlich serverseitig an TikTok. Aktuell nur für WooCommerce-Purchase-Tracking genutzt (Tab „E-Commerce“), dedupliziert über dieselbe Event-ID wie im Browser.',
+	'Events API Access Token' => 'Events API Access Token',
+	'TikTok Events Manager → your pixel → Settings → Events API → Generate access token.' => 'TikTok Events Manager → dein Pixel → Einstellungen → Events API → Zugriffstoken generieren.',
+	'Google Ads conversion label (Purchase)' => 'Google Ads Conversion Label (Purchase)',
+	'Optional. Google Ads → Conversions → your Purchase action → "Use tag" → the part after the slash in send_to. Leave empty to skip the Google Ads Purchase conversion (ViewContent/AddToCart/InitiateCheckout are not affected).' => 'Optional. Google Ads → Conversions → deine Purchase-Aktion → „Use tag“ → der Teil nach dem Schrägstrich in send_to. Leer lassen, um die Google-Ads-Purchase-Conversion zu überspringen (ViewContent/AddToCart/InitiateCheckout sind davon nicht betroffen).',
+	// v0.6.7: SureCart-Integration (zweite E-Commerce-Plattform neben WooCommerce)
+	'SureCart was not detected on this site. Once SureCart is activated, the tracking options will appear here.' => 'SureCart wurde auf dieser Website nicht erkannt. Sobald SureCart aktiviert ist, erscheinen hier die Tracking-Optionen.',
+	'SureCart' => 'SureCart',
+	'Enable SureCart tracking' => 'SureCart-Tracking aktivieren',
+	'Automatically tracks ViewContent, AddToCart, InitiateCheckout and Purchase for SureCart, deduplicated via the same event ID as in the browser. Purchase additionally uses a server-side fallback for orders that reach a paid status outside the regular checkout confirmation (e.g. asynchronous payment methods).' => 'Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für SureCart, dedupliziert über dieselbe Event-ID wie im Browser. Purchase nutzt zusätzlich einen serverseitigen Fallback für Bestellungen, die außerhalb der regulären Checkout-Bestätigung einen bezahlten Status erreichen (z. B. asynchrone Zahlungsmethoden).',
+	'Sends hashed billing details from the checkout (email, phone, name, address) to the Conversions API for better match quality. Mind data privacy.' => 'Sendet gehashte Rechnungsdaten des Checkouts (E-Mail, Telefon, Name, Adresse) für eine bessere Zuordnungsqualität an die Conversions API. Beachte den Datenschutz.',
+	'Automatically track ViewContent, AddToCart, InitiateCheckout and Purchase for SureCart — deduplicated via the same event ID as in the browser, with a server-side fallback for orders that reach a paid status outside the regular checkout confirmation. Available in Pixel Made Simple Pro.' => 'Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für SureCart – dedupliziert über dieselbe Event-ID wie im Browser, mit serverseitigem Fallback für Bestellungen, die außerhalb der regulären Checkout-Bestätigung einen bezahlten Status erreichen. Verfügbar in Pixel Made Simple Pro.',
 );
 
 /* ---------------------------------------------------------------

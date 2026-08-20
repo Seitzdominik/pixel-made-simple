@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple Pro
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Pro add-on for Pixel Made Simple: everything in the free version plus [Pro-only features go here].
- * Version:           0.6.6
+ * Version:           0.6.7
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -49,7 +49,7 @@ if ( defined( 'PMS_IS_PRO' ) && false === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', true );
-define( 'PMS_VERSION', '0.6.6' );
+define( 'PMS_VERSION', '0.6.7' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -134,6 +134,9 @@ require_once PMS_PLUGIN_DIR . 'pro/class-pro-utm.php';
 require_once PMS_PLUGIN_DIR . 'pro/class-pro-woo-product-data.php';
 require_once PMS_PLUGIN_DIR . 'pro/class-pro-woo.php';
 require_once PMS_PLUGIN_DIR . 'pro/class-pro-woo-purchase.php';
+require_once PMS_PLUGIN_DIR . 'pro/class-pro-surecart-product-data.php';
+require_once PMS_PLUGIN_DIR . 'pro/class-pro-surecart.php';
+require_once PMS_PLUGIN_DIR . 'pro/class-pro-surecart-purchase.php';
 
 if ( is_admin() ) {
 	require_once PMS_PLUGIN_DIR . 'includes/class-pms-admin.php';
@@ -150,6 +153,8 @@ PMS_Pro_Features::init();
 PMS_Pro_UTM::init();
 PMS_Pro_WooCommerce::init();
 PMS_Pro_Woo_Purchase::init();
+PMS_Pro_SureCart::init();
+PMS_Pro_SureCart_Purchase::init();
 
 // Die Live-Debug-Leiste registriert sich erst, wenn ein Administrator im
 // Frontend unterwegs ist – reguläre Besucher erzeugen keinerlei Overhead.

@@ -202,6 +202,8 @@ class PMS_Admin {
 			'log_retention_days'   => array( 'type' => 'log_retention_days', 'pro_only' => true ),
 			'wc_tracking_enabled'  => array( 'type' => 'bool', 'pro_only' => true ),
 			'wc_purchase_advanced_matching' => array( 'type' => 'bool', 'pro_only' => true ),
+			'sc_tracking_enabled'  => array( 'type' => 'bool', 'pro_only' => true ),
+			'sc_purchase_advanced_matching' => array( 'type' => 'bool', 'pro_only' => true ),
 		);
 	}
 
@@ -1171,13 +1173,18 @@ class PMS_Admin {
 	 * Tab: E-Commerce. Bündelt WooCommerce-Tracking (ViewContent/AddToCart/
 	 * InitiateCheckout, seit v0.6.4) und Purchase-Tracking an einem Ort,
 	 * statt sie über Tab "Allgemein" zu verstreuen (siehe dortige Doku zur
-	 * Verschiebung).
+	 * Verschiebung). Seit v0.6.7 zusätzlich eine zweite, unabhängige
+	 * SureCart-Box nach demselben Muster (siehe pro/class-pro-surecart.php)
+	 * -- beide Plattform-Boxen haben ihren eigenen Drei-Wege-Zweig (nicht
+	 * erkannt / Pro+erkannt / Free) und können unabhängig voneinander
+	 * sichtbar sein, falls eine Installation ausnahmsweise beide
+	 * E-Commerce-Plugins gleichzeitig einsetzt.
 	 *
 	 * Seit v0.6.5 IMMER Teil der Tab-Leiste, auch ohne WooCommerce (vorher
 	 * fehlte der Tab auf Nicht-WooCommerce-Sites komplett, siehe render_page()) --
 	 * ohne WooCommerce rendert diese Methode stattdessen einen reinen
 	 * Hinweis-Card statt der Accordion/des Teasers, siehe erste Verzweigung
-	 * unten.
+	 * unten. Dieselbe Regel gilt seit v0.6.7 unabhängig für SureCart.
 	 *
 	 * @return void
 	 */
@@ -1211,6 +1218,21 @@ class PMS_Admin {
 				$ecommerce_skip[] = 'wc_purchase_value_type';
 				$ecommerce_skip[] = 'wc_purchase_advanced_matching';
 				$ecommerce_skip[] = 'wc_google_conversion_label';
+			}
+			// SureCart -- zweite E-Commerce-Integration, eigener
+			// Aktivitäts-Guard (class_exists('SureCart') ||
+			// function_exists('surecart'), siehe PMS_Pro_SureCart::active()),
+			// unabhängig davon, ob WooCommerce oben zutrifft. Dieselbe
+			// Downgrade-/Deaktivierungs-Falle wie bei WooCommerce: die fünf
+			// sc_*-Keys dürfen nur dann aus dem Skip-Array raus, wenn diese
+			// Bedingung unten TATSÄCHLICH die echte Accordion statt eines
+			// Hinweis-/Teaser-Zweigs rendert.
+			if ( PMS_Settings::is_pro() && ( class_exists( 'SureCart' ) || function_exists( 'surecart' ) ) ) {
+				$ecommerce_skip[] = 'sc_tracking_enabled';
+				$ecommerce_skip[] = 'sc_content_id_type';
+				$ecommerce_skip[] = 'sc_purchase_value_type';
+				$ecommerce_skip[] = 'sc_purchase_advanced_matching';
+				$ecommerce_skip[] = 'sc_google_conversion_label';
 			}
 			self::preserve_hidden_settings( $s, $ecommerce_skip );
 			?>
@@ -1275,6 +1297,74 @@ class PMS_Admin {
 					__( 'WooCommerce', 'pixel-made-simple' ),
 					__( 'Automatically track ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce — deduplicated via the same event ID as in the browser, with a server-side fallback for orders completed via external payment gateways. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
 					'woocommerce'
+				);
+				?>
+			<?php endif; ?>
+
+			<?php
+			// SureCart -- zweite E-Commerce-Integration, unabhängiger
+			// Drei-Wege-Zweig (nicht erkannt / Pro+erkannt / Free), exakt
+			// dasselbe Muster wie die WooCommerce-Box direkt darüber, siehe
+			// dortige Kommentare für die Begründung.
+			?>
+			<?php if ( ! class_exists( 'SureCart' ) && ! function_exists( 'surecart' ) ) : ?>
+				<div class="pms-card">
+					<div class="pms-card-body">
+						<p><?php esc_html_e( 'SureCart was not detected on this site. Once SureCart is activated, the tracking options will appear here.', 'pixel-made-simple' ); ?></p>
+					</div>
+				</div>
+			<?php elseif ( PMS_Settings::is_pro() ) : ?>
+				<?php self::accordion_open( __( 'SureCart', 'pixel-made-simple' ), 'pms_settings[sc_tracking_enabled]', ! empty( $s['sc_tracking_enabled'] ), __( 'Enable SureCart tracking', 'pixel-made-simple' ), 'sc_tracking_enabled' ); ?>
+				<p class="description"><?php esc_html_e( 'Automatically tracks ViewContent, AddToCart, InitiateCheckout and Purchase for SureCart, deduplicated via the same event ID as in the browser. Purchase additionally uses a server-side fallback for orders that reach a paid status outside the regular checkout confirmation (e.g. asynchronous payment methods).', 'pixel-made-simple' ); ?></p>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row">
+							<?php esc_html_e( 'Product identifier', 'pixel-made-simple' ); ?>
+							<?php self::tip( __( 'Must match how your Meta catalog identifies products (content_id).', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<select name="pms_settings[sc_content_id_type]">
+								<option value="id" <?php selected( $s['sc_content_id_type'], 'id' ); ?>><?php esc_html_e( 'Product ID', 'pixel-made-simple' ); ?></option>
+								<option value="sku" <?php selected( $s['sc_content_id_type'], 'sku' ); ?>><?php esc_html_e( 'SKU (falls back to Product ID when empty)', 'pixel-made-simple' ); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<?php esc_html_e( 'Purchase value', 'pixel-made-simple' ); ?>
+							<?php self::tip( __( 'Whether the Purchase event value includes tax (gross, the amount actually paid) or excludes it (net).', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<select name="pms_settings[sc_purchase_value_type]">
+								<option value="gross" <?php selected( $s['sc_purchase_value_type'], 'gross' ); ?>><?php esc_html_e( 'Gross (incl. tax)', 'pixel-made-simple' ); ?></option>
+								<option value="net" <?php selected( $s['sc_purchase_value_type'], 'net' ); ?>><?php esc_html_e( 'Net (excl. tax)', 'pixel-made-simple' ); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Purchase Advanced Matching', 'pixel-made-simple' ); ?></th>
+						<td>
+							<?php self::toggle( 'pms_settings[sc_purchase_advanced_matching]', ! empty( $s['sc_purchase_advanced_matching'] ), __( 'Enable Purchase Advanced Matching', 'pixel-made-simple' ), false, 'sc_purchase_advanced_matching' ); ?>
+							<p class="description"><?php esc_html_e( 'Sends hashed billing details from the checkout (email, phone, name, address) to the Conversions API for better match quality. Mind data privacy.', 'pixel-made-simple' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="pms-sc-google-conversion-label"><?php esc_html_e( 'Google Ads conversion label (Purchase)', 'pixel-made-simple' ); ?></label>
+							<?php self::tip( __( 'Optional. Google Ads → Conversions → your Purchase action → "Use tag" → the part after the slash in send_to. Leave empty to skip the Google Ads Purchase conversion (ViewContent/AddToCart/InitiateCheckout are not affected).', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<input type="text" id="pms-sc-google-conversion-label" class="regular-text" name="pms_settings[sc_google_conversion_label]" value="<?php echo esc_attr( $s['sc_google_conversion_label'] ); ?>" placeholder="AbCdEfGhIjKlMnOp" />
+						</td>
+					</tr>
+				</table>
+				<?php self::accordion_close(); ?>
+			<?php else : ?>
+				<?php
+				self::render_pro_teaser_box(
+					__( 'SureCart', 'pixel-made-simple' ),
+					__( 'Automatically track ViewContent, AddToCart, InitiateCheckout and Purchase for SureCart — deduplicated via the same event ID as in the browser, with a server-side fallback for orders that reach a paid status outside the regular checkout confirmation. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
+					'surecart'
 				);
 				?>
 			<?php endif; ?>

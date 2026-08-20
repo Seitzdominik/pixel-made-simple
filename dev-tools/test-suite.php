@@ -514,6 +514,123 @@ function wc_get_order( $id ) {
 }
 
 /* ---------------------------------------------------------------------
+ * Minimaler SureCart-Ersatz für PMS_Pro_SureCart(_Product_Data|_Purchase).
+ * Die eigentlichen Model-Klassen (\SureCart\Models\Product/Price/LineItem/
+ * Checkout/Order) leben in einer separaten Datei (stub-surecart-models.php,
+ * dort per require weiter unten geladen) -- eine echte PHP-namespace-
+ * Deklaration lässt sich nicht mitten in diese namespace-lose Datei
+ * einmischen, siehe dortiger Datei-Kommentar. "SureCart" ist -- wie
+ * "WooCommerce" oben -- eine leere Marker-Klasse, unconditional deklariert;
+ * es gibt deshalb (derselbe bereits dokumentierte Trade-off) keinen
+ * automatisierten Test für eine Installation OHNE SureCart.
+ * ------------------------------------------------------------------- */
+
+class Test_SC_LineItem_Query {
+	private $items;
+
+	public function __construct( array $items ) {
+		$this->items = $items;
+	}
+
+	public function get() {
+		return $this->items;
+	}
+}
+
+class SureCart {}
+
+class WP_Post {
+	public $ID;
+	public $post_content;
+
+	public function __construct( $id, $content = '' ) {
+		$this->ID           = $id;
+		$this->post_content = $content;
+	}
+}
+
+class WP_REST_Request {
+	private $headers;
+
+	public function __construct( array $headers = array() ) {
+		$this->headers = $headers;
+	}
+
+	public function get_header( $name ) {
+		return isset( $this->headers[ $name ] ) ? $this->headers[ $name ] : null;
+	}
+}
+
+function sc_get_product( $post_id ) {
+	return isset( $GLOBALS['stub']['sc_product_by_post'][ $post_id ] ) ? $GLOBALS['stub']['sc_product_by_post'][ $post_id ] : null;
+}
+
+$GLOBALS['stub']['surecart'] = array(
+	'is_singular'       => false,
+	'queried_post_type' => '',
+	'queried_object_id' => 0,
+);
+$GLOBALS['stub']['posts']                = array(); // id => WP_Post.
+$GLOBALS['stub']['post_meta']            = array(); // id => array( key => value ).
+$GLOBALS['stub']['sc_products']          = array(); // id => \SureCart\Models\Product.
+$GLOBALS['stub']['sc_prices']            = array(); // id => \SureCart\Models\Price.
+$GLOBALS['stub']['sc_checkouts']         = array(); // id => \SureCart\Models\Checkout.
+$GLOBALS['stub']['sc_line_items']        = array(); // flache Liste, gefiltert über LineItem::where().
+$GLOBALS['stub']['sc_product_by_post']   = array(); // WP-Post-ID => \SureCart\Models\Product (sc_get_product()).
+$GLOBALS['stub']['captured_sc_updates']  = array(); // jeder Checkout::update()-Aufruf, fürs Dedup-Assert.
+
+function is_singular( $post_types = '' ) {
+	if ( ! $GLOBALS['stub']['surecart']['is_singular'] ) {
+		return false;
+	}
+	if ( '' === $post_types || empty( $post_types ) ) {
+		return true;
+	}
+	return in_array( $GLOBALS['stub']['surecart']['queried_post_type'], (array) $post_types, true );
+}
+function get_queried_object_id() {
+	return (int) $GLOBALS['stub']['surecart']['queried_object_id'];
+}
+function get_post( $post_id = null ) {
+	if ( null === $post_id ) {
+		$post_id = $GLOBALS['stub']['surecart']['queried_object_id'];
+	}
+	return isset( $GLOBALS['stub']['posts'][ $post_id ] ) ? $GLOBALS['stub']['posts'][ $post_id ] : null;
+}
+function has_block( $block_name, $post = null ) {
+	$content = ( is_object( $post ) && isset( $post->post_content ) ) ? $post->post_content : '';
+	return false !== strpos( $content, '<!-- wp:' . $block_name );
+}
+function has_shortcode( $content, $tag ) {
+	return false !== strpos( (string) $content, '[' . $tag );
+}
+function get_post_meta( $post_id, $key, $single = false ) {
+	return isset( $GLOBALS['stub']['post_meta'][ $post_id ][ $key ] ) ? $GLOBALS['stub']['post_meta'][ $post_id ][ $key ] : '';
+}
+
+/**
+ * Alle SureCart-Fixtures zwischen Testabschnitten zurücksetzen -- dasselbe
+ * Muster wie wc_test_reset() oben.
+ *
+ * @return void
+ */
+function sc_test_reset() {
+	$GLOBALS['stub']['surecart'] = array(
+		'is_singular'       => false,
+		'queried_post_type' => '',
+		'queried_object_id' => 0,
+	);
+	$GLOBALS['stub']['posts']               = array();
+	$GLOBALS['stub']['post_meta']           = array();
+	$GLOBALS['stub']['sc_products']         = array();
+	$GLOBALS['stub']['sc_prices']           = array();
+	$GLOBALS['stub']['sc_checkouts']        = array();
+	$GLOBALS['stub']['sc_line_items']       = array();
+	$GLOBALS['stub']['sc_product_by_post']  = array();
+	$GLOBALS['stub']['captured_sc_updates'] = array();
+}
+
+/* ---------------------------------------------------------------------
  * Plugin-Klassen laden (echter Code, kein Mock)
  * ------------------------------------------------------------------- */
 
@@ -549,6 +666,19 @@ require __DIR__ . '/../src/pro/class-pro-utm.php';
 require __DIR__ . '/../src/pro/class-pro-woo-product-data.php';
 require __DIR__ . '/../src/pro/class-pro-woo.php';
 require __DIR__ . '/../src/pro/class-pro-woo-purchase.php';
+
+// PMS_Pro_SureCart_Product_Data/PMS_Pro_SureCart/PMS_Pro_SureCart_Purchase:
+// dasselbe unconditional-Lade-Muster wie die WooCommerce-Klassen oben.
+// Die namespaced \SureCart\Models\*-Stubs müssen VOR diesen drei Dateien
+// geladen sein, da class-pro-surecart(-purchase).php sie per
+// class_exists('\SureCart\Models\...') zur Laufzeit referenzieren (rein
+// lazy, aber Test_SC_LineItem_Query -- von LineItem::where() referenziert --
+// ist oben bereits deklariert, bevor stub-surecart-models.php hier geladen
+// wird).
+require __DIR__ . '/stub-surecart-models.php';
+require __DIR__ . '/../src/pro/class-pro-surecart-product-data.php';
+require __DIR__ . '/../src/pro/class-pro-surecart.php';
+require __DIR__ . '/../src/pro/class-pro-surecart-purchase.php';
 
 /* ---------------------------------------------------------------------
  * Test-Helfer (Reflection für private Properties/Methods)
@@ -1863,7 +1993,11 @@ unset( $GLOBALS['stub']['filters']['pms_allow_tracking'] );
  * über beide Auslösewege hinweg, mit dem ECHTEN pms_capi_event_data-Filter
  * aus PMS_Pro_WooCommerce (siehe dortige Registrierung in init() -- hier
  * direkt registriert statt init() aufzurufen, um keine WooCommerce-Hooks
- * mitzuregistrieren, die dieser Test nicht braucht). --- */
+ * mitzuregistrieren, die dieser Test nicht braucht). Wird in Abschnitt 23
+ * durch dieselbe Registrierung für PMS_Pro_SureCart abgelöst (der
+ * add_filter()-Stub hält nur einen Callback pro Tag) -- unproblematisch, da
+ * nichts zwischen hier und dort den WooCommerce-Zweig dieses Filters mehr
+ * braucht. --- */
 
 add_filter( 'pms_capi_event_data', array( 'PMS_Pro_WooCommerce', 'filter_capi_event_data' ) );
 
@@ -2248,6 +2382,374 @@ reset_consent_cache();
 $GLOBALS['stub']['captured_posts']          = array();
 $GLOBALS['stub']['wc_orders']               = array();
 wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+echo "\n=== 23. SureCart-Integration (v0.6.7): Product Data, Checkout-custom_data, Purchase (CAPI/Events API/Dedup) ===\n";
+
+/* --- 23a. PMS_Settings: sanitize_settings()/Defaults/Helper für die fünf sc_*-Keys --- */
+
+check( 'sc_tracking_enabled: Default ist 0', 0 === PMS_Settings::get()['sc_tracking_enabled'] );
+check( 'sc_content_id_type: Default ist "id"', 'id' === PMS_Settings::get()['sc_content_id_type'] );
+check( 'sc_purchase_value_type: Default ist "gross"', 'gross' === PMS_Settings::get()['sc_purchase_value_type'] );
+check( 'sc_purchase_advanced_matching: Default ist 0 (Privacy-by-Default)', 0 === PMS_Settings::get()['sc_purchase_advanced_matching'] );
+
+check( 'sanitize_settings(): sc_tracking_enabled "1" -> 1', 1 === PMS_Settings::sanitize_settings( array( 'sc_tracking_enabled' => '1' ) )['sc_tracking_enabled'] );
+check( 'sanitize_settings(): sc_content_id_type "sku" bleibt erhalten', 'sku' === PMS_Settings::sanitize_settings( array( 'sc_content_id_type' => 'sku' ) )['sc_content_id_type'] );
+check( 'sanitize_settings(): sc_content_id_type unbekannter Wert -> Fallback "id"', 'id' === PMS_Settings::sanitize_settings( array( 'sc_content_id_type' => 'xyz' ) )['sc_content_id_type'] );
+check( 'sanitize_settings(): sc_purchase_value_type "net" bleibt erhalten', 'net' === PMS_Settings::sanitize_settings( array( 'sc_purchase_value_type' => 'net' ) )['sc_purchase_value_type'] );
+check( 'sanitize_settings(): sc_google_conversion_label -- Markup wird entfernt (XSS-Schutz)', 'scriptalert1scriptabc' === PMS_Settings::sanitize_settings( array( 'sc_google_conversion_label' => '<script>alert(1)</script>abc' ) )['sc_google_conversion_label'] );
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'sc_content_id_type' => 'sku', 'sc_purchase_value_type' => 'net' );
+check( 'PMS_Settings::sc_content_id_type() liest den gespeicherten Wert', 'sku' === PMS_Settings::sc_content_id_type() );
+check( 'PMS_Settings::sc_purchase_value_type() liest den gespeicherten Wert', 'net' === PMS_Settings::sc_purchase_value_type() );
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+/* --- 23b. PMS_Pro_SureCart_Product_Data::get_product_data() -- Content-ID-Modus,
+ * Preisauflösung (embedded price -> prices-Collection -> metrics-Fallback), Währung,
+ * Kategorie, Minor-Unit-Filter --- */
+
+sc_test_reset();
+
+$product_full = new \SureCart\Models\Product( array(
+	'id'    => 'prod_full',
+	'name'  => 'T-Shirt',
+	'sku'   => 'TSHIRT-1',
+	'price' => (object) array( 'amount' => 1999, 'currency' => 'eur' ),
+) );
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge( PMS_Settings::get(), array( 'sc_content_id_type' => 'id' ) );
+$data_full = PMS_Pro_SureCart_Product_Data::get_product_data( $product_full, 3 );
+check( 'get_product_data(): content_id ist die Produkt-ID (Default-Modus)', 'prod_full' === $data_full['content_id'] );
+check( 'get_product_data(): content_name', 'T-Shirt' === $data_full['content_name'] );
+check( 'get_product_data(): value aus embedded ->price->amount, Minor-Units-Umrechnung (/100)', 19.99 === $data_full['value'] );
+check( 'get_product_data(): value ist der Einzelpreis (NICHT mit qty multipliziert)', 3 === $data_full['quantity'] );
+check( 'get_product_data(): currency aus ->price->currency, großgeschrieben', 'EUR' === $data_full['currency'] );
+
+$GLOBALS['stub']['options']['pms_settings']['sc_content_id_type'] = 'sku';
+check( 'get_product_data(): content_id_type "sku" -- SKU vorhanden -> SKU statt ID', 'TSHIRT-1' === PMS_Pro_SureCart_Product_Data::get_product_data( $product_full, 1 )['content_id'] );
+
+$product_no_sku = new \SureCart\Models\Product( array( 'id' => 'prod_nosku', 'name' => 'Ohne SKU', 'sku' => '', 'price' => (object) array( 'amount' => 500, 'currency' => 'usd' ) ) );
+check( 'get_product_data(): content_id_type "sku", aber SKU leer -> Fallback auf Produkt-ID', 'prod_nosku' === PMS_Pro_SureCart_Product_Data::get_product_data( $product_no_sku, 1 )['content_id'] );
+$GLOBALS['stub']['options']['pms_settings']['sc_content_id_type'] = 'id';
+
+// Preis-Fallback-Kette: kein ->price, aber ->prices (Collection mit ->data[])
+$product_prices_collection = new \SureCart\Models\Product( array(
+	'id'     => 'prod_coll',
+	'name'   => 'Aus Collection',
+	'prices' => (object) array( 'data' => array( (object) array( 'amount' => 3200, 'currency' => 'gbp' ) ) ),
+) );
+$data_coll = PMS_Pro_SureCart_Product_Data::get_product_data( $product_prices_collection, 1 );
+check( 'get_product_data(): Preis-Fallback über ->prices->data[0]->amount', 32.0 === $data_coll['value'] );
+check( 'get_product_data(): Währungs-Fallback über ->prices->data[0]->currency', 'GBP' === $data_coll['currency'] );
+
+// Preis-Fallback-Kette: weder ->price noch ->prices, aber ->metrics->min_price_amount
+$product_metrics_only = new \SureCart\Models\Product( array(
+	'id'      => 'prod_metrics',
+	'name'    => 'Nur Metrics',
+	'metrics' => (object) array( 'min_price_amount' => 750, 'currency' => 'eur' ),
+) );
+$data_metrics = PMS_Pro_SureCart_Product_Data::get_product_data( $product_metrics_only, 1 );
+check( 'get_product_data(): Preis-Fallback über ->metrics->min_price_amount', 7.5 === $data_metrics['value'] );
+check( 'get_product_data(): Währungs-Fallback über ->metrics->currency', 'EUR' === $data_metrics['currency'] );
+
+// Kein Preis irgendwo auffindbar -> 0.0, kein Fatal Error.
+$product_no_price = new \SureCart\Models\Product( array( 'id' => 'prod_nopricedata', 'name' => 'Ohne Preisdaten' ) );
+check( 'get_product_data(): kein Preis auffindbar -> value 0.0 statt Fatal Error', 0.0 === PMS_Pro_SureCart_Product_Data::get_product_data( $product_no_price, 1 )['value'] );
+
+check( 'get_product_data(): null ist kein Objekt -> leeres Array', array() === PMS_Pro_SureCart_Product_Data::get_product_data( null, 1 ) );
+check( 'get_product_data(): Objekt ohne id -> leeres Array', array() === PMS_Pro_SureCart_Product_Data::get_product_data( new stdClass(), 1 ) );
+
+// Kategorie: nur auflösbar, wenn eine Post-ID mitgegeben wird (get_the_terms()).
+$GLOBALS['stub']['wc']['terms'][555] = array( (object) array( 'name' => 'Apparel' ) );
+check( 'get_product_data(): content_category leer ohne post_id', '' === PMS_Pro_SureCart_Product_Data::get_product_data( $product_full, 1 )['content_category'] );
+check( 'get_product_data(): content_category aus get_the_terms(), wenn post_id mitgegeben wird', 'Apparel' === PMS_Pro_SureCart_Product_Data::get_product_data( $product_full, 1, 555 )['content_category'] );
+
+// Minor-Unit-Filter: JPY-artige Zero-Decimal-Währung (Exponent 0).
+add_filter( 'pms_surecart_currency_minor_unit', function () { return 0; } );
+check( 'get_product_data(): pms_surecart_currency_minor_unit=0 -- kein Teilen durch 100', 1999.0 === PMS_Pro_SureCart_Product_Data::get_product_data( $product_full, 1 )['value'] );
+add_filter( 'pms_surecart_currency_minor_unit', function () { return 2; } );
+
+/* --- 23c. PMS_Pro_SureCart::fetch_checkout() / build_checkout_custom_data() --- */
+
+sc_test_reset();
+
+check( 'fetch_checkout(): leere ID -> null', null === PMS_Pro_SureCart::fetch_checkout( '' ) );
+check( 'fetch_checkout(): unbekannte ID -> null', null === PMS_Pro_SureCart::fetch_checkout( 'does-not-exist' ) );
+
+$checkout_a = new \SureCart\Models\Checkout( array(
+	'id' => 'chk_a', 'status' => 'draft', 'total_amount' => 5500, 'tax_amount' => 500, 'currency' => 'eur',
+) );
+$GLOBALS['stub']['sc_checkouts']['chk_a'] = $checkout_a;
+check( 'fetch_checkout(): bekannte ID liefert das Checkout-Objekt', $checkout_a === PMS_Pro_SureCart::fetch_checkout( 'chk_a' ) );
+
+$GLOBALS['stub']['sc_products']['prod_501'] = new \SureCart\Models\Product( array( 'id' => 'prod_501', 'name' => 'Sneaker', 'sku' => 'SNK-1' ) );
+$GLOBALS['stub']['sc_prices']['price_501']  = new \SureCart\Models\Price( array( 'id' => 'price_501', 'amount' => 2000, 'currency' => 'eur', 'product' => 'prod_501' ) );
+// Preis ohne auflösbares Produkt (bewusst NICHT in sc_products) -- prüft den
+// content_id-Fallback auf die Price-ID.
+$GLOBALS['stub']['sc_prices']['price_777'] = new \SureCart\Models\Price( array( 'id' => 'price_777', 'amount' => 1500, 'currency' => 'eur', 'product' => 'prod_missing' ) );
+
+$GLOBALS['stub']['sc_line_items'] = array(
+	new \SureCart\Models\LineItem( array( 'id' => 'li_1', 'quantity' => 2, 'price' => 'price_501', 'total_amount' => 4000, 'checkout' => 'chk_a' ) ),
+	new \SureCart\Models\LineItem( array( 'id' => 'li_2', 'quantity' => 1, 'price' => 'price_777', 'total_amount' => 1500, 'checkout' => 'chk_a' ) ),
+	// Gehört zu einem ANDEREN Checkout -- darf in den Ergebnissen für chk_a nicht auftauchen.
+	new \SureCart\Models\LineItem( array( 'id' => 'li_3', 'quantity' => 1, 'price' => 'price_501', 'total_amount' => 2000, 'checkout' => 'chk_other' ) ),
+);
+
+$custom_gross = PMS_Pro_SureCart::build_checkout_custom_data( $checkout_a, 'gross' );
+check( 'build_checkout_custom_data(): genau 2 Positionen (chk_other-Line-Item korrekt gefiltert)', 2 === count( $custom_gross['contents'] ) );
+check( 'build_checkout_custom_data(): content_id über Price->product aufgelöst', 'prod_501' === $custom_gross['contents'][0]['id'] );
+check( 'build_checkout_custom_data(): content_id-Fallback auf Price-ID, wenn Produkt nicht auflösbar', 'price_777' === $custom_gross['contents'][1]['id'] );
+check( 'build_checkout_custom_data(): item_price aus LineItem::total_amount/quantity (historisch), NICHT aus Price::amount', 20.0 === $custom_gross['contents'][0]['item_price'] );
+check( 'build_checkout_custom_data(): value (gross) aus Checkout::total_amount', 55.0 === $custom_gross['value'] );
+check( 'build_checkout_custom_data(): currency aus Checkout::currency, großgeschrieben', 'EUR' === $custom_gross['currency'] );
+check( 'build_checkout_custom_data(): tax aus Checkout::tax_amount', 5.0 === $custom_gross['tax'] );
+check( 'build_checkout_custom_data(): num_items summiert die Mengen', 3 === $custom_gross['num_items'] );
+
+$custom_net = PMS_Pro_SureCart::build_checkout_custom_data( $checkout_a, 'net' );
+check( 'build_checkout_custom_data(): value (net) = total_amount - tax_amount', 50.0 === $custom_net['value'] );
+
+check( 'build_checkout_custom_data(): kein Objekt -> leeres Array statt Fatal Error', array() === PMS_Pro_SureCart::build_checkout_custom_data( null ) );
+
+$checkout_empty = new \SureCart\Models\Checkout( array( 'id' => 'chk_empty', 'total_amount' => 0 ) );
+$GLOBALS['stub']['sc_checkouts']['chk_empty'] = $checkout_empty;
+check( 'build_checkout_custom_data(): Checkout ohne Line-Items -> leeres Array (kein Fatal Error)', array() === PMS_Pro_SureCart::build_checkout_custom_data( $checkout_empty ) );
+
+/* --- 23d. PMS_Pro_SureCart_Purchase: event_id(), Meta-CAPI + TikTok Events API
+ * über track_confirmed()/maybe_track_fallback() (Ende-zu-Ende, dasselbe Muster wie
+ * Abschnitt 19g/22e für WooCommerce), Dedup über Checkout-Metadata --- */
+
+sc_test_reset();
+
+check( 'PMS_Pro_SureCart_Purchase::event_id() -- deterministisches Format', 'pms_sc_order_chk_purchase_1' === PMS_Pro_SureCart_Purchase::event_id( 'chk_purchase_1' ) );
+
+// Der add_filter()-Stub hält nur EINEN Callback pro Tag (siehe dessen
+// Kommentar oben) -- registriert PMS_Pro_SureCart::filter_capi_event_data()
+// für 'pms_capi_event_data' und löst damit bewusst die WooCommerce-
+// Registrierung aus Abschnitt 19g ab (nichts danach braucht diese mehr,
+// siehe Kommentar dort).
+add_filter( 'pms_capi_event_data', array( 'PMS_Pro_SureCart', 'filter_capi_event_data' ) );
+
+function sc_make_purchase_fixture( $checkout_id ) {
+	$checkout = new \SureCart\Models\Checkout( array(
+		'id'              => $checkout_id,
+		'status'          => 'paid',
+		'total_amount'    => 5500,
+		'tax_amount'      => 500,
+		'currency'        => 'eur',
+		'email'           => 'kunde@example.com',
+		'first_name'      => 'Erika',
+		'last_name'       => 'Musterfrau',
+		'phone'           => '+49 176 1234567',
+		'billing_address' => (object) array( 'line1' => 'Musterstraße 1', 'city' => 'New York', 'state' => 'NY', 'postal_code' => '10001', 'country' => 'US' ),
+		'metadata'        => array(),
+	) );
+	$GLOBALS['stub']['sc_checkouts'][ $checkout_id ] = $checkout;
+
+	$GLOBALS['stub']['sc_products']['prod_501'] = new \SureCart\Models\Product( array( 'id' => 'prod_501', 'name' => 'Sneaker', 'sku' => 'SNK-1' ) );
+	$GLOBALS['stub']['sc_prices']['price_501']  = new \SureCart\Models\Price( array( 'id' => 'price_501', 'amount' => 2000, 'currency' => 'eur', 'product' => 'prod_501' ) );
+	$GLOBALS['stub']['sc_prices']['price_777']  = new \SureCart\Models\Price( array( 'id' => 'price_777', 'amount' => 1500, 'currency' => 'eur', 'product' => 'prod_missing' ) );
+
+	$GLOBALS['stub']['sc_line_items'] = array_merge(
+		$GLOBALS['stub']['sc_line_items'],
+		array(
+			new \SureCart\Models\LineItem( array( 'id' => 'li_' . $checkout_id . '_1', 'quantity' => 2, 'price' => 'price_501', 'total_amount' => 4000, 'checkout' => $checkout_id ) ),
+			new \SureCart\Models\LineItem( array( 'id' => 'li_' . $checkout_id . '_2', 'quantity' => 1, 'price' => 'price_777', 'total_amount' => 1500, 'checkout' => $checkout_id ) ),
+		)
+	);
+
+	return $checkout;
+}
+
+// -- Meta CAPI (TikTok bewusst aus, um den Meta-Request isoliert zu prüfen -- dasselbe
+// Isolationsmuster wie bei PMS_Pro_Woo_Purchase in Abschnitt 19g.) --
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'sc_tracking_enabled' => 1,
+		'capi_enabled'        => 1,
+		'pixel_id'            => '999999',
+		'capi_token'          => 'meta-secret-token',
+		'consent_detection'   => 0,
+		'tiktok_enabled'      => 0,
+		'sc_purchase_value_type' => 'gross',
+	)
+);
+
+$checkout_meta = sc_make_purchase_fixture( 'chk_meta_1' );
+$GLOBALS['stub']['captured_posts'] = array();
+PMS_Pro_SureCart_Purchase::track_confirmed( $checkout_meta, null );
+
+$meta_posts = array_values( array_filter( $GLOBALS['stub']['captured_posts'], function ( $p ) {
+	return false !== strpos( $p['url'], 'graph.facebook.com' );
+} ) );
+check( 'track_confirmed(): löst genau einen Meta-CAPI-Request aus', 1 === count( $meta_posts ) );
+
+$meta_body  = json_decode( $meta_posts[0]['args']['body'], true );
+$meta_event = $meta_body['data'][0];
+check( 'track_confirmed(): Meta-Event-Name ist "Purchase"', 'Purchase' === $meta_event['event_name'] );
+check( 'track_confirmed(): Meta event_id nutzt dieselbe deterministische Formel', 'pms_sc_order_chk_meta_1' === $meta_event['event_id'] );
+// json_decode() liefert für einen ganzzahligen JSON-Zahlenwert (kein
+// Nachkommaanteil im JSON) einen PHP int, nicht den ursprünglichen PHP
+// float -- dieselbe Eigenheit, wegen der Abschnitt 22e's TikTok-Checks
+// bereits "55 ===" statt "55.0 ===" nutzen. Direkte (nicht über JSON
+// geführte) Aufrufe wie build_checkout_custom_data() in Abschnitt 23c
+// bleiben davon unberührt und behalten "55.0 ===".
+check( 'track_confirmed(): custom_data.value (gross) aus Checkout::total_amount', 55 === $meta_event['custom_data']['value'] );
+check( 'track_confirmed(): custom_data.content_ids enthält das aufgelöste Produkt', in_array( 'prod_501', $meta_event['custom_data']['content_ids'], true ) );
+check( 'track_confirmed(): ohne sc_purchase_advanced_matching kein em/ph in user_data', ! isset( $meta_event['user_data']['em'] ) );
+
+check( 'track_confirmed(): markiert den Checkout als getrackt (Checkout::update() mit _pms_sc_purchase_tracked)', ! empty( $checkout_meta->metadata['_pms_sc_purchase_tracked'] ) );
+check( 'already_tracked()-Dedup: ein zweiter track_confirmed()-Aufruf für denselben Checkout sendet nichts erneut', 1 === count( $meta_posts ) );
+
+$updates_before = count( $GLOBALS['stub']['captured_sc_updates'] );
+PMS_Pro_SureCart_Purchase::track_confirmed( $checkout_meta, null );
+check( 'Dedup gilt auch für Checkout::update() selbst -- kein zweiter mark_tracked()-Aufruf', $updates_before === count( $GLOBALS['stub']['captured_sc_updates'] ) );
+check( 'Dedup gilt auch für den Meta-Request -- weiterhin nur ein einziger captured_posts-Eintrag an Meta', 1 === count( array_filter( $GLOBALS['stub']['captured_posts'], function ( $p ) { return false !== strpos( $p['url'], 'graph.facebook.com' ); } ) ) );
+
+// Advanced Matching an -> em/ph/fn/ln/ct/st/zp/country gehasht (Metas hash_email()/hash_phone()/hash_field(), wiederverwendet).
+$GLOBALS['stub']['options']['pms_settings']['sc_purchase_advanced_matching'] = 1;
+$checkout_am = sc_make_purchase_fixture( 'chk_meta_am' );
+$GLOBALS['stub']['captured_posts'] = array();
+PMS_Pro_SureCart_Purchase::track_confirmed( $checkout_am, null );
+$am_body  = json_decode( array_values( array_filter( $GLOBALS['stub']['captured_posts'], function ( $p ) { return false !== strpos( $p['url'], 'graph.facebook.com' ); } ) )[0]['args']['body'], true );
+$am_user  = $am_body['data'][0]['user_data'];
+check( 'Advanced Matching an: em gehasht vorhanden', array( PMS_CAPI::hash_email( 'kunde@example.com' ) ) === $am_user['em'] );
+check( 'Advanced Matching an: ph gehasht vorhanden', array( PMS_CAPI::hash_phone( '+49 176 1234567' ) ) === $am_user['ph'] );
+check( 'Advanced Matching an: fn/ln gehasht vorhanden', array( PMS_CAPI::hash_field( 'Erika' ) ) === $am_user['fn'] && array( PMS_CAPI::hash_field( 'Musterfrau' ) ) === $am_user['ln'] );
+check( 'Advanced Matching an: ct/zp gehasht mit entfernten Leerzeichen', array( PMS_CAPI::hash_field( 'New York', true ) ) === $am_user['ct'] );
+$GLOBALS['stub']['options']['pms_settings']['sc_purchase_advanced_matching'] = 0;
+
+/* --- 23e. build_google_user_data()/hash_google_phone() (private, via Reflection) --
+ * dasselbe Feld-Set/Klartext-Ausnahmen wie PMS_Pro_Woo_Purchase, siehe Abschnitt 22d. --- */
+
+$checkout_google = sc_make_purchase_fixture( 'chk_google_1' );
+$google_user_data = call_private( 'PMS_Pro_SureCart_Purchase', 'build_google_user_data', $checkout_google );
+check( 'build_google_user_data(): email gehasht', PMS_CAPI::hash_email( 'kunde@example.com' ) === $google_user_data['email'] );
+check( 'build_google_user_data(): phone_number im E.164-Hash-Format (abweichend von Metas hash_phone())', call_private( 'PMS_Pro_SureCart_Purchase', 'hash_google_phone', '+49 176 1234567' ) === $google_user_data['phone_number'] );
+check( 'build_google_user_data(): phone_number unterscheidet sich von Metas hash_phone()', PMS_CAPI::hash_phone( '+49 176 1234567' ) !== $google_user_data['phone_number'] );
+check( 'build_google_user_data(): address ist ein Array mit genau einem Objekt', 1 === count( $google_user_data['address'] ) );
+check( 'build_google_user_data(): first_name/last_name/street sind gehasht', PMS_CAPI::hash_field( 'Erika' ) === $google_user_data['address'][0]['first_name'] && PMS_CAPI::hash_field( 'Musterstraße 1' ) === $google_user_data['address'][0]['street'] );
+check( 'build_google_user_data(): city/region/postal_code/country bleiben Klartext', 'New York' === $google_user_data['address'][0]['city'] && 'US' === $google_user_data['address'][0]['country'] );
+
+/* --- 23f. TikTok Events API (Meta bewusst aus, um den TikTok-Request isoliert zu
+ * prüfen). dispatch_capi()/PMS_CAPI::send_events() gaten NICHT auf capi_enabled --
+ * genau wie bei PMS_Pro_Woo_Purchase (siehe dortiges Ende-zu-Ende-Muster in
+ * Abschnitt 19g/22e) reicht Purchase-Tracking Meta-CAPI-Events unconditional an
+ * send_events() durch, das selbst nur auf pixel_id/capi_token gated ist -- pixel_id/
+ * capi_token müssen deshalb hier explizit LEER sein (nicht nur capi_enabled=0),
+ * sonst würde ein aus Abschnitt 23d noch gespeicherter Wert Meta hier ebenfalls
+ * feuern lassen. --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'sc_tracking_enabled' => 1,
+		'capi_enabled'        => 0,
+		'pixel_id'            => '',
+		'capi_token'          => '',
+		'consent_detection'   => 0,
+		'tiktok_enabled'      => 1,
+		'tiktok_pixel_id'     => 'ABCD1234',
+		'tiktok_capi_enabled' => 1,
+		'tiktok_access_token' => 'tt-secret-token',
+	)
+);
+
+$checkout_tt = sc_make_purchase_fixture( 'chk_tt_1' );
+$GLOBALS['stub']['captured_posts'] = array();
+PMS_Pro_SureCart_Purchase::track_confirmed( $checkout_tt, null );
+
+check( 'TikTok: löst genau einen Request an die TikTok Events API aus', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+$tt_call = $GLOBALS['stub']['captured_posts'][0];
+check( 'TikTok: URL ist der TikTok-Events-API-Endpoint (v1.3)', 'https://business-api.tiktok.com/open_api/v1.3/event/track/' === $tt_call['url'] );
+$tt_body = json_decode( $tt_call['args']['body'], true );
+check( 'TikTok: event ist "CompletePayment"', 'CompletePayment' === $tt_body['data'][0]['event'] );
+check( 'TikTok: event_id nutzt dieselbe deterministische Formel wie Meta', 'pms_sc_order_chk_tt_1' === $tt_body['data'][0]['event_id'] );
+check( 'TikTok: properties.value aus custom_data (gross)', 55 === $tt_body['data'][0]['properties']['value'] );
+
+/* --- 23g. Fallback-Weg: surecart/order_updated (maybe_track_fallback()) -- Status-Gating,
+ * Checkout als String-ID vs. bereits eingebettetes Objekt, Idempotenz gegen Weg 1 --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array( 'sc_tracking_enabled' => 1, 'capi_enabled' => 1, 'pixel_id' => '999999', 'capi_token' => 'x', 'consent_detection' => 0, 'tiktok_enabled' => 0 )
+);
+
+$checkout_fb = sc_make_purchase_fixture( 'chk_fallback_1' );
+
+$order_pending = new \SureCart\Models\Order( array( 'id' => 'ord_1', 'status' => 'pending', 'checkout' => 'chk_fallback_1' ) );
+$GLOBALS['stub']['captured_posts'] = array();
+PMS_Pro_SureCart_Purchase::maybe_track_fallback( $order_pending );
+check( 'maybe_track_fallback(): status != "paid" -> kein Request', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+
+$order_paid_string_checkout = new \SureCart\Models\Order( array( 'id' => 'ord_2', 'status' => 'paid', 'checkout' => 'chk_fallback_1' ) );
+PMS_Pro_SureCart_Purchase::maybe_track_fallback( $order_paid_string_checkout );
+check( 'maybe_track_fallback(): status "paid", checkout als String-ID -> löst über fetch_checkout() auf und sendet', 1 === count( array_filter( $GLOBALS['stub']['captured_posts'], function ( $p ) { return false !== strpos( $p['url'], 'graph.facebook.com' ); } ) ) );
+
+$checkout_fb2 = sc_make_purchase_fixture( 'chk_fallback_2' );
+$order_paid_embedded = new \SureCart\Models\Order( array( 'id' => 'ord_3', 'status' => 'paid', 'checkout' => $checkout_fb2 ) );
+$GLOBALS['stub']['captured_posts'] = array();
+PMS_Pro_SureCart_Purchase::maybe_track_fallback( $order_paid_embedded );
+check( 'maybe_track_fallback(): status "paid", checkout bereits als Objekt eingebettet -> sendet ohne fetch_checkout()', 1 === count( array_filter( $GLOBALS['stub']['captured_posts'], function ( $p ) { return false !== strpos( $p['url'], 'graph.facebook.com' ); } ) ) );
+
+// Idempotenz zwischen Weg 1 (track_confirmed) und Weg 2 (maybe_track_fallback): einmal
+// über Weg 1 getrackt, darf Weg 2 für dieselbe Bestellung nichts mehr senden.
+$checkout_both = sc_make_purchase_fixture( 'chk_both_ways' );
+PMS_Pro_SureCart_Purchase::track_confirmed( $checkout_both, null );
+$GLOBALS['stub']['captured_posts'] = array();
+$order_both = new \SureCart\Models\Order( array( 'id' => 'ord_4', 'status' => 'paid', 'checkout' => $checkout_both ) );
+PMS_Pro_SureCart_Purchase::maybe_track_fallback( $order_both );
+check( 'Idempotenz Weg 1 <-> Weg 2: bereits über track_confirmed() getrackt -> maybe_track_fallback() sendet nichts', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+
+/* --- 23h. Consent-Gating: derselbe Fail-closed-Grundsatz wie bei WooCommerce (Abschnitt 22).
+ * mark_tracked() läuft trotzdem (kein Retry bei fehlendem Consent, siehe CLAUDE.md
+ * "Bekannte Trade-offs"). --- */
+
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 1;
+$GLOBALS['stub']['wp_consent'] = false;
+reset_consent_cache();
+check( 'Testaufbau: WP-Consent-API verweigert -> Consent false', false === PMS_Consent::has_marketing_consent() );
+
+$checkout_noconsent = sc_make_purchase_fixture( 'chk_noconsent' );
+$GLOBALS['stub']['captured_posts'] = array();
+PMS_Pro_SureCart_Purchase::track_confirmed( $checkout_noconsent, null );
+check( 'track_confirmed(): kein Marketing-Consent -> kein Request (weder Meta noch TikTok)', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( 'track_confirmed(): Checkout gilt trotzdem als bearbeitet (kein Retry-Mechanismus, wie bei WooCommerce)', ! empty( $checkout_noconsent->metadata['_pms_sc_purchase_tracked'] ) );
+
+$GLOBALS['stub']['options']['pms_settings']['consent_detection'] = 0;
+$GLOBALS['stub']['wp_consent'] = true;
+reset_consent_cache();
+
+/* --- 23i. Admin-UI: Tab "E-Commerce" rendert die SureCart-Accordion zusätzlich zur
+ * WooCommerce-Accordion (SureCart-Marker-Klasse ist in diesem Harness unconditional
+ * aktiv, siehe Stub-Doku oben); sc_*-Keys bleiben auf Tab "Allgemein" als Hidden-Feld
+ * geschützt. --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array();
+$GLOBALS['stub']['options']['pms_events']   = array();
+$GLOBALS['stub']['current_user_can']        = true;
+
+$_GET['page'] = PMS_Admin::PAGE_SLUG;
+$_GET['tab']  = 'ecommerce';
+ob_start();
+PMS_Admin::render_page();
+$sc_ecommerce_output = ob_get_clean();
+check( 'tab=ecommerce rendert zusätzlich die SureCart-Accordion (Pro+SureCart-Zweig)', false !== strpos( $sc_ecommerce_output, 'Enable SureCart tracking' ) );
+check( 'tab=ecommerce: SureCart-Accordion zeigt das Google-Ads-Conversion-Label-Feld', false !== strpos( $sc_ecommerce_output, 'pms_settings[sc_google_conversion_label]' ) );
+
+$_GET['tab'] = 'general';
+ob_start();
+PMS_Admin::render_page();
+$sc_general_output = ob_get_clean();
+check( 'tab=general schützt sc_tracking_enabled als Hidden-Feld (kein echtes Feld auf diesem Tab)', false !== strpos( $sc_general_output, 'name="pms_settings[sc_tracking_enabled]"' ) && false !== strpos( $sc_general_output, 'type="hidden"' ) );
+
+unset( $_GET['tab'], $_GET['page'] );
+$GLOBALS['stub']['current_user_can'] = false;
+
+$GLOBALS['stub']['captured_posts']          = array();
+$GLOBALS['stub']['wc_orders']               = array();
+wc_test_reset();
+sc_test_reset();
 $GLOBALS['stub']['options']['pms_settings'] = array();
 
 echo "\n==============================\n";
