@@ -2,7 +2,7 @@
 /**
  * Funktionaler Test-Harness für Pixel Made Simple.
  * Stubbt die benötigten WordPress-Funktionen und testet die echte Plugin-Logik
- * per require – kein echtes WordPress nötig. Stand: v0.5.7, 205 Tests.
+ * per require – kein echtes WordPress nötig. Stand: v0.6.4, 312 Tests.
  *
  * Für die rein clientseitige Logik in assets/frontend.js (UTM-Form-Fill),
  * die hier nicht erreichbar ist, siehe das analoge Node-Pendant
@@ -96,13 +96,29 @@ function wp_generate_uuid4() {
 		mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff )
 	);
 }
-function apply_filters( $tag, $value ) {
+// Signatur muss die echte apply_filters()-Signatur inkl. variadischer
+// Zusatzargumente nachbilden (z. B. apply_filters('pms_capi_event_data',
+// $payload, $event) in class-pms-capi.php) -- ein zu einfacher 2-Parameter-
+// Stub hätte diesen Aufrufpfad nie über das echte Filter-System testbar
+// gemacht (siehe dieselbe Lehre bei wp_json_encode() weiter oben).
+function apply_filters( $tag, $value, ...$args ) {
 	if ( isset( $GLOBALS['stub']['filters'][ $tag ] ) ) {
-		return call_user_func( $GLOBALS['stub']['filters'][ $tag ], $value );
+		return call_user_func( $GLOBALS['stub']['filters'][ $tag ], $value, ...$args );
 	}
 	return $value;
 }
 function add_action( $tag, $cb, $prio = 10 ) {}
+// Erfasst jede Registrierung (statt nur die letzte zu behalten wie beim
+// add_filter()-Stub oben) -- für Abschnitt 20 (Submenü-Registrierungen).
+function add_menu_page( $page_title, $menu_title, $capability, $menu_slug, $callback = '', $icon_url = '', $position = null ) {
+	$GLOBALS['stub']['registered_menu_pages'][] = compact( 'page_title', 'menu_title', 'capability', 'menu_slug', 'callback' );
+	return 'toplevel_page_' . $menu_slug;
+}
+function add_submenu_page( $parent_slug, $page_title, $menu_title, $capability, $menu_slug, $callback = '' ) {
+	$hook = $parent_slug . '_page_' . $menu_slug;
+	$GLOBALS['stub']['registered_submenu_pages'][] = compact( 'parent_slug', 'page_title', 'menu_title', 'capability', 'menu_slug', 'callback', 'hook' );
+	return $hook;
+}
 function is_admin() { return $GLOBALS['stub']['is_admin']; }
 function wp_doing_ajax() { return false; }
 function wp_doing_cron() { return false; }
@@ -151,6 +167,8 @@ function add_filter( $tag, $cb, $prio = 10, $args = 1 ) { $GLOBALS['stub']['filt
 function wp_enqueue_script( $handle = '', $src = '', $deps = array(), $ver = false, $in_footer = false ) {
 	$GLOBALS['stub']['enqueued_scripts'][] = $handle;
 }
+function wp_enqueue_style( $handle = '', $src = '', $deps = array(), $ver = false ) {}
+function wp_script_add_data( $handle, $key, $value ) { return true; }
 // Signatur muss wp_localize_script() real nachbilden (Handle, Objektname, Daten),
 // sonst kann kein Test die lokalisierten JS-Settings (pms_settings) prüfen.
 function wp_localize_script( $handle, $object_name, $data ) {
@@ -161,6 +179,50 @@ function admin_url( $p = '' ) { return 'https://example.com/wp-admin/' . $p; }
 function nocache_headers() {}
 function esc_html__( $t, $d = null ) { return $t; }
 function __( $t, $d = null ) { return $t; }
+// Ab hier: Abschnitt 20 (register_menu()/render_page() erstmals über diesen
+// Harness getestet statt nur über das separate dev-tools/preview-admin.php)
+// -- dieselben Stub-Bodies wie dort (kein echtes Escaping/HTML nötig, die
+// Tests hier prüfen nur String-Vorkommen, kein DOM).
+function esc_html_e( $t, $d = null ) { echo $t; }
+function esc_attr__( $t, $d = null ) { return $t; }
+function esc_attr_e( $t, $d = null ) { echo $t; }
+function checked( $a, $b = true, $echo = true ) {
+	$r = ( (string) $a === (string) $b || ( true === $b && ! empty( $a ) ) ) ? ' checked="checked"' : '';
+	if ( $echo ) { echo $r; }
+	return $r;
+}
+function selected( $a, $b = true, $echo = true ) {
+	$r = ( (string) $a === (string) $b ) ? ' selected="selected"' : '';
+	if ( $echo ) { echo $r; }
+	return $r;
+}
+function disabled( $a, $b = true, $echo = true ) {
+	$r = ( (string) $a === (string) $b || ( true === $b && ! empty( $a ) ) ) ? ' disabled="disabled"' : '';
+	if ( $echo ) { echo $r; }
+	return $r;
+}
+function wp_nonce_field( $a = -1, $n = '_wpnonce', $r = true, $e = true ) {
+	$f = '<input type="hidden" name="' . $n . '" value="test-nonce" />';
+	if ( $e ) { echo $f; }
+	return $f;
+}
+function submit_button( $text = 'Save', $type = 'primary', $name = 'submit', $wrap = true ) {
+	$btn = '<input type="submit" name="' . $name . '" class="button button-' . $type . '" value="' . $text . '" />';
+	echo $wrap ? '<p class="submit">' . $btn . '</p>' : $btn;
+}
+function settings_fields( $g ) { echo '<input type="hidden" name="option_page" value="' . $g . '" />'; }
+function esc_html( $t ) { return (string) $t; }
+function esc_attr( $t ) { return (string) $t; }
+function esc_textarea( $t ) { return (string) $t; }
+function get_date_from_gmt( $gmt_date, $format = 'Y-m-d H:i:s' ) { return gmdate( $format, strtotime( $gmt_date . ' UTC' ) ); }
+function add_query_arg( $args, $url = '' ) {
+	if ( ! is_array( $args ) ) {
+		$args = array( $args => $url );
+		$url  = func_get_arg( 2 );
+	}
+	$sep = ( false === strpos( $url, '?' ) ) ? '?' : '&';
+	return $url . $sep . http_build_query( $args );
+}
 function current_time( $type, $gmt = 0 ) {
 	return 'timestamp' === $type ? time() : gmdate( 'Y-m-d H:i:s' );
 }
@@ -248,6 +310,206 @@ class Test_PMS_Wpdb {
 $GLOBALS['wpdb'] = new Test_PMS_Wpdb();
 
 /* ---------------------------------------------------------------------
+ * Minimaler WooCommerce-Ersatz für PMS_Pro_Woo_Product_Data. Bildet nur die
+ * Getter/Funktionen nach, die die Klasse tatsächlich aufruft -- kein echtes
+ * WooCommerce nötig (dieselbe Philosophie wie Test_PMS_Wpdb oben: kein
+ * SQL-/DB-Layer, nur genug Oberfläche, um echten Plugin-Code zu bedienen).
+ * "WooCommerce" ist bewusst eine leere Marker-Klasse (WooCommerce-Core
+ * definiert selbst eine Klasse mit exakt diesem Namen) -- class_exists()-
+ * Gates prüfen nur auf ihre Existenz. Sie wird unconditional deklariert;
+ * es gibt daher (wie schon bei class_exists('PMS_Pro_UTM'), siehe Abschnitt
+ * 18 unten) keinen automatisierten Test für eine Installation OHNE
+ * WooCommerce -- derselbe bereits dokumentierte Trade-off.
+ * ------------------------------------------------------------------- */
+
+class WooCommerce {}
+
+class WC_Product {
+	protected $data;
+
+	public function __construct( array $data = array() ) {
+		$this->data = array_merge(
+			array(
+				'id'        => 0,
+				'name'      => '',
+				'sku'       => '',
+				'parent_id' => 0,
+			),
+			$data
+		);
+	}
+
+	public function get_id() {
+		return (int) $this->data['id'];
+	}
+
+	public function get_name() {
+		return (string) $this->data['name'];
+	}
+
+	public function get_sku() {
+		return (string) $this->data['sku'];
+	}
+
+	public function get_parent_id() {
+		return (int) $this->data['parent_id'];
+	}
+}
+
+class WC_Product_Variation extends WC_Product {}
+
+$GLOBALS['stub']['wc'] = array(
+	'currency' => 'EUR',
+	'prices'   => array(), // product_id => Preis (float).
+	'terms'    => array(), // post_id => Array von (object) array('name' => ...).
+);
+
+function get_woocommerce_currency() {
+	return $GLOBALS['stub']['wc']['currency'];
+}
+function wc_get_price_to_display( $product ) {
+	$id = $product->get_id();
+	return isset( $GLOBALS['stub']['wc']['prices'][ $id ] ) ? (float) $GLOBALS['stub']['wc']['prices'][ $id ] : 0.0;
+}
+function get_the_terms( $post_id, $taxonomy ) {
+	return isset( $GLOBALS['stub']['wc']['terms'][ $post_id ] ) ? $GLOBALS['stub']['wc']['terms'][ $post_id ] : false;
+}
+
+/* ---------------------------------------------------------------------
+ * Minimaler WC_Order/WC_Order_Item_Product-Ersatz für PMS_Pro_Woo_Purchase.
+ * Dieselbe Philosophie wie WC_Product oben: nur die Getter, die die Klasse
+ * tatsächlich aufruft. get_meta()/update_meta_data()/save() bilden WC_Order's
+ * eigene, storage-agnostische Meta-API nach (siehe class-pro-woo-purchase.php,
+ * warum PMS_Pro_Woo_Purchase bewusst NICHT get_post_meta()/update_post_meta()
+ * nutzt -- HPOS-Sicherheit).
+ * ------------------------------------------------------------------- */
+
+class WC_Order_Item_Product {
+	private $data;
+
+	public function __construct( array $data = array() ) {
+		$this->data = array_merge(
+			array(
+				'quantity'   => 1,
+				'total'      => 0.0,
+				'product_id' => 0,
+				'name'       => '',
+				'product'    => null,
+			),
+			$data
+		);
+	}
+
+	public function get_quantity() {
+		return $this->data['quantity'];
+	}
+	public function get_total() {
+		return $this->data['total'];
+	}
+	public function get_product_id() {
+		return $this->data['product_id'];
+	}
+	public function get_name() {
+		return $this->data['name'];
+	}
+	public function get_product() {
+		return $this->data['product'];
+	}
+}
+
+class WC_Order {
+	private $data;
+	private $meta = array();
+
+	/** @var bool Wurde save() aufgerufen? Für Dedup-Tests. */
+	public $saved = false;
+
+	public function __construct( array $data = array() ) {
+		$this->data = array_merge(
+			array(
+				'id'                 => 0,
+				'items'              => array(),
+				'total'              => 0.0,
+				'total_tax'          => 0.0,
+				'shipping_total'     => 0.0,
+				'currency'           => 'EUR',
+				'billing_email'      => '',
+				'billing_phone'      => '',
+				'billing_first_name' => '',
+				'billing_last_name'  => '',
+				'billing_city'       => '',
+				'billing_state'      => '',
+				'billing_postcode'   => '',
+				'billing_country'    => '',
+			),
+			$data
+		);
+	}
+
+	public function get_id() {
+		return $this->data['id'];
+	}
+	public function get_items() {
+		return $this->data['items'];
+	}
+	public function get_total() {
+		return $this->data['total'];
+	}
+	public function get_total_tax() {
+		return $this->data['total_tax'];
+	}
+	public function get_shipping_total() {
+		return $this->data['shipping_total'];
+	}
+	public function get_currency() {
+		return $this->data['currency'];
+	}
+	public function get_checkout_order_received_url() {
+		return 'https://example.com/checkout/order-received/' . $this->data['id'] . '/';
+	}
+	public function get_billing_email() {
+		return $this->data['billing_email'];
+	}
+	public function get_billing_phone() {
+		return $this->data['billing_phone'];
+	}
+	public function get_billing_first_name() {
+		return $this->data['billing_first_name'];
+	}
+	public function get_billing_last_name() {
+		return $this->data['billing_last_name'];
+	}
+	public function get_billing_city() {
+		return $this->data['billing_city'];
+	}
+	public function get_billing_state() {
+		return $this->data['billing_state'];
+	}
+	public function get_billing_postcode() {
+		return $this->data['billing_postcode'];
+	}
+	public function get_billing_country() {
+		return $this->data['billing_country'];
+	}
+
+	public function get_meta( $key, $single = true ) {
+		return isset( $this->meta[ $key ] ) ? $this->meta[ $key ] : '';
+	}
+	public function update_meta_data( $key, $value ) {
+		$this->meta[ $key ] = $value;
+	}
+	public function save() {
+		$this->saved = true;
+	}
+}
+
+$GLOBALS['stub']['wc_orders'] = array(); // id => WC_Order.
+
+function wc_get_order( $id ) {
+	return isset( $GLOBALS['stub']['wc_orders'][ $id ] ) ? $GLOBALS['stub']['wc_orders'][ $id ] : false;
+}
+
+/* ---------------------------------------------------------------------
  * Plugin-Klassen laden (echter Code, kein Mock)
  * ------------------------------------------------------------------- */
 
@@ -261,6 +523,10 @@ require $base . 'class-pms-forms.php';
 require $base . 'class-pms-debug.php';
 require $base . 'class-pms-tools.php';
 require_once $base . 'class-pms-admin.php';
+// Seit Abschnitt 20 (Sidebar-Shortcut "Event Log", seit v0.6.4) auch hier
+// geladen -- vorher rein über PMS_Logger direkt getestet, nie über die
+// Admin-Tab-Rendering-Schicht selbst.
+require_once $base . 'admin/class-pms-admin-event-log.php';
 
 // PMS_Pro_UTM lebt seit v0.6.0 in pro/ (nur von pixel-made-simple-pro.php
 // geladen), nicht mehr in includes/. Hier trotzdem unconditional geladen,
@@ -271,6 +537,14 @@ require_once $base . 'class-pms-admin.php';
 // 16 weiter unten für die eigenständigen Tests des Gatings selbst
 // (PMS_Settings::is_pro() / free_event_limit_reached()).
 require __DIR__ . '/../src/pro/class-pro-utm.php';
+
+// PMS_Pro_Woo_Product_Data/PMS_Pro_WooCommerce: dasselbe Muster wie
+// PMS_Pro_UTM oben -- unconditional geladen, obwohl beide Klassen im echten
+// Betrieb nur von pixel-made-simple-pro.php require't werden. Siehe
+// Abschnitt 18 weiter unten für die eigenständigen Tests.
+require __DIR__ . '/../src/pro/class-pro-woo-product-data.php';
+require __DIR__ . '/../src/pro/class-pro-woo.php';
+require __DIR__ . '/../src/pro/class-pro-woo-purchase.php';
 
 /* ---------------------------------------------------------------------
  * Test-Helfer (Reflection für private Properties/Methods)
@@ -1361,6 +1635,357 @@ check( 'cleanup_old_entries(): Eintrag älter als die Retention (20 Tage bei 14 
 check( 'cleanup_old_entries(): der verbleibende Eintrag ist der neue', 'new-evt' === ( $remaining[0]['event_id'] ?? '' ) );
 
 $GLOBALS['wpdb']->rows = array();
+
+echo "\n=== 18. WooCommerce-Tracking (Pro): Produktdaten-Extraktion & CAPI-Anbindung ===\n";
+
+function wc_test_reset() {
+	$GLOBALS['stub']['wc'] = array(
+		'currency' => 'EUR',
+		'prices'   => array(),
+		'terms'    => array(),
+	);
+}
+
+// 18a. Simple Product: alle Felder, content_id-Modus "id" (Default).
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge( PMS_Settings::get(), array( 'wc_content_id_type' => 'id' ) );
+$GLOBALS['stub']['wc']['prices'][101]       = 19.99;
+$GLOBALS['stub']['wc']['terms'][101]        = array( (object) array( 'name' => 'Apparel' ) );
+$simple = new WC_Product( array( 'id' => 101, 'name' => 'T-Shirt', 'sku' => 'TSHIRT-1' ) );
+$data   = PMS_Pro_Woo_Product_Data::get_product_data( $simple, 3 );
+
+check( 'Simple Product: content_id ist die ID (Default-Modus)', '101' === $data['content_id'] );
+check( 'Simple Product: content_name', 'T-Shirt' === $data['content_name'] );
+check( 'Simple Product: content_category aus get_the_terms()', 'Apparel' === $data['content_category'] );
+check( 'Simple Product: value ist der Einzelpreis (NICHT mit qty multipliziert)', 19.99 === $data['value'] );
+check( 'Simple Product: currency aus get_woocommerce_currency()', 'EUR' === $data['currency'] );
+check( 'Simple Product: quantity wird durchgereicht', 3 === $data['quantity'] );
+
+// 18b. content_id_type = "sku": SKU vorhanden -> SKU statt ID.
+$GLOBALS['stub']['options']['pms_settings']['wc_content_id_type'] = 'sku';
+$data_sku                                                          = PMS_Pro_Woo_Product_Data::get_product_data( $simple, 1 );
+check( 'content_id_type=sku: content_id ist die SKU, wenn vorhanden', 'TSHIRT-1' === $data_sku['content_id'] );
+
+// 18c. content_id_type = "sku", aber Produkt hat KEINE SKU -> Fallback auf ID.
+$no_sku    = new WC_Product( array( 'id' => 102, 'name' => 'Ohne SKU', 'sku' => '' ) );
+$data_none = PMS_Pro_Woo_Product_Data::get_product_data( $no_sku, 1 );
+check( 'content_id_type=sku: Fallback auf ID, wenn die SKU leer ist', '102' === $data_none['content_id'] );
+$GLOBALS['stub']['options']['pms_settings']['wc_content_id_type'] = 'id';
+
+// 18d. Variation (Variable Product): Kategorie hängt am Elternprodukt, nicht
+// an der Variation selbst -- get_parent_id() muss für die Kategorie-Auflösung
+// genutzt werden.
+$GLOBALS['stub']['wc']['terms'][200] = array( (object) array( 'name' => 'Shoes' ) );
+$variation                            = new WC_Product_Variation( array( 'id' => 201, 'parent_id' => 200, 'name' => 'Sneaker - Blue, 42', 'sku' => '' ) );
+$GLOBALS['stub']['wc']['prices'][201] = 89.5;
+$data_variation                       = PMS_Pro_Woo_Product_Data::get_product_data( $variation, 2 );
+check( 'Variation: content_id ist die Variations-ID, nicht die Parent-ID', '201' === $data_variation['content_id'] );
+check( 'Variation: content_category kommt vom Elternprodukt (get_parent_id())', 'Shoes' === $data_variation['content_category'] );
+check( 'Variation: content_name enthält die Variationsbezeichnung', 'Sneaker - Blue, 42' === $data_variation['content_name'] );
+
+// 18e. Kein zugewiesener Term -> leerer String, kein Fehler/Notice.
+$uncategorized      = new WC_Product( array( 'id' => 103, 'name' => 'Ohne Kategorie' ) );
+$data_uncategorized = PMS_Pro_Woo_Product_Data::get_product_data( $uncategorized, 1 );
+check( 'Kein Term zugewiesen: content_category ist ein leerer String', '' === $data_uncategorized['content_category'] );
+
+// 18f. Andere Shop-Währung wird durchgereicht.
+$GLOBALS['stub']['wc']['currency'] = 'USD';
+$data_usd                          = PMS_Pro_Woo_Product_Data::get_product_data( $simple, 1 );
+check( 'currency spiegelt get_woocommerce_currency() wider (USD)', 'USD' === $data_usd['currency'] );
+$GLOBALS['stub']['wc']['currency'] = 'EUR';
+
+// 18g. Ungültiges Produkt -> leeres Array statt Fehler.
+check( 'get_product_data(): null ist kein WC_Product -> leeres Array', array() === PMS_Pro_Woo_Product_Data::get_product_data( null, 1 ) );
+check( 'get_product_data(): stdClass ist kein WC_Product -> leeres Array', array() === PMS_Pro_Woo_Product_Data::get_product_data( new stdClass(), 1 ) );
+
+// 18h. PMS_Pro_WooCommerce::enabled(): Pro + WooCommerce-Klasse (siehe Stub
+// oben) + wc_tracking_enabled.
+$GLOBALS['stub']['options']['pms_settings']['wc_tracking_enabled'] = 0;
+check( 'enabled(): false, wenn wc_tracking_enabled aus ist', false === PMS_Pro_WooCommerce::enabled() );
+$GLOBALS['stub']['options']['pms_settings']['wc_tracking_enabled'] = 1;
+check( 'enabled(): true, wenn Pro + WooCommerce + wc_tracking_enabled aktiv sind', true === PMS_Pro_WooCommerce::enabled() );
+
+// 18i. filter_capi_event_data(): mischt pms_woo_custom_data in payload['custom_data'],
+// ohne bereits vorhandene Felder (z. B. aus PMS_Pro_UTM::custom_data()) zu verlieren.
+$payload_unrelated = PMS_Pro_WooCommerce::filter_capi_event_data( array( 'event_name' => 'ViewContent' ), array( 'id' => 'x' ) );
+check( 'filter_capi_event_data(): Payload bleibt unverändert ohne pms_woo_custom_data-Schlüssel', ! isset( $payload_unrelated['custom_data'] ) );
+
+$payload_with_utm = array(
+	'event_name'  => 'AddToCart',
+	'custom_data' => array( 'utm_source' => 'newsletter' ),
+);
+$event_with_woo_data = array(
+	'pms_woo_custom_data' => array( 'content_ids' => array( '101' ), 'value' => 19.99 ),
+);
+$merged = PMS_Pro_WooCommerce::filter_capi_event_data( $payload_with_utm, $event_with_woo_data );
+check( 'filter_capi_event_data(): bestehende custom_data (z. B. UTM) bleibt erhalten', 'newsletter' === ( $merged['custom_data']['utm_source'] ?? null ) );
+check( 'filter_capi_event_data(): WooCommerce-custom_data wird eingemischt', array( '101' ) === ( $merged['custom_data']['content_ids'] ?? null ) );
+
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+echo "\n=== 19. WooCommerce Purchase-Tracking (Pro): Order-Extraktion, Advanced Matching, Dedup ===\n";
+
+/**
+ * Test-Order mit zwei Positionen (eine mit noch existierendem Produkt, eine
+ * mit gelöschtem Produkt -- deckt den content_id-Fallback auf
+ * item->get_product_id() ab) + vollständiger Rechnungsadresse.
+ */
+function make_test_order( $overrides = array() ) {
+	$product = new WC_Product( array( 'id' => 501, 'name' => 'Sneaker', 'sku' => 'SNK-1' ) );
+	$GLOBALS['stub']['wc']['terms'][501] = array( (object) array( 'name' => 'Shoes' ) );
+
+	$item1 = new WC_Order_Item_Product( array( 'quantity' => 2, 'total' => 40.00, 'product' => $product, 'product_id' => 501 ) );
+	$item2 = new WC_Order_Item_Product( array( 'quantity' => 1, 'total' => 9.99, 'product' => null, 'product_id' => 777 ) );
+
+	$defaults = array(
+		'id'                 => 1001,
+		'items'              => array( $item1, $item2 ),
+		'total'              => 55.00,
+		'total_tax'          => 5.00,
+		'shipping_total'     => 4.99,
+		'currency'           => 'EUR',
+		'billing_email'      => 'kunde@example.com',
+		'billing_phone'      => '+49 176 1234567',
+		'billing_first_name' => 'Erika',
+		'billing_last_name'  => 'Musterfrau',
+		'billing_city'       => 'New York',
+		'billing_state'      => 'NY',
+		'billing_postcode'   => '10001',
+		'billing_country'    => 'US',
+	);
+
+	$order = new WC_Order( array_merge( $defaults, $overrides ) );
+	$GLOBALS['stub']['wc_orders'][ $order->get_id() ] = $order;
+
+	return $order;
+}
+
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array( 'wc_tracking_enabled' => 1, 'wc_purchase_value_type' => 'gross', 'wc_purchase_advanced_matching' => 0 )
+);
+
+/* --- 19a. PMS_CAPI::hash_field() --- */
+
+check( 'hash_field(): lowercase + trim vor dem Hash', hash( 'sha256', 'erika' ) === PMS_CAPI::hash_field( ' Erika ' ) );
+check( 'hash_field(): strip_spaces entfernt alle Leerzeichen (city/zip)', hash( 'sha256', 'newyork' ) === PMS_CAPI::hash_field( 'New York', true ) );
+check( 'hash_field(): ohne strip_spaces bleiben Leerzeichen erhalten', hash( 'sha256', 'new york' ) === PMS_CAPI::hash_field( 'New York', false ) );
+check( 'hash_field(): leerer Wert -> leerer String', '' === PMS_CAPI::hash_field( '   ' ) );
+
+/* --- 19b. build_order_custom_data(): Positionen, Netto/Brutto, Steuer/Versand --- */
+
+$order = make_test_order();
+$data  = call_private( 'PMS_Pro_Woo_Purchase', 'build_order_custom_data', $order );
+
+check( 'build_order_custom_data(): content_ids enthält beide Positionen', array( '501', '777' ) === $data['content_ids'] );
+check( 'build_order_custom_data(): content_id der gelöschten Position fällt auf get_product_id() zurück', '777' === $data['contents'][1]['id'] );
+check( 'build_order_custom_data(): item_price = Line-Total / Menge (40.00 / 2 = 20.00)', 20.00 === $data['contents'][0]['item_price'] );
+check( 'build_order_custom_data(): quantity je Position korrekt', 2 === $data['contents'][0]['quantity'] && 1 === $data['contents'][1]['quantity'] );
+check( 'build_order_custom_data(): value = Brutto (Default), also order->get_total()', 55.00 === $data['value'] );
+check( 'build_order_custom_data(): currency aus der Bestellung', 'EUR' === $data['currency'] );
+check( 'build_order_custom_data(): num_items = Summe aller Mengen (2+1=3)', 3 === $data['num_items'] );
+check( 'build_order_custom_data(): tax wird extrahiert', 5.00 === $data['tax'] );
+check( 'build_order_custom_data(): shipping wird extrahiert', 4.99 === $data['shipping'] );
+
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_value_type'] = 'net';
+$data_net = call_private( 'PMS_Pro_Woo_Purchase', 'build_order_custom_data', $order );
+check( 'build_order_custom_data(): value = Netto, wenn konfiguriert (55.00 - 5.00 = 50.00)', 50.00 === $data_net['value'] );
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_value_type'] = 'gross';
+
+$empty_order = make_test_order( array( 'id' => 1002, 'items' => array() ) );
+check( 'build_order_custom_data(): Bestellung ohne Positionen -> null', null === call_private( 'PMS_Pro_Woo_Purchase', 'build_order_custom_data', $empty_order ) );
+
+/* --- 19c. build_order_user_data(): Advanced Matching, gated + normalisiert --- */
+
+$user_data_off = call_private( 'PMS_Pro_Woo_Purchase', 'build_order_user_data', $order );
+check( 'build_order_user_data(): leeres Array, wenn wc_purchase_advanced_matching aus ist', array() === $user_data_off );
+
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_advanced_matching'] = 1;
+$user_data = call_private( 'PMS_Pro_Woo_Purchase', 'build_order_user_data', $order );
+
+check( 'build_order_user_data(): em gehasht (PMS_CAPI::hash_email())', array( PMS_CAPI::hash_email( 'kunde@example.com' ) ) === $user_data['em'] );
+check( 'build_order_user_data(): ph gehasht (PMS_CAPI::hash_phone())', array( PMS_CAPI::hash_phone( '+49 176 1234567' ) ) === $user_data['ph'] );
+check( 'build_order_user_data(): fn gehasht', array( PMS_CAPI::hash_field( 'Erika' ) ) === $user_data['fn'] );
+check( 'build_order_user_data(): ln gehasht', array( PMS_CAPI::hash_field( 'Musterfrau' ) ) === $user_data['ln'] );
+check( 'build_order_user_data(): ct gehasht MIT entfernten Leerzeichen ("New York" -> "newyork")', array( hash( 'sha256', 'newyork' ) ) === $user_data['ct'] );
+check( 'build_order_user_data(): st gehasht', array( PMS_CAPI::hash_field( 'NY' ) ) === $user_data['st'] );
+check( 'build_order_user_data(): zp gehasht MIT entfernten Leerzeichen', array( hash( 'sha256', '10001' ) ) === $user_data['zp'] );
+check( 'build_order_user_data(): country gehasht', array( PMS_CAPI::hash_field( 'US' ) ) === $user_data['country'] );
+
+$order_no_phone = make_test_order( array( 'id' => 1003, 'billing_phone' => '' ) );
+$user_data_partial = call_private( 'PMS_Pro_Woo_Purchase', 'build_order_user_data', $order_no_phone );
+check( 'build_order_user_data(): leere Felder (hier: Telefon) werden nicht in user_data aufgenommen', ! array_key_exists( 'ph', $user_data_partial ) );
+
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_advanced_matching'] = 0;
+
+/* --- 19d. event_id(): deterministisch --- */
+
+check( 'event_id(): Format "pms_order_{id}"', 'pms_order_1001' === call_private( 'PMS_Pro_Woo_Purchase', 'event_id', 1001 ) );
+
+/* --- 19e. already_tracked()/mark_tracked(): HPOS-sichere WC_Order-Meta-API --- */
+
+$dedup_order = make_test_order( array( 'id' => 1004 ) );
+check( 'already_tracked(): frische Bestellung ist noch nicht getrackt', false === call_private( 'PMS_Pro_Woo_Purchase', 'already_tracked', $dedup_order ) );
+
+call_private( 'PMS_Pro_Woo_Purchase', 'mark_tracked', $dedup_order );
+check( 'mark_tracked(): setzt _pms_purchase_tracked über update_meta_data()', 1 === $dedup_order->get_meta( PMS_Pro_Woo_Purchase::TRACKED_META_KEY ) );
+check( 'mark_tracked(): ruft save() auf (HPOS-sicher, kein direkter update_post_meta()-Zugriff)', true === $dedup_order->saved );
+check( 'already_tracked(): erkennt die eben gesetzte Markierung', true === call_private( 'PMS_Pro_Woo_Purchase', 'already_tracked', $dedup_order ) );
+
+/* --- 19f. should_process()/enabled(): Gating --- */
+
+$GLOBALS['stub']['options']['pms_settings']['wc_tracking_enabled'] = 0;
+check( 'enabled(): false, wenn wc_tracking_enabled aus ist (Purchase hat keinen eigenen Master-Toggle)', false === PMS_Pro_Woo_Purchase::enabled() );
+$GLOBALS['stub']['options']['pms_settings']['wc_tracking_enabled'] = 1;
+check( 'enabled(): true, wenn Pro + WooCommerce + wc_tracking_enabled aktiv sind', true === PMS_Pro_Woo_Purchase::enabled() );
+
+$GLOBALS['stub']['options']['pms_settings']['exclude_admins'] = 1;
+$GLOBALS['stub']['current_user_can'] = true;
+check( 'should_process(): false, wenn exclude_admins aktiv und der aktuelle Nutzer Admin ist', false === call_private( 'PMS_Pro_Woo_Purchase', 'should_process' ) );
+$GLOBALS['stub']['current_user_can'] = false;
+check( 'should_process(): true, wenn exclude_admins aktiv, aber kein Admin eingeloggt ist (z. B. Zahlungs-Webhook)', true === call_private( 'PMS_Pro_Woo_Purchase', 'should_process' ) );
+$GLOBALS['stub']['options']['pms_settings']['exclude_admins'] = 0;
+
+$GLOBALS['stub']['filters']['pms_allow_tracking'] = function () {
+	return false;
+};
+check( 'should_process(): respektiert das pms_allow_tracking-Filter', false === call_private( 'PMS_Pro_Woo_Purchase', 'should_process' ) );
+unset( $GLOBALS['stub']['filters']['pms_allow_tracking'] );
+
+/* --- 19g. Ende-zu-Ende: track_thankyou()/maybe_track_fallback() inkl. Dedup
+ * über beide Auslösewege hinweg, mit dem ECHTEN pms_capi_event_data-Filter
+ * aus PMS_Pro_WooCommerce (siehe dortige Registrierung in init() -- hier
+ * direkt registriert statt init() aufzurufen, um keine WooCommerce-Hooks
+ * mitzuregistrieren, die dieser Test nicht braucht). --- */
+
+add_filter( 'pms_capi_event_data', array( 'PMS_Pro_WooCommerce', 'filter_capi_event_data' ) );
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled' => 1,
+		'pixel_enabled'       => 1,
+		'pixel_id'            => '1234567890',
+		'capi_enabled'        => 1,
+		'capi_token'          => 'test-token',
+		'consent_detection'   => 0, // Consent gilt als erteilt (kein Banner-Plugin aktiv).
+	)
+);
+
+$e2e_order = make_test_order( array( 'id' => 1005 ) );
+$GLOBALS['stub']['captured_posts'] = array();
+
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $e2e_order->get_id() );
+$browser_output = ob_get_clean();
+
+check( 'track_thankyou(): Browser-Pixel-Skript wird ausgegeben', false !== strpos( $browser_output, "fbq('track','Purchase'" ) );
+check( 'track_thankyou(): eventID im Browser-Skript ist die deterministische ID', false !== strpos( $browser_output, "eventID:'pms_order_1005'" ) );
+
+check( 'track_thankyou(): löst genau einen CAPI-Request aus', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+$sent_body = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'], true );
+check( 'track_thankyou(): event_id im CAPI-Payload ist die deterministische ID', 'pms_order_1005' === $sent_body['data'][0]['event_id'] );
+check( 'track_thankyou(): event_name ist "Purchase"', 'Purchase' === $sent_body['data'][0]['event_name'] );
+check( 'track_thankyou(): custom_data kommt über den PMS_Pro_WooCommerce-Filter tatsächlich im Payload an', array( '501', '777' ) === ( $sent_body['data'][0]['custom_data']['content_ids'] ?? null ) );
+check( 'track_thankyou(): markiert die Bestellung als getrackt', true === call_private( 'PMS_Pro_Woo_Purchase', 'already_tracked', $e2e_order ) );
+
+// Erneuter Aufruf derselben Danke-Seite (z. B. F5) -> kein zweiter Request.
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $e2e_order->get_id() );
+ob_end_clean();
+check( 'track_thankyou(): wiederholter Aufruf derselben Bestellung löst KEINEN weiteren CAPI-Request aus', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+
+// Server-Side-Fallback für DIESELBE (bereits über die Danke-Seite getrackte) Bestellung -> ebenfalls kein weiterer Request.
+PMS_Pro_Woo_Purchase::maybe_track_fallback( $e2e_order->get_id() );
+check( 'maybe_track_fallback(): greift NICHT, wenn die Danke-Seite dieselbe Bestellung bereits getrackt hat', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+
+// Fallback-Pfad eigenständig (Bestellung, die NIE die Danke-Seite erreicht hat).
+$fallback_order = make_test_order( array( 'id' => 1006 ) );
+PMS_Pro_Woo_Purchase::maybe_track_fallback( $fallback_order->get_id() );
+check( 'maybe_track_fallback(): trackt eigenständig eine Bestellung ohne vorherigen Danke-Seiten-Aufruf', 2 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( 'maybe_track_fallback(): markiert die Bestellung ebenfalls als getrackt', true === call_private( 'PMS_Pro_Woo_Purchase', 'already_tracked', $fallback_order ) );
+$fallback_body = json_decode( $GLOBALS['stub']['captured_posts'][1]['args']['body'], true );
+check( 'maybe_track_fallback(): source im Event Log ist "capi" (kein Browser-Dispatch)', 'capi' === PMS_Logger::get_entries( array( 'limit' => 1 ) )[0]['source'] );
+
+$GLOBALS['stub']['captured_posts'] = array();
+$GLOBALS['stub']['wc_orders']      = array();
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+echo "\n=== 20. Admin-Menü-Umstrukturierung (seit v0.6.4): Submenü-Registrierungen + Sidebar-Shortcuts ===\n";
+
+$GLOBALS['stub']['registered_menu_pages']    = array();
+$GLOBALS['stub']['registered_submenu_pages'] = array();
+$GLOBALS['stub']['current_user_can']         = true; // render_page() prüft current_user_can( CAPABILITY ).
+$GLOBALS['stub']['options']['pms_events']    = array();
+
+PMS_Admin::register_menu();
+
+$submenu_slugs = array_column( $GLOBALS['stub']['registered_submenu_pages'], 'menu_slug' );
+check( 'register_menu(): registriert das Hauptmenü', 1 === count( $GLOBALS['stub']['registered_menu_pages'] ) );
+check( 'register_menu(): "Event Log" wird als eigener Sidebar-Submenüpunkt registriert', in_array( PMS_Admin::EVENT_LOG_SLUG, $submenu_slugs, true ) );
+check( 'register_menu(): "Import / Export" wird als eigener Sidebar-Submenüpunkt registriert', in_array( PMS_Admin::IMPORT_EXPORT_SLUG, $submenu_slugs, true ) );
+
+$find_submenu = static function ( $slug ) {
+	foreach ( $GLOBALS['stub']['registered_submenu_pages'] as $entry ) {
+		if ( $slug === $entry['menu_slug'] ) {
+			return $entry;
+		}
+	}
+	return null;
+};
+
+$event_log_entry      = $find_submenu( PMS_Admin::EVENT_LOG_SLUG );
+$import_export_entry  = $find_submenu( PMS_Admin::IMPORT_EXPORT_SLUG );
+
+check( 'Event-Log-Submenü: hängt am Hauptmenü (PAGE_SLUG) statt an einer eigenen Top-Level-Seite', PMS_Admin::PAGE_SLUG === ( $event_log_entry['parent_slug'] ?? null ) );
+check( 'Event-Log-Submenü: Menü-Titel ist "Event Log"', 'Event Log' === ( $event_log_entry['menu_title'] ?? null ) );
+check( 'Event-Log-Submenü: dieselbe Capability wie die Haupt-Seite', PMS_Admin::CAPABILITY === ( $event_log_entry['capability'] ?? null ) );
+check( 'Import-Export-Submenü: Menü-Titel ist "Import / Export" (nicht mehr "Tools"/"Werkzeuge")', 'Import / Export' === ( $import_export_entry['menu_title'] ?? null ) );
+check( 'Import-Export-Submenü: hängt ebenfalls am Hauptmenü', PMS_Admin::PAGE_SLUG === ( $import_export_entry['parent_slug'] ?? null ) );
+
+// enqueue_assets() muss auch für die beiden neuen Hook-Suffixe greifen (siehe
+// dortige Erweiterung von einer Zwei- auf eine Vier-Wege-Prüfung), sonst
+// laden admin.css/admin.js auf den neuen Sidebar-Seiten nicht.
+$GLOBALS['stub']['enqueued_scripts'] = array();
+PMS_Admin::enqueue_assets( $event_log_entry['hook'] );
+check( 'enqueue_assets(): lädt Assets auch auf dem neuen Event-Log-Sidebar-Hook', in_array( 'pms-admin', $GLOBALS['stub']['enqueued_scripts'], true ) );
+
+$GLOBALS['stub']['enqueued_scripts'] = array();
+PMS_Admin::enqueue_assets( $import_export_entry['hook'] );
+check( 'enqueue_assets(): lädt Assets auch auf dem neuen Import/Export-Sidebar-Hook', in_array( 'pms-admin', $GLOBALS['stub']['enqueued_scripts'], true ) );
+
+$GLOBALS['stub']['enqueued_scripts'] = array();
+PMS_Admin::enqueue_assets( 'irgendein_fremder_hook' );
+check( 'enqueue_assets(): lädt weiterhin NICHT auf fremden Admin-Seiten', array() === $GLOBALS['stub']['enqueued_scripts'] );
+
+/* --- Sidebar-Shortcuts: wählen den richtigen Tab vor und rendern die
+ * normale Haupt-Seite (kein eigenes Markup, siehe Klassen-Doku dort). --- */
+
+unset( $_GET['tab'] );
+ob_start();
+PMS_Admin::render_import_export_shortcut();
+$import_export_output = ob_get_clean();
+check( 'render_import_export_shortcut(): setzt tab=tools', 'tools' === ( $_GET['tab'] ?? null ) );
+check( 'render_import_export_shortcut(): rendert den Import/Export-Tab-Inhalt (nicht "Global Options" von Tab "Allgemein")', false !== strpos( $import_export_output, 'Export configuration' ) && false === strpos( $import_export_output, 'Global Options' ) );
+check( 'render_import_export_shortcut(): Tab-Leiste markiert "Import / Export" als aktiv', false !== strpos( $import_export_output, 'nav-tab-active' ) && false !== strpos( $import_export_output, 'Import / Export' ) );
+
+unset( $_GET['tab'] );
+ob_start();
+PMS_Admin::render_event_log_shortcut();
+$event_log_output = ob_get_clean();
+check( 'render_event_log_shortcut(): setzt tab=log', 'log' === ( $_GET['tab'] ?? null ) );
+check( 'render_event_log_shortcut(): rendert tatsächlich den Event-Log-Tab (PMS_Admin_Event_Log::render_tab())', false !== strpos( $event_log_output, 'nav-tab-active' ) );
+
+unset( $_GET['tab'], $_GET['page'] );
+$GLOBALS['stub']['registered_menu_pages']    = array();
+$GLOBALS['stub']['registered_submenu_pages'] = array();
+$GLOBALS['stub']['current_user_can']         = false;
+$GLOBALS['stub']['enqueued_scripts']         = array();
+$GLOBALS['stub']['options']['pms_settings']  = array();
+$GLOBALS['stub']['options']['pms_events']    = array();
 
 echo "\n==============================\n";
 echo 'Ergebnis: ' . $GLOBALS['t_pass'] . ' bestanden, ' . $GLOBALS['t_fail'] . " fehlgeschlagen\n";

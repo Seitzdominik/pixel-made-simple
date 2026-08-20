@@ -9,7 +9,7 @@ bis v0.5.7, damals als „Lightweight Meta Pixel & CAPI Tracker") steht in
 Diese Datei hier verdoppelt das nicht, sondern beschreibt den **Ist-Zustand**
 und **wie man produktiv weiterarbeitet**.
 
-**Stand:** Version 0.6.3 (Rebrand-Relaunch als „Pixel Made Simple", vormals
+**Stand:** Version 0.6.4 (Rebrand-Relaunch als „Pixel Made Simple", vormals
 „Lightweight Meta Pixel & CAPI Tracker" — die Session, die den Rebrand baute,
 hatte die Version versehentlich auf 1.0.0 gesetzt; Dominik hat das im
 Folgeauftrag auf 0.6.0 korrigiert, die Versionszählung der Vor-Rebrand-Ära
@@ -39,9 +39,45 @@ fünfte Session hat in 0.6.3 auf einen von Dominik gemeldeten Fatal Error
 ist in beiden Hauptdateien jetzt zusätzlich mit `function_exists()`
 abgesichert (siehe „Free/Pro-Kollisionsschutz" weiter unten für die Analyse,
 warum der bestehende Kollisionsguard diesen Fall eigentlich schon strukturell
-abdeckt und was der neue Guard zusätzlich absichert). Es
+abdeckt und was der neue Guard zusätzlich absichert). Eine sechste Session
+hat eine headless WordPress-Testumgebung via `@wp-playground/cli` ergänzt
+(`npm run test:wp` / `npm run wp:serve`, siehe „Headless WordPress-
+Testumgebung" weiter unten) — reine Dev-Tooling-Ergänzung ohne Änderung an
+der Plugin-Laufzeit, deshalb ohne Versions-Bump und ohne readme.txt-
+Changelog-Eintrag. Eine siebte Session hat in 0.6.4 das erste echte
+Pro-Feature seit der UTM-Attribution gebaut: **WooCommerce-Tracking**
+(ViewContent/AddToCart/InitiateCheckout, siehe „WooCommerce-Tracking (Pro)"
+weiter unten für die vollständige Architektur-Doku) — zwei neue Klassen unter
+`src/pro/`, ein neues Frontend-Skript, ein neuer AJAX-Endpunkt, eine neue
+Admin-Box und Erweiterungen beider Test-Harnesses (245 → 265 PHP-Tests,
++36 neue JS-Tests in einer eigenen Datei). Der Auftrag für diese Session war
+in einem Stil formuliert, der von diesem Projekt abweichende Konventionen
+annahm (PSR-4-artige Namespace-Pfade `src/Pro/Integrations/WooCommerce/...`,
+PHPUnit-Tests unter `tests/`, Jest) — die Session hat stattdessen konsequent
+die tatsächlichen, in dieser Datei dokumentierten Konventionen verwendet
+(flache `PMS_`-präfixierte Klassen ohne Namespaces, `src/pro/class-pro-*.php`,
+Erweiterung der bestehenden Stub-Harnesses statt PHPUnit/Jest neu
+einzuführen). Eine achte Session hat – weiterhin in v0.6.4, kein weiterer
+Versions-Bump, siehe Auftragstext – zwei Dinge ergänzt: **Purchase-Tracking
+mit Server-Side-Fallback** (`PMS_Pro_Woo_Purchase`, siehe „WooCommerce
+Purchase-Tracking & Server-Side-Fallback (Pro)" weiter unten – dabei einen
+eigenen Timing-Bug im ersten Entwurf gefunden und korrigiert, siehe dortige
+Doku) und eine **Admin-Menü-/Tab-Umstrukturierung** (neuer Tab „E-Commerce",
+zwei neue Sidebar-Shortcuts „Event Log"/„Import / Export", siehe
+„Admin-Menü- & Tab-Umstrukturierung (seit v0.6.4)" weiter unten) — dabei auch
+die WooCommerce-Box aus Session sieben von Tab „Allgemein" auf den neuen
+Tab „E-Commerce" verschoben. Nebenbei einen echten, bis dahin unbemerkten
+Stub-Bug im Test-Harness selbst gefunden und behoben (`apply_filters()`
+reichte keine variadischen Zusatzargumente durch, siehe „Tests ausführen" im
+Purchase-Abschnitt) sowie – erstmals überhaupt in diesem Harness –
+`register_menu()`/`render_page()` selbst end-to-end getestet (Abschnitt 20:
+Submenü-Registrierungen, `enqueue_assets()`-Hook-Matching, beide Sidebar-
+Shortcuts inkl. tatsächlich gerenderter Tab-Inhalte), was rund ein Dutzend
+weiterer, bis dahin fehlender WP-Admin-Render-Stubs nötig machte (`esc_html_e()`,
+`checked()`, `add_query_arg()`, `get_date_from_gmt()` u. a. – siehe „Admin-
+Menü- & Tab-Umstrukturierung" weiter unten). 265 → 328 PHP-Tests. Es
 wurde bewusst **kein `git init` ausgeführt** und **kein GitHub-Repo
-angelegt/gepusht** – das war nie Teil eines der fünf Aufträge. Der alte Plugin-Ordner liegt unangetastet
+angelegt/gepusht** – das war nie Teil eines der acht Aufträge. Der alte Plugin-Ordner liegt unangetastet
 als `_pre-migration-backup_lightweight-meta-pixel-capi-tracker/` neben `src/`
 (zusammen mit der alten `lightweight-meta-pixel-capi-tracker.zip`) und kann
 gelöscht werden, sobald Dominik den neuen Stand verifiziert hat. Die
@@ -63,7 +99,7 @@ Seit dem v0.6.0-Rebrand als **Freemium** angelegt: **Pixel Made Simple**
 Made Simple Pro** (Slug `pixel-made-simple-pro`) ist ein separates, sich
 selbst aktualisierendes Plugin. Beide teilen sich denselben Options-Key
 (`pms_settings`) und denselben Übersetzungskatalog. Aktuelle Tier-Aufteilung
-(Stand v0.6.0, siehe „Freemium-Feature-Gating" weiter unten für die
+(Stand v0.6.4, siehe „Freemium-Feature-Gating" weiter unten für die
 Umsetzung):
 
 | Feature | Free | Pro |
@@ -79,11 +115,18 @@ Umsetzung):
 | First-Touch-/UTM-Attribution + Auto-Form-Fill | ❌ (Teaser) | ✅ |
 | Konfiguration exportieren (JSON) | ❌ (Teaser) | ✅ |
 | Konfiguration importieren (JSON) | ❌ (Teaser) | ✅ |
+| WooCommerce-Tracking (ViewContent/AddToCart/InitiateCheckout/Purchase, Tab „E-Commerce") | ❌ (Teaser, nur falls WooCommerce aktiv ist) | ✅ (nur bei aktivem WooCommerce) |
+| Purchase Advanced Matching (gehashte Rechnungsdaten) | ❌ (Teil des WooCommerce-Teasers) | ✅ (Tab „E-Commerce", standardmäßig aus) |
 
 `src/pro/class-pro-features.php` (Klasse `PMS_Pro_Features`) ist weiterhin
 ein leerer Erweiterungspunkt für zukünftige Pro-Features ohne eigene Datei;
-`src/pro/class-pro-utm.php` (`PMS_Pro_UTM`) ist das erste tatsächlich
-befüllte Pro-Modul.
+`src/pro/class-pro-utm.php` (`PMS_Pro_UTM`) war das erste befüllte Pro-Modul,
+`src/pro/class-pro-woo.php` + `src/pro/class-pro-woo-product-data.php`
+(`PMS_Pro_WooCommerce` + `PMS_Pro_Woo_Product_Data`, seit v0.6.4) das zweite,
+`src/pro/class-pro-woo-purchase.php` (`PMS_Pro_Woo_Purchase`, ebenfalls
+v0.6.4) das dritte — siehe „WooCommerce-Tracking (Pro)" bzw. „WooCommerce
+Purchase-Tracking & Server-Side-Fallback (Pro)" weiter unten für die
+vollständige Architektur-Doku.
 
 ---
 
@@ -100,8 +143,9 @@ lightweight_meta_pixel_and_capi_tracker/          <- Projekt-Root (Monorepo)
 │   └── workflows/
 │       └── release.yml                           <- baut bei jedem "vX.Y.Z"-Tag beide ZIPs
 ├── dev-tools/                                     <- NUR Entwicklung, wird NIE mitgezippt
-│   ├── test-suite.php                             <- 245 Tests, kein WordPress nötig
+│   ├── test-suite.php                             <- 328 Tests, kein WordPress nötig
 │   ├── test-frontend-js.js                        <- JS-Pendant für src/assets/frontend.js
+│   ├── test-frontend-woocommerce-js.js            <- JS-Pendant für src/assets/pms-woocommerce.js
 │   ├── build-translations.php                     <- POT/PO/MO-Generator + Validator
 │   └── preview-admin.php                          <- rendert Admin-Tabs als HTML z. Betrachten
 └── src/                                            <- Quelle beider Pakete (Free + Pro)
@@ -125,13 +169,18 @@ lightweight_meta_pixel_and_capi_tracker/          <- Projekt-Root (Monorepo)
     │                                                    siehe "Event Log" weiter unten)
     ├── assets/
     │   ├── admin.css / admin.js                      <- Admin-UI (Accordions, Toasts, Tooltips)
-    │   └── frontend.js                                <- Formular-Auto-Grabber + UTM-Form-Fill
+    │   ├── frontend.js                                <- Formular-Auto-Grabber + UTM-Form-Fill
+    │   └── pms-woocommerce.js                         <- WooCommerce-Tracking (Pro-only, siehe unten;
+    │                                                      liegt trotzdem in BEIDEN ZIPs, siehe dortige Doku)
     ├── languages/                                     <- POT + de_DE.po/.mo (Loco-Translate-kompatibel)
     ├── plugin-update-checker/                         <- VENDORED Library (YahnisElsts v5.7), nur
     │                                                      von der Pro-Hauptdatei geladen
     └── pro/
         ├── class-pro-features.php                     <- Erweiterungspunkt, aktuell leer
-        └── class-pro-utm.php                          <- First-Touch/UTM-Attribution + Form-Fill (Pro-only)
+        ├── class-pro-utm.php                          <- First-Touch/UTM-Attribution + Form-Fill (Pro-only)
+        ├── class-pro-woo.php                          <- WooCommerce-Hooks, AJAX-Endpunkt, CAPI-Filter
+        ├── class-pro-woo-product-data.php              <- WooCommerce-Produktdaten-Extraktion (zustandslos)
+        └── class-pro-woo-purchase.php                  <- Purchase-Tracking + Server-Side-Fallback (Order-Meta-Dedup)
 ```
 
 **Wichtig:** `dev-tools/` liegt weiterhin bewusst **außerhalb** von `src/`,
@@ -478,6 +527,378 @@ Bewusste Entscheidung, die Abhängigkeitsrichtung zur „Settings ist die
 Schaltzentrale"-Regel konsistent zu halten (siehe unten) – `PMS_Logger`
 konsumiert diese Konstanten nur.
 
+### WooCommerce-Tracking (Pro, seit v0.6.4)
+
+Trackt `ViewContent` (Produktseite), `AddToCart` (Archiv-/Mini-Cart-AJAX-
+Buttons und Single-Product-Formulare inkl. Variable Products) und
+`InitiateCheckout` (Classic- und Block-/Cart-Checkout) für WooCommerce. Zwei
+neue Klassen unter `src/pro/`:
+
+- **`PMS_Pro_Woo_Product_Data`** (`class-pro-woo-product-data.php`): reine,
+  zustandslose Extraktionsschicht. `get_product_data( WC_Product $product,
+  $qty = 1 )` liefert `content_id`/`content_name`/`content_category`/`value`/
+  `currency`/`quantity`. **`value` ist bewusst der Einzelpreis, NICHT mit
+  `qty` multipliziert** – Aufrufer (siehe unten) multiplizieren selbst für
+  ViewContent/AddToCart; bei InitiateCheckout würde derselbe Einzelpreis
+  sonst doppelt skaliert in `contents[].item_price` einfließen. `content_id`
+  folgt der Einstellung `wc_content_id_type` (`id`|`sku`, Tab „Allgemein" →
+  Box „WooCommerce"): SKU nur, wenn tatsächlich vorhanden, sonst immer
+  Fallback auf die numerische ID (auch bei Variationen – `WC_Product::
+  get_sku()` liefert dort bereits nativ die geerbte Parent-SKU). Kategorie
+  kommt bei Variationen vom Elternprodukt (`get_parent_id()`), da Kategorien
+  nur dort zugewiesen werden.
+- **`PMS_Pro_WooCommerce`** (`class-pro-woo.php`): Hooks, AJAX-Endpunkt,
+  CAPI-Filter. `init()` bricht sofort ab, wenn `class_exists('WooCommerce')`
+  falsch ist – eine Pro-Lizenz ohne WooCommerce registriert keine toten
+  Hooks/Assets. `enabled()` prüft zusätzlich `PMS_Settings::is_pro()` UND das
+  Setting `wc_tracking_enabled`.
+
+**Lade-/Namensraum-Entscheidung bewusst abweichend vom Auftragstext:** Der
+Auftrag für diese Session beschrieb Pfade wie
+`src/Pro/Integrations/WooCommerce/ProductDataHelper.php` und PHPUnit-Tests
+unter `tests/`. Dieses Projekt nutzt aber durchgängig flache,
+`PMS_`-präfixierte Klassen ohne Namespaces/Autoloading (kein Composer-
+Autoload) und einen selbstgebauten Stub-Test-Harness statt PHPUnit/Jest
+(siehe „Tests ausführen" weiter unten). Diese Session hat die tatsächlichen
+Projekt-Konventionen fortgeführt statt eine zweite, parallele Architektur
+einzuführen – `PMS_Pro_UTM` diente direkt als Vorbild für Klassenname/
+Dateipfad/Lademuster.
+
+**Cache-Sicherheit (verschärfte Variante des bestehenden Dedup-Patterns
+weiter unten):** `ViewContent` und `AddToCart` bekommen NIE eine serverseitig
+generierte `event_id` – auf einer vollständig gecachten Produkt-/Archivseite
+läuft für einen Cache-HIT gar kein PHP mehr; ein dort eingebackenes UUID wäre
+für jeden Besucher identisch und würde die Meta-Deduplizierung zerstören (das
+erste Event mit dieser ID „gewinnt", alle folgenden Besucher-Events verwirft
+Meta als Duplikat). Die `event_id` entsteht deshalb ausschließlich im Browser
+(`crypto.randomUUID()`, `assets/pms-woocommerce.js`) und wird synchron für
+`fbq()` UND den asynchronen CAPI-Request wiederverwendet. Produktdaten
+(Preis/Name/Kategorie) selbst dürfen serverseitig gerendert werden (nicht
+besucherspezifisch) – nur die ID nicht.
+
+`InitiateCheckout` ist davon bewusst ausgenommen: WooCommerce schließt
+Checkout-Seiten bereits selbst von Full-Page-Caching aus (`DONOTCACHEPAGE`),
+daher darf der **klassische** Checkout (`woocommerce_before_checkout_form`-
+Hook, `PMS_Pro_WooCommerce::render_initiate_checkout_payload()`) genau wie
+die bestehenden URL-Events (`PMS_Frontend::match_events()`) eine vollständig
+angereicherte Nutzlast serverseitig rendern. Der **Block-Checkout** hat
+dagegen gar keinen PHP-Template-Hook zum Andocken (React-Rendering über die
+Store API) – `pms-woocommerce.js` erkennt ihn per
+`document.querySelector('.wp-block-woocommerce-checkout')` und liest den
+aktuellen Warenkorb stattdessen direkt über die öffentliche WooCommerce Store
+API (`GET /wp-json/wc/store/v1/cart`, URL via `rest_url()` lokalisiert).
+**Preise dort liegen in Minor-Units vor** (z. B. Cent) und werden per
+`currency_minor_unit` zurückgerechnet (`price / 10^minor_unit`) – ein
+klassischer Store-API-Stolperstein, den Abschnitt 5 in
+`dev-tools/test-frontend-woocommerce-js.js` gezielt abdeckt.
+
+**Preise/Namen/Kategorien werden NIE aus dem Client übernommen** – dieselbe
+Defense-in-Depth-Haltung wie im CAPI-Sicherheitsmodell weiter unten. Für
+ViewContent/AddToCart sendet der Client nur `product_id`/`variation_id`/
+`quantity`; `PMS_Pro_WooCommerce::handle_track()` löst das Produkt IMMER neu
+über `wc_get_product()` auf und baut `custom_data` selbst. Für
+InitiateCheckout sendet der Client GAR KEINE Produktdaten – der AJAX-Handler
+liest ausschließlich den serverseitigen Sitzungs-Warenkorb (`WC()->cart`, in
+`admin-ajax.php`-Requests genauso verfügbar wie im normalen Frontend, da
+WooCommerce seine Frontend-Includes bei `DOING_AJAX` mitlädt). Das gilt
+identisch für Classic- UND Block-Checkout, weshalb der AJAX-Handler gar nicht
+wissen muss, über welchen der beiden Wege das Event ausgelöst wurde.
+
+**AJAX statt REST-API, bewusst.** Obwohl der Auftrag „REST-/AJAX-Endpoints"
+vorschlug, nutzt `handle_track()` denselben `wp_ajax_pms_woo_track` /
+`wp_ajax_nopriv_pms_woo_track` + `check_ajax_referer()`-Mechanismus wie
+`PMS_Forms::handle_lead()` – dieses Plugin hat an keiner Stelle je die WP
+REST API genutzt (`PMS_Frontend::should_track()` schließt `REST_REQUEST`
+sogar explizit von eigenem Tracking aus); eine zweite Endpoint-Art hätte
+einen komplett neuen Nonce-/Berechtigungsmechanismus parallel zum
+etablierten Muster eingeführt, ohne funktionalen Vorteil. Die einzige
+tatsächlich genutzte REST-Schnittstelle ist die WooCommerce-eigene,
+lesende Store API im Block-Checkout (s. o.).
+
+**Consent-Queue – die erste ihrer Art in diesem Plugin.** Bisher gilt
+überall (Formular-Grabber, URL-Events): fehlt beim ersten Auswertungszeitpunkt
+die Marketing-Einwilligung, wird das Event schlicht verworfen (kein Retry).
+Für WooCommerce-Events (höherer kommerzieller Wert pro Event, und
+`ViewContent` feuert auf jedem Produktseitenaufruf, oft bevor der Besucher
+das Cookie-Banner überhaupt gesehen hat) hält `pms-woocommerce.js`
+zurückgehaltene Events stattdessen in einem In-Memory-Array und lauscht auf
+dieselben Banner-Events wie der bestehende Consent-Bootstrap in
+`class-pms-frontend.php` (`PMS_Consent::consent_events()`, per
+`wp_localize_script()` als `consentEvents` mitgegeben). Ein späterer
+Consent-Grant flusht die Queue automatisch (100 ms-Debounce, identisch zum
+bestehenden `pmsInitTracking()`-Muster). `window.pmsHasConsent` – vom
+bestehenden Consent-Bootstrap gesetzt, sobald mindestens eine Plattform aktiv
+und Consent beim Seitenaufruf noch nicht erteilt war – wird dafür
+wiederverwendet, nicht neu erfunden.
+
+**Admin-UI:** Box „WooCommerce", nach demselben Google-Ads/TikTok-Muster
+(echte Accordion in Pro, `render_pro_teaser_box()` in Free) – nur sichtbar,
+wenn `class_exists('WooCommerce')` zutrifft (weder ein funktionsloses Toggle
+noch ein Upgrade-Teaser helfen auf einer Nicht-WooCommerce-Site). **Seit
+v0.6.4 auf einem eigenen Tab „E-Commerce"**, nicht mehr auf Tab „Allgemein"
+(siehe „Admin-Menü- & Tab-Umstrukturierung (seit v0.6.4)" weiter unten – diese
+Verschiebung war Teil derselben Session, die auch Purchase-Tracking
+eingeführt hat, damit dessen zwei neue Settings direkt daneben Platz finden,
+statt einen weiteren, dritten Tab dafür zu brauchen).
+`preserve_hidden_settings()` schließt `wc_tracking_enabled`/
+`wc_content_id_type`/`wc_purchase_value_type`/`wc_purchase_advanced_matching`
+nur auf dem E-Commerce-Tab selbst aus, und dort auch nur, wenn Pro UND
+WooCommerce beide zutreffen (derselbe Downgrade-Fallstrick wie bei
+Google/TikTok/UTM, siehe „Freemium-Feature-Gating" weiter oben) – auf allen
+anderen Tabs (insbesondere „Allgemein", wo die Box bis v0.6.3 lebte) sind
+diese vier Keys jetzt unconditional per Hidden-Feld geschützt, weil dort nie
+mehr ein echtes Feld für sie existiert.
+
+**Tests ausführen:** `dev-tools/test-suite.php` lädt beide neuen Klassen
+unconditional (Abschnitt 18, +20 Tests, 245 → 265) nach demselben Muster wie
+`PMS_Pro_UTM` – inkl. einer neuen, bewusst leichtgewichtigen
+`WC_Product`/`WC_Product_Variation`-Stub-Klasse und einer leeren
+`WooCommerce`-Marker-Klasse (kein echtes WooCommerce, kein SQL/DB-Layer,
+dieselbe Philosophie wie `Test_PMS_Wpdb`). Da eine einmal deklarierte
+PHP-Klasse nicht wieder „verschwinden" kann, gibt es – genau wie bei
+`class_exists('PMS_Pro_UTM')` – keinen automatisierten Test für eine
+Installation OHNE WooCommerce; dasselbe bereits dokumentierte Trade-off.
+`handle_track()` selbst (der eigentliche AJAX-Handler) wird NICHT getestet,
+aus demselben Grund, aus dem `PMS_Forms::handle_lead()` es nie war:
+`check_ajax_referer()`/`wp_send_json_*()` sind in diesem Harness nicht
+gestubbt. Getestet werden stattdessen die reinen Bausteine
+(`PMS_Pro_Woo_Product_Data::get_product_data()`, `PMS_Pro_WooCommerce::
+enabled()`/`filter_capi_event_data()`) – exakt das in Abschnitt 18 sichtbare
+Muster. Ein neues, eigenständiges `dev-tools/test-frontend-woocommerce-js.js`
+(36 Tests, `npm test` führt jetzt beide JS-Dateien nacheinander aus) deckt
+`pms-woocommerce.js` komplett ab: ViewContent, AddToCart (beide Wege),
+InitiateCheckout (beide Checkout-Varianten inkl. Minor-Unit-Umrechnung) und
+die Consent-Queue. Der Block-Checkout-Test wartet auf verkettete Promises
+(`fetch().then().then()`) – die Datei ist deshalb als CommonJS-Skript in eine
+`async function main()` gewrappt (kein top-level-await, `package.json` hat
+kein `"type": "module"`).
+
+**Bekannter Trade-off:** `pms-woocommerce.js` liegt unter `src/assets/` und
+landet dadurch – anders als die `pro/`-PHP-Klassen – in BEIDEN ZIPs (der
+`FREE_EXCLUDES`-Mechanismus in `dev-tools/test-wp-environment.js` bzw. die
+rsync-Exclude-Liste in `.github/workflows/release.yml` schließen nur ganze
+Top-Level-Ordner/-Dateien direkt unter `src/` aus, keine Pfade innerhalb von
+`assets/`). Funktional unkritisch (die Datei tut in Free nichts, da
+`PMS_Pro_WooCommerce` dort nie lädt und das Skript folglich nie enqueued
+wird) – nur ein paar KB totes JS im Free-ZIP. Absichtlich nicht behoben, um
+den ohnehin noch nie live getesteten Release-Mechanismus nicht ohne Not
+weiter anzufassen (siehe „Releases bauen" weiter unten).
+
+### WooCommerce Purchase-Tracking & Server-Side-Fallback (Pro, seit v0.6.4)
+
+`PMS_Pro_Woo_Purchase` (`class-pro-woo-purchase.php`) trackt `Purchase` über
+**zwei unabhängige Auslösewege**, die sich gegenseitig gegen Doppelzählung
+absichern:
+
+1. **Danke-Seite** (`woocommerce_thankyou`): synchron, Browser-Pixel + CAPI
+   im selben Request.
+2. **Server-Side-Fallback** (`woocommerce_payment_complete` sowie
+   `woocommerce_order_status_completed`/`_processing`, alle auf denselben
+   Handler): reiner CAPI-Pfad, fängt Bestellungen ab, bei denen der Kunde nach
+   der Zahlung nicht zur Danke-Seite zurückkehrt (externe Payment-Gateways).
+
+**Deterministische statt zufällige Event-ID.** Anders als ViewContent/
+AddToCart/InitiateCheckout (Task 1, siehe oben) bekommt Purchase bewusst
+`'pms_order_' . $order_id` statt eines client-generierten UUID. Eine
+Bestellung ist immer genau eine Bestellung – eine feste ID über beide
+Auslösewege hinweg ist hier kein Cache-Risiko (die Danke-Seite ist
+WooCommerce-seitig ohnehin von Full-Page-Caching ausgeschlossen und pro
+Bestellung einmalig), macht aber Metas eigene Deduplizierung zur zweiten
+Absicherungsebene, falls das unten beschriebene Order-Flag durch einen
+seltenen Timing-Zufall doch einmal beide Pfade durchlässt.
+
+**Dedup-Flag `_pms_purchase_tracked` über `WC_Order`s eigene Meta-API, NICHT
+`update_post_meta()`/`get_post_meta()`.** Der Auftragstext beschrieb explizit
+Letzteres – diese Session hat das als ungenaue Beschreibung behandelt und
+stattdessen `$order->get_meta()`/`update_meta_data()`+`save()` verwendet.
+Grund: Bestellungen liegen seit WooCommerce High-Performance Order Storage
+(HPOS, seit WC 8.2 zunehmend Standard bei Neuinstallationen) nicht mehr
+zwingend als `wp_posts`-Zeile vor – rohe `*_post_meta()`-Aufrufe würden dort
+entweder ins Leere laufen oder schlimmstenfalls eine falsche, zufällig
+gleich nummerierte Post-ID treffen. Dasselbe „native CRUD statt Rohzugriff"-
+Prinzip wie bei den Produktdaten (`$product->get_price()` statt eigener
+SQL/Meta-Queries, siehe Task-1-Vorgaben).
+
+**Historischer Bestellpreis statt Live-Katalogpreis.** `build_order_custom_data()`
+liest `WC_Order_Item_Product::get_total()`/`get_quantity()` für
+`contents[].item_price` – bewusst NICHT `PMS_Pro_Woo_Product_Data::
+get_product_data()` (das den AKTUELLEN Katalogpreis zurückgibt). Eine
+Bestellung von vor drei Monaten muss den damals tatsächlich gezahlten Preis
+zeigen, auch wenn der Artikel seither im Preis geändert oder rabattiert
+wurde. Content-ID/-Kategorie sind dagegen reine Produkt-Identität ohne
+Preisbezug – dafür wurden `PMS_Pro_Woo_Product_Data::resolve_content_id()`/
+`resolve_category()` von `private` auf `public` gestellt und werden hier
+wiederverwendet (Wiederverwendung zwischen zwei Pro-Geschwisterklassen im
+selben `pro/`-Ordner, keine Verletzung des „Isolation von geteilten Free/Pro-
+Dateien"-Prinzips aus Task 1 – das bezog sich auf `includes/`, nicht auf
+pro-internes Teilen).
+
+**Kein zweiter Consent-Bootstrap – Polling auf `window.pmsInitialized`
+statt Duplikat.** Der Browser-Pixel-Call für Purchase wartet, statt
+`PMS_Consent::consent_check_js()`/`consent_events()` ein zweites Mal
+nachzubauen, einfach darauf, dass der GLOBALE Init-Guard aus
+`class-pms-frontend.php` (`window.pmsInitialized`) `true` wird – der ist
+sofort wahr, wenn beim Rendern schon Consent vorlag, sonst erst, sobald
+deren bestehender Consent-Bootstrap ihn setzt (banner-agnostisch, kein
+zweiter Event-Listener auf dieselben Banner-Events nötig). Ein 150ms-Poll
+mit 30s-Sicherheitsnetz statt eines zweiten, potenziell mit dem bestehenden
+Bootstrap um Registrierungsreihenfolge wettlaufenden Event-Listeners (siehe
+nächster Punkt für den Grund, warum ein zweiter Listener riskant gewesen wäre).
+
+**Echter Timing-Bug im ersten Entwurf gefunden und korrigiert:** Der erste
+Entwurf von `print_pixel_script()` hat den Browser-Pixel-Call per
+`add_action( 'wp_head', $closure, 6 )` **innerhalb** von `track_thankyou()`
+registriert – in der Annahme, das laufe analog zu `PMS_Frontend::
+print_scripts()` (Priorität 4 auf `wp_head`). Tatsächlich feuert
+`woocommerce_thankyou` aber erst im Seiten-BODY (WooCommerce-Template
+`checkout/thankyou.php`), lange NACHDEM `wp_head` für diesen Request
+bereits vollständig durchlaufen ist – ein dort registrierter `wp_head`-
+Callback wäre für den ganzen Request nie mehr aufgerufen worden (stiller
+Totalausfall des Browser-Pixel-Calls, nur die CAPI-Seite hätte funktioniert).
+Behoben durch direktes Echo an der Stelle, an der `woocommerce_thankyou`
+selbst feuert (ein `<script>`-Tag mitten im Body ist unproblematisch). Beim
+nächsten `wp_head`/`wp_footer`-Hook aus einem WooCommerce-Endpoint-Kontext
+heraus: zuerst prüfen, WANN dieser Hook im Vergleich zum eigentlichen
+WooCommerce-Action-Hook tatsächlich feuert, nicht nur wo er "logisch"
+hingehören würde.
+
+**Advanced Matching: neues, eigenes Setting statt Wiederverwendung von
+`hash_email`.** Das bestehende `hash_email`-Setting (Tab „Allgemein")
+betrifft ausschließlich die E-Mail eingeloggter Nutzer
+(`PMS_CAPI::build_user_data()`) – eine deutlich kleinere, anders benannte
+Datenmenge als die hier neu eingeführten acht Rechnungsadress-Felder (em/ph/
+fn/ln/ct/st/zp/country). Ein bestehendes, eng beschriftetes Checkbox-Label
+für einen viel größeren PII-Umfang stillschweigend mitzunutzen wäre
+irreführend gewesen – stattdessen `wc_purchase_advanced_matching`, Privacy-
+by-Default aus, eigene Checkbox mit eigener Beschreibung (Tab „E-Commerce").
+`PMS_CAPI::hash_field()` ist der neue, generische Hasher für die sechs Felder
+jenseits von em/ph (lowercase+trim, zusätzlich leerzeichenfrei für ct/zp
+gemäß Meta-Normalisierung) – `hash_email()`/`hash_phone()` bleiben
+unverändert und werden für em/ph weiterhin direkt wiederverwendet.
+
+**Fallback-Pfad respektiert Consent genauso streng wie alles andere –
+bewusst KEIN Sonderfall für Server-zu-Server-Kontexte.** `payment_complete`
+kann aus einem echten Zahlungs-Webhook ganz ohne Browser-Cookies laufen; in
+diesem Fall liefert `PMS_Consent::has_marketing_consent()` (Cookie-basiert)
+mangels jeglicher Cookies dasselbe Ergebnis wie „kein Consent nachweisbar" –
+bei aktivem Banner-Plugin also `consent_blocked`. Bewusst NICHT umgangen:
+ein stillschweigender Consent-Bypass für Webhook-Kontexte wäre eine
+eigenständige, folgenreiche Privacy-Entscheidung, die weder angefragt noch
+im Sinne der sonstigen Fail-closed-Haltung dieses Plugins ist. Wer den
+Fallback davon unabhängig immer feuern lassen will, nutzt den bestehenden
+`pms_has_marketing_consent`-Filter (kein neuer Mechanismus nötig).
+
+**`should_process()` dupliziert bewusst NUR `exclude_admins`/
+`pms_allow_tracking` aus `PMS_Frontend::should_track()`, NICHT
+`PMS_Frontend::is_active()`.** Die Fallback-Hooks laufen oft ganz ohne
+Seitenaufruf (Webhook) – `PMS_Frontend::is_active()` wäre dort nie gesetzt
+und würde den gesamten Fallback-Pfad strukturell lahmlegen. Dieselbe kleine,
+bereits in Task 1 akzeptierte Dupliziierung wie bei `PMS_Pro_WooCommerce::
+should_load()` für Google/TikTok.
+
+**`mark_tracked()` läuft unabhängig vom CAPI-Ergebnis** (auch bei
+`consent_blocked`/`skipped`) – sobald `should_process()` grünes Licht gibt
+und gültige Bestelldaten vorliegen, gilt die Bestellung als „bearbeitet".
+Kein Retry-Mechanismus für später erteilten Consent (anders als die
+client-seitige Consent-Queue aus Task 1, die nur INNERHALB desselben
+Seitenaufrufs überbrückt) – deckt sich mit dem bisherigen Plugin-Verhalten
+für jedes andere Event (siehe „Bekannte Trade-offs").
+
+**Tests ausführen – ein echter, bis dahin unbemerkter Stub-Bug gefunden.**
+Der End-zu-Ende-Test (Abschnitt 19g in `dev-tools/test-suite.php`) registriert
+den ECHTEN `pms_capi_event_data`-Filter aus `PMS_Pro_WooCommerce` (statt ihn
+wie in Task 1 nur direkt aufzurufen) und prüft den tatsächlich an
+`wp_remote_post()` übergebenen JSON-Body – die erste Stelle im gesamten
+Testlauf, die diesen Filterpfad wirklich durchläuft. Dabei aufgefallen: der
+`apply_filters()`-Stub akzeptierte nur `($tag, $value)` und reichte
+zusätzliche Argumente (das `$event`-Array bei `pms_capi_event_data`) NICHT
+durch – ein `ArgumentCountError`, sobald `PMS_Pro_WooCommerce::
+filter_capi_event_data( $payload, $event )` darüber aufgerufen wurde. Behoben
+durch `function apply_filters( $tag, $value, ...$args )` mit Durchreichen von
+`...$args`. Dieselbe Lehre wie beim `wp_json_encode()`-Stub in v0.5.5 (siehe
+„Wichtigste Lektion beim Testen" weiter unten): ein zu einfacher Stub kann
+einen ganzen Aufrufpfad ungetestet lassen, ohne dass ein einziger Test rot
+wird. Neue `WC_Order`/`WC_Order_Item_Product`-Stub-Klassen (dieselbe
+Philosophie wie `WC_Product`/`Test_PMS_Wpdb`: nur die tatsächlich genutzten
+Getter, `get_meta()`/`update_meta_data()`/`save()` bilden `WC_Order`s echte
+Meta-API nach) + `wc_get_order()`. 265 → 312 Tests (siehe „Admin-Menü- &
+Tab-Umstrukturierung" direkt im Anschluss für Abschnitt 20, 312 → 328).
+
+### Admin-Menü- & Tab-Umstrukturierung (seit v0.6.4)
+
+Zwei unabhängige Änderungen an `class-pms-admin.php`, beide Teil derselben
+Session wie Purchase-Tracking:
+
+**Neuer Tab „E-Commerce"** (`render_ecommerce_tab()`) bündelt alle
+WooCommerce-/Purchase-Settings an einem Ort – vorher lebte die WooCommerce-
+Box (Task 1) auf Tab „Allgemein". Nur in `$tabs` aufgenommen, wenn
+`class_exists('WooCommerce')` zutrifft (dieselbe Sichtbarkeitsregel wie die
+Box selbst); ein direkter `?tab=ecommerce`-Aufruf ohne WooCommerce fällt in
+`render_page()`s Tab-Validierung schon auf „general" zurück, ein zusätzlicher
+defensiver Guard innerhalb von `render_ecommerce_tab()` wäre deshalb toter
+Code und wurde bewusst weggelassen. Folgt exakt demselben Drei-Bausteine-
+Muster wie jeder andere Settings-Array-Tab (`<form action="options.php">` +
+`settings_fields('pms_settings_group')` + `preserve_hidden_settings()` mit
+Pro/WooCommerce-abhängigem Skip-Array) – kein neues Pattern, nur ein neuer
+Ort dafür.
+
+**Zwei neue Sidebar-Untermenüpunkte** – „Event Log" und „Import / Export" –
+sind jetzt direkt unter „Pixel Made Simple" in der Seitenleiste klickbar,
+nicht mehr nur über die Tab-Leiste der Haupt-Seite erreichbar. Implementiert
+als zwei zusätzliche `add_submenu_page()`-Einträge mit **eigenen, aber
+denkbar simplen Callbacks** (`render_event_log_shortcut()`/
+`render_import_export_shortcut()`): beide setzen nur `$_GET['tab']` auf den
+Ziel-Tab und rufen direkt `render_page()` auf – keine eigene Rendering-Logik,
+kein Duplikat der Tab-Inhalte. Folgeeffekt, der zu erwarten und unproblematisch
+ist: Interagiert der Nutzer danach mit der Tab-Leiste selbst (die immer auf
+`page=pms-settings` verlinkt), landet er auf der Haupt-Seite statt auf dem
+Shortcut-Slug zurück – für einen reinen Einstiegspunkt das erwartete
+Verhalten. **`enqueue_assets()` musste entsprechend erweitert werden**: die
+bisherige Zwei-Wege-Prüfung (`toplevel_page_...` ODER `$help_hook`) ist jetzt
+eine Liste aus vier möglichen Hook-Suffixen (`$help_hook`, `$event_log_hook`,
+`$import_export_hook` zusätzlich zum Haupt-Hook) – ohne diese Erweiterung
+hätten die beiden neuen Sidebar-Seiten weder `admin.css` noch `admin.js`
+geladen (keine Akkordeon-/Toggle-Funktionalität, kaputtes Styling).
+
+**„Werkzeuge" → „Import / Export": nur das UI-Label geändert, der interne
+Slug bleibt `'tools'`.** `PMS_Tools::redirect()` schickt nach Export/Import
+weiterhin hart auf `tab=tools` zurück; eine Slug-Änderung hätte diese
+Konstante plus jede andere Referenz mitziehen müssen, für null sichtbaren
+Nutzen (der Slug taucht nirgends in der UI auf, nur die `$tabs`-Array-
+Beschriftung ist für den Nutzer sichtbar).
+
+**Kein Skip-Array-Update in `render_general_tab()`/`render_advanced_tab()`
+für die vier neuen `wc_purchase_*`-Keys nötig.** `preserve_hidden_settings()`
+versteckt standardmäßig JEDEN Settings-Key, der nicht explizit im Skip-Array
+steht (siehe „Die Settings-Klasse ist die Schaltzentrale" weiter unten) – ein
+neuer Key, der auf einem Tab schlicht nie referenziert wird, ist dort also
+automatisch bereits korrekt geschützt, ganz ohne Code-Änderung. Nur der Tab,
+der TATSÄCHLICH ein echtes Feld für einen Key zeigt, muss ihn aus seinem
+eigenen Skip-Array herausnehmen (hier: nur „E-Commerce", und auch dort nur
+im Pro+WooCommerce-Zweig).
+
+**Tests ausführen – `register_menu()`/`render_page()` erstmals über
+`dev-tools/test-suite.php` statt nur über das separate
+`dev-tools/preview-admin.php` getestet.** Bis einschließlich Session sieben
+lief die komplette Admin-Rendering-Schicht (`PMS_Admin::render_page()` und
+alle `render_*_tab()`-Methoden) ausschließlich über `preview-admin.php`
+(eigener, kompletter WP-Admin-Stub-Satz, manuell im Browser geprüft) – der
+PHP-Stub-Harness selbst hatte dafür nie die nötigen Stubs (`esc_html_e()`,
+`checked()`/`selected()`/`disabled()`, `wp_nonce_field()`, `submit_button()`,
+`settings_fields()`, `add_query_arg()`, `get_date_from_gmt()` u. a.).
+Abschnitt 20 hat diese Lücke geschlossen (Submenü-Registrierungen inkl.
+Slug/Label/Parent/Capability, `enqueue_assets()`s Vier-Wege-Hook-Prüfung, UND
+beide neuen Sidebar-Shortcuts end-to-end inkl. `PMS_Admin_Event_Log::
+render_tab()`, dafür zusätzlich `require admin/class-pms-admin-event-log.php`
+im Harness) – 312 → 328 Tests. **Für künftige Sessions:** Diese neuen Stubs
+decken nur, was `render_page()`/`render_tools_tab()`/`PMS_Admin_Event_Log::
+render_tab()` tatsächlich brauchen, NICHT automatisch jede andere
+`render_*_tab()`-Methode (z. B. `render_general_tab()`/`render_events_tab()`/
+`render_ecommerce_tab()` wurden hier nie tatsächlich aufgerufen) – beim
+Testen einer dieser Methoden über den Harness ggf. weitere WP-Funktions-
+Stubs nachziehen, derselbe iterative "Fatal Error zeigt die fehlende
+Funktion, ergänzen, erneut laufen lassen"-Ablauf wie hier.
+
 ### Die Settings-Klasse ist die Schaltzentrale
 
 `class-pms-settings.php` ist die **einzige** Stelle, die weiß, welche
@@ -716,10 +1137,10 @@ Pfad angeben:
 & "C:\php\php.exe" dev-tools\test-suite.php
 ```
 
-245 Tests, reiner PHP-Stub-Harness (kein WordPress nötig) — lädt die echten
-Plugin-Klassen aus `../src/includes/` (inkl. `pro/class-pro-utm.php`, siehe
-„Event Log" oben) per `require` und stubbt nur die WP-Funktionen, die sie
-aufrufen. Nutzt `ReflectionMethod`/`ReflectionProperty` für Zugriff auf
+328 Tests, reiner PHP-Stub-Harness (kein WordPress nötig) — lädt die echten
+Plugin-Klassen aus `../src/includes/` (inkl. aller `pro/class-pro-*.php`,
+siehe „Event Log" oben) per `require` und stubbt nur die WP-Funktionen, die
+sie aufrufen. Nutzt `ReflectionMethod`/`ReflectionProperty` für Zugriff auf
 private Properties/Methods (z. B. `PMS_Frontend::$matched_events`,
 `PMS_CAPI::$log`, `PMS_Consent::$cache` via `reset_consent_cache()`-Helper —
 **bei jedem neuen Test, der `PMS_Consent`/`send_events()` mit wechselndem
@@ -828,11 +1249,16 @@ lassen, statt sie mitzubearbeiten).
 
 Manuelles ZIP-Bauen entfällt komplett. Workflow:
 
-1. `PMS_VERSION` + `Version:`-Header in **beiden** `src/pixel-made-simple.php`
+1. `npm run test:wp` — headless Playground-Testumgebung (siehe „Headless
+   WordPress-Testumgebung" oben): kein Fatal Error bei Free/Pro-Aktivierung,
+   Kollisionsguard greift, `pms_event_log`-Tabelle wird angelegt. Bricht mit
+   Exit-Code 1 ab, falls nicht — dann NICHT taggen, bevor die Ursache
+   geklärt ist.
+2. `PMS_VERSION` + `Version:`-Header in **beiden** `src/pixel-made-simple.php`
    und `src/pixel-made-simple-pro.php` erhöhen, Changelog-Eintrag in
    `src/readme.txt` ergänzen.
-2. `git tag v1.2.3 && git push origin v1.2.3`.
-3. `.github/workflows/release.yml` baut auf `ubuntu-latest` zwei ZIPs aus
+3. `git tag v1.2.3 && git push origin v1.2.3`.
+4. `.github/workflows/release.yml` baut auf `ubuntu-latest` zwei ZIPs aus
    `src/` (per `rsync --exclude`, dann `zip -r`) und hängt beide über die
    `gh`-CLI ans GitHub-Release des Tags an — `pixel-made-simple.zip` (ohne
    `/pro/`, `plugin-update-checker/`, `pixel-made-simple-pro.php`) und
@@ -923,6 +1349,114 @@ Nach jeder `php -S localhost:PORT`-Session:
 Get-Process php -ErrorAction SilentlyContinue | ForEach-Object { try { $_ | Stop-Process -Force -Confirm:$false -ErrorAction Stop } catch {} }
 ```
 
+### Headless WordPress-Testumgebung (WP Playground CLI, seit dieser Session)
+
+Sechste Session, `dev-tools/test-wp-environment.js` + `@wp-playground/cli`
+(WASM-PHP + SQLite, kein Docker/MySQL/echter Webserver nötig). Ergänzt die
+drei bestehenden Test-/Preview-Wege (PHP-Stub-Harness, JS-Harness,
+`preview-admin.php` ohne echtes WordPress) um einen vierten: eine echte,
+aber komplett lokale WordPress-Instanz, in der sich Plugin-Aktivierung, der
+Free/Pro-Kollisionsschutz und angelegte DB-Tabellen tatsächlich verifizieren
+lassen statt nur plausibel gemacht zu werden.
+
+```powershell
+npm run test:wp
+```
+
+Baut zuerst aus `src/` zwei temporäre Ordner unter `build/` — exakt mit
+denselben `--exclude`-Listen wie `.github/workflows/release.yml` (siehe
+`FREE_EXCLUDES`/`PRO_EXCLUDES` in `test-wp-environment.js`; validiert damit
+bei jedem Lauf nebenbei, dass diese Listen überhaupt ein startfähiges Plugin
+ergeben) —, startet dann per `runCLI({ command: 'run-blueprint', ... })`
+eine frische Playground-Instanz, mountet beide Ordner als Plugins und
+aktiviert darin per `activate_plugin()` zuerst Free, dann Pro, **innerhalb
+desselben PHP-Prozesses** (ein einzelner `runPHP`-Blueprint-Schritt). Geprüft
+wird danach: kein Fatal Error bei beiden Aktivierungen, `active_plugins`
+enthält am Ende ausschließlich Pro (Free hat sich über den Kollisionsguard
+selbst deaktiviert), die Tabelle `{$wpdb->prefix}pms_event_log` existiert,
+und die Standard-WordPress-Optionstabelle wurde angelegt. Das Ergebnis kommt
+als JSON aus einem gemounteten Host-Verzeichnis zurück (nicht durch Parsen
+der CLI-Konsolenausgabe, siehe Skript-Kopfkommentar) — Exit-Code 1 bei jeder
+fehlgeschlagenen Prüfung ODER wenn `runCLI()` selbst wirft (z. B. ein
+echter, nicht abgefangener Fatal Error). In dieser Session erfolgreich gegen
+den aktuellen `src/`-Stand verifiziert (inkl. `npm install`, `npm run
+test:wp` UND `npm run wp:serve` real ausgeführt, nicht nur die API-Doku
+gelesen — siehe die beiden Fallstricke unten, die genau dabei auffielen).
+
+**Warum genau EIN PHP-Prozess mit zwei `activate_plugin()`-Aufrufen
+hintereinander, keine zwei getrennten Playground-Boots:** Das bildet exakt
+den Härtefall nach, für den der Early Guard laut CLAUDE.md
+(„Free/Pro-Kollisionsschutz" weiter oben) überhaupt existiert — WordPress'
+eigener Bulk-Activate-Admin-Callback lädt beim gleichzeitigen Ankreuzen
+mehrerer Plugins ebenfalls beide Hauptdateien nacheinander per
+`include_once` im selben Request. Ein separates "Bulk"-Szenario wäre an
+dieser Stelle keine zusätzliche Absicherung, nur Redundanz.
+
+**Fallstrick #1 — `is_admin()` muss im Skript selbst erzwungen werden:** Der
+Kollisionsguard ruft `deactivate_plugins()` nur `if ( is_admin() )` auf
+(siehe `pixel-made-simple(-pro).php`). Ein reiner `require_once
+'/wordpress/wp-load.php'`-Bootstrap (Frontend-Kontext) liefert `is_admin()
+=== false` — der Guard würde die Redeklaration zwar korrekt verhindern, die
+eigentliche Deaktivierung der jeweils anderen Version aber stillschweigend
+überspringen. Deshalb steht `define( 'WP_ADMIN', true );` als ALLERERSTE
+Zeile im Test-PHP, vor `wp-load.php` — exakt das, was `wp-admin/admin.php`
+beim echten Aktivieren in wp-admin auch tut.
+
+**Fallstrick #2 — `include_once`-Dedup gilt für den ganzen PHP-Prozess:**
+Ein früherer Entwurf dieses Skripts hatte zusätzlich ein zweites,
+"Bulk"-genanntes Szenario NACH dem ersten im selben Prozess (mit einem
+`deactivate_plugins()`-Reset dazwischen). Das erzeugte einen falschen
+Fehlschlag: `activate_plugin()` inkludiert die Hauptdatei per
+`include_once`, und PHPs Once-Dedup gilt pro Prozess, nicht pro
+Funktionsaufruf — der zweite `activate_plugin( $pro_slug )`-Aufruf im selben
+Prozess führte den Dateiinhalt (und damit auch den Kollisionsguard) gar
+nicht mehr aus, wodurch Free fälschlich aktiv blieb. Die Lehre: **jedes
+weitere Aktivierungs-Szenario in diesem Skript braucht einen eigenen,
+frischen `runCLI()`-Aufruf**, kein zweites Szenario im selben
+`runPHP`-Schritt.
+
+Nur die Free/Pro-Ordner unter `build/` neu bauen, ohne Playground zu
+starten:
+
+```powershell
+node dev-tools\test-wp-environment.js --stage-only
+```
+
+Für manuelles Herumklicken (AJAX-Calls im echten Browser beobachten,
+Formular-Grabber testen, Kollisionsschutz live nachvollziehen) statt der
+automatisierten Prüfung:
+
+```powershell
+npm run wp:serve
+```
+
+Baut (via `prewp:serve`-Hook) beide Ordner frisch und startet
+`wp-playground-cli server --login --port=9400` mit beiden als gemountete
+Plugins. Login als Admin ist automatisch, Aktivieren bleibt bewusst ein
+manueller Schritt im echten wp-admin-Plugins-Screen (realistischer als eine
+vorab aktivierte Instanz, deckt sich mit „Für Frontend-Szenarien..." weiter
+oben in diesem Kapitel).
+
+**Aufräumen nach `npm run wp:serve`:** ANDERS als beim PHP-Dev-Server oben
+NICHT pauschal alle `node`-Prozesse killen — in dieser Session liefen
+gleichzeitig mehrere fremde `node.exe`-Prozesse (u. a. Claude-Code-eigene
+Tooling-Prozesse). Gezielt nur die Playground-Prozesse anhand ihrer
+Kommandozeile beenden:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -match 'wp-playground|9400' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -Confirm:$false -ErrorAction SilentlyContinue }
+```
+
+**Erster Lauf ist langsam, danach schnell:** `@wp-playground/cli` lädt beim
+allerersten Aufruf WordPress-Core + die PHP-8.3-WASM-Runtime herunter (lokal
+gecacht, kein erneuter Download bei Folgeläufen). Auf Windows erscheinen
+dabei harmlose `lockWholeFile: unlock failed for pid=...`-Zeilen in der
+Konsole (Datei-Locking-Eigenheit von Playgrounds Node-Dateisystem-Layer
+unter Windows) — kein Fehler, der Testlauf schließt trotzdem korrekt mit
+Exit-Code 0 ab.
+
 ---
 
 ## Formular-Vorschlag für den Auto-Grabber
@@ -1009,6 +1543,33 @@ zu Doppelzählung.
 
 ## Bekannte Trade-offs / offene Punkte
 
+- **Purchase-Tracking: kein Retry, wenn der erste Versuch am Consent
+  scheitert.** `PMS_Pro_Woo_Purchase::mark_tracked()` markiert eine
+  Bestellung als bearbeitet, sobald `should_process()` grünes Licht gibt und
+  gültige Bestelldaten vorliegen – unabhängig davon, ob der CAPI-Versand
+  wegen fehlendem Consent tatsächlich abgebrochen wurde
+  (`consent_blocked`). Ein Zahlungs-Webhook ohne Browser-Cookies liefert bei
+  aktivem Banner-Plugin zudem grundsätzlich "kein Consent nachweisbar" (siehe
+  „WooCommerce Purchase-Tracking..." weiter oben). Bewusst dieselbe
+  Kein-Retry-Haltung wie überall sonst im Plugin (Formular-Grabber,
+  URL-Events) – ein späterer, echter Consent-Grant des Kunden holt dieses
+  eine Purchase-Event dann nicht mehr nach. Wer das anders haben möchte,
+  kann `pms_has_marketing_consent` filtern.
+- **WooCommerce AddToCart: theoretische Doppelzählung bei themespezifischem
+  AJAX-Add-to-Cart auf der Single-Product-Seite.** `pms-woocommerce.js`
+  lauscht sowohl auf WooCommerce-Cores `added_to_cart`-jQuery-Event
+  (Archiv-/Mini-Cart-AJAX-Buttons) als auch auf `submit` von `form.cart`
+  (klassischer Single-Product-POST). Im WooCommerce-Standardverhalten sind
+  beide Wege gegenseitig exklusiv (die AJAX-Buttons aus `add-to-cart.js`
+  gehören nicht zu `form.cart`). Aktiviert ein Theme/Plugin jedoch
+  zusätzlich AJAX-Add-to-Cart FÜR das Single-Product-Formular selbst UND
+  lässt dabei den nativen `submit` weiterlaufen (statt ihn per
+  `preventDefault()` zu unterbinden), können beide Listener für denselben
+  Klick feuern – kein globaler, formularübergreifender Lock wie beim
+  Formular-Auto-Grabber (`lastFired`/`LOCK_MS` in `frontend.js`), nur der
+  lokale Submit-Lock pro Formular. Bewusst nicht zusätzlich abgesichert
+  (nicht der WooCommerce-Standardfall, gleiche Risikoklasse wie andere schon
+  dokumentierte Restfälle in `frontend.js`).
 - **Event Log: Browser-Bestätigung fehlt für URL-Events.** Nur der
   Formular-Grabber meldet `browser_fired` mit (eigener AJAX-Request, siehe
   „Event Log" oben). URL-Events (Tab „URL-Events") werden im Event Log daher

@@ -9,16 +9,21 @@ defined( 'ABSPATH' ) || exit;
 
 class PMS_Admin {
 
-	const CAPABILITY = 'manage_options';
-	const PAGE_SLUG  = 'pms-settings';
-	const HELP_SLUG  = 'pms-help';
+	const CAPABILITY         = 'manage_options';
+	const PAGE_SLUG          = 'pms-settings';
+	const HELP_SLUG          = 'pms-help';
+	const EVENT_LOG_SLUG     = 'pms-event-log';
+	const IMPORT_EXPORT_SLUG = 'pms-import-export';
 
 	/**
-	 * Hook-Suffix der Hilfe-Unterseite (für gezieltes Asset-Loading).
+	 * Hook-Suffixe der drei Unterseiten, die nicht der Haupt-Seitenaufruf
+	 * sind (für gezieltes Asset-Loading, siehe enqueue_assets()).
 	 *
 	 * @var string
 	 */
-	private static $help_hook = '';
+	private static $help_hook          = '';
+	private static $event_log_hook     = '';
+	private static $import_export_hook = '';
 
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
@@ -68,6 +73,31 @@ class PMS_Admin {
 			self::PAGE_SLUG
 		);
 
+		// Direkte Sidebar-Verknüpfungen zu zwei Tabs der Haupt-Seite: beide
+		// Callbacks selektieren nur den passenden Tab vor und rendern
+		// anschließend dieselbe render_page() -- keine eigene Rendering-Logik,
+		// kein Duplikat. Landet der Nutzer über die Tab-Leiste selbst wieder
+		// auf einem Tab, führt das normal zurück zu page=pms-settings (die
+		// Tab-Links dort zeigen immer auf PAGE_SLUG) -- erwartetes Verhalten
+		// für einen reinen Einstiegs-Shortcut.
+		self::$event_log_hook = (string) add_submenu_page(
+			self::PAGE_SLUG,
+			__( 'Event Log', 'pixel-made-simple' ),
+			__( 'Event Log', 'pixel-made-simple' ),
+			self::CAPABILITY,
+			self::EVENT_LOG_SLUG,
+			array( __CLASS__, 'render_event_log_shortcut' )
+		);
+
+		self::$import_export_hook = (string) add_submenu_page(
+			self::PAGE_SLUG,
+			__( 'Import / Export', 'pixel-made-simple' ),
+			__( 'Import / Export', 'pixel-made-simple' ),
+			self::CAPABILITY,
+			self::IMPORT_EXPORT_SLUG,
+			array( __CLASS__, 'render_import_export_shortcut' )
+		);
+
 		self::$help_hook = (string) add_submenu_page(
 			self::PAGE_SLUG,
 			__( 'Info & Help', 'pixel-made-simple' ),
@@ -76,6 +106,26 @@ class PMS_Admin {
 			self::HELP_SLUG,
 			array( __CLASS__, 'render_help_page' )
 		);
+	}
+
+	/**
+	 * Sidebar-Shortcut "Event Log" -> Haupt-Seite mit vorausgewähltem Tab.
+	 *
+	 * @return void
+	 */
+	public static function render_event_log_shortcut() {
+		$_GET['tab'] = 'log';
+		self::render_page();
+	}
+
+	/**
+	 * Sidebar-Shortcut "Import / Export" -> Haupt-Seite mit vorausgewähltem Tab.
+	 *
+	 * @return void
+	 */
+	public static function render_import_export_shortcut() {
+		$_GET['tab'] = 'tools';
+		self::render_page();
 	}
 
 	public static function register_settings() {
@@ -96,7 +146,14 @@ class PMS_Admin {
 	 * @return void
 	 */
 	public static function enqueue_assets( $hook_suffix ) {
-		if ( 'toplevel_page_' . self::PAGE_SLUG !== $hook_suffix && self::$help_hook !== $hook_suffix ) {
+		$own_hooks = array(
+			'toplevel_page_' . self::PAGE_SLUG,
+			self::$help_hook,
+			self::$event_log_hook,
+			self::$import_export_hook,
+		);
+
+		if ( ! in_array( $hook_suffix, $own_hooks, true ) ) {
 			return;
 		}
 
@@ -121,8 +178,8 @@ class PMS_Admin {
 	 * (Dropdown im Event-Log-Tab). Keys, die als Pro-only markiert sind,
 	 * werden in handle_toggle_autosave() zusätzlich per is_pro() geprüft --
 	 * die Free-UI zeigt für sie ohnehin keinen echten Toggle mehr an (siehe
-	 * render_general_tab()), das hier ist reines Defense-in-Depth gegen
-	 * direkte AJAX-Requests.
+	 * render_general_tab()/render_ecommerce_tab()), das hier ist reines
+	 * Defense-in-Depth gegen direkte AJAX-Requests.
 	 *
 	 * @return array<string,array{type:string,pro_only:bool}>
 	 */
@@ -142,6 +199,8 @@ class PMS_Admin {
 			'enable_utm_form_fill' => array( 'type' => 'bool', 'pro_only' => true ),
 			'debug_bar'            => array( 'type' => 'bool', 'pro_only' => false ),
 			'log_retention_days'   => array( 'type' => 'log_retention_days', 'pro_only' => true ),
+			'wc_tracking_enabled'  => array( 'type' => 'bool', 'pro_only' => true ),
+			'wc_purchase_advanced_matching' => array( 'type' => 'bool', 'pro_only' => true ),
 		);
 	}
 
@@ -382,9 +441,20 @@ class PMS_Admin {
 			'general'  => __( 'General', 'pixel-made-simple' ),
 			'events'   => __( 'URL Events', 'pixel-made-simple' ),
 			'advanced' => __( 'Advanced Tracking', 'pixel-made-simple' ),
-			'log'      => __( 'Event Log', 'pixel-made-simple' ),
-			'tools'    => __( 'Tools', 'pixel-made-simple' ),
 		);
+
+		// Eigener Tab nur, wenn WooCommerce überhaupt aktiv ist -- dasselbe
+		// Prinzip wie die WooCommerce-Box selbst (siehe render_ecommerce_tab()):
+		// weder ein Toggle noch ein Upgrade-Teaser helfen auf einer Site, die
+		// das Feature ohnehin nicht nutzen könnte. Ein direkter Aufruf mit
+		// ?tab=ecommerce fällt in diesem Fall einfach auf "general" zurück
+		// (siehe die $tabs-Prüfung weiter unten).
+		if ( class_exists( 'WooCommerce' ) ) {
+			$tabs['ecommerce'] = __( 'E-Commerce', 'pixel-made-simple' );
+		}
+
+		$tabs['log']   = __( 'Event Log', 'pixel-made-simple' );
+		$tabs['tools'] = __( 'Import / Export', 'pixel-made-simple' ); // Umbenannt von "Tools" -- Slug bleibt 'tools' (siehe PMS_Tools::redirect()).
 
 		$active_tab = 'general';
 		if ( isset( $_GET['tab'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nur Tab-Navigation.
@@ -416,6 +486,9 @@ class PMS_Admin {
 					break;
 				case 'advanced':
 					self::render_advanced_tab();
+					break;
+				case 'ecommerce':
+					self::render_ecommerce_tab();
 					break;
 				case 'log':
 					PMS_Admin_Event_Log::render_tab();
@@ -909,6 +982,12 @@ class PMS_Admin {
 				$general_skip[] = 'tiktok_enabled';
 				$general_skip[] = 'tiktok_pixel_id';
 			}
+			// WooCommerce-/Purchase-Keys (wc_tracking_enabled, wc_content_id_type,
+			// wc_purchase_value_type, wc_purchase_advanced_matching) haben auf
+			// DIESEM Tab seit der Einführung des eigenen "E-Commerce"-Tabs nie
+			// mehr ein echtes Feld -- sie bleiben deshalb IMMER über den
+			// preserve_hidden_settings()-Default (nicht in $general_skip
+			// gelistet = Hidden-Feld) erhalten, unabhängig von Pro/WooCommerce.
 			self::preserve_hidden_settings( $s, $general_skip );
 			?>
 
@@ -1043,6 +1122,95 @@ class PMS_Admin {
 					__( 'TikTok', 'pixel-made-simple' ),
 					__( 'Track conversions with the TikTok Pixel using the official web events. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
 					'tiktok'
+				);
+				?>
+			<?php endif; ?>
+
+			<?php submit_button( __( 'Save Settings', 'pixel-made-simple' ) ); ?>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Tab: E-Commerce. Bündelt WooCommerce-Tracking (ViewContent/AddToCart/
+	 * InitiateCheckout, seit v0.6.4) und Purchase-Tracking an einem Ort,
+	 * statt sie über Tab "Allgemein" zu verstreuen (siehe dortige Doku zur
+	 * Verschiebung). Nur über render_page() erreichbar, wenn WooCommerce
+	 * aktiv ist -- ein ?tab=ecommerce-Aufruf ohne WooCommerce fällt dort
+	 * bereits auf "general" zurück, ein defensiver class_exists()-Check hier
+	 * wäre deshalb toter Code.
+	 *
+	 * @return void
+	 */
+	private static function render_ecommerce_tab() {
+		$s = PMS_Settings::get();
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>">
+			<?php settings_fields( 'pms_settings_group' ); ?>
+			<?php
+			$ecommerce_skip = array();
+			if ( PMS_Settings::is_pro() ) {
+				// Echte Felder gibt es nur in Pro (siehe unten) -- in Free zeigt
+				// dieser Tab stattdessen einen Teaser ohne echte Felder; dort
+				// MÜSSEN alle vier Keys stattdessen ganz normal über
+				// preserve_hidden_settings() erhalten bleiben (dasselbe Muster
+				// wie überall sonst in diesem Plugin), sonst würde das Speichern
+				// dieses Formulars eine unter Pro bereits gesetzte WooCommerce-/
+				// Purchase-Konfiguration bei einem Downgrade auf Free
+				// stillschweigend auf 0/leer zurücksetzen.
+				$ecommerce_skip[] = 'wc_tracking_enabled';
+				$ecommerce_skip[] = 'wc_content_id_type';
+				$ecommerce_skip[] = 'wc_purchase_value_type';
+				$ecommerce_skip[] = 'wc_purchase_advanced_matching';
+			}
+			self::preserve_hidden_settings( $s, $ecommerce_skip );
+			?>
+
+			<h2 class="pms-section-title"><?php esc_html_e( 'E-Commerce', 'pixel-made-simple' ); ?></h2>
+
+			<?php if ( PMS_Settings::is_pro() ) : ?>
+				<?php self::accordion_open( __( 'WooCommerce', 'pixel-made-simple' ), 'pms_settings[wc_tracking_enabled]', ! empty( $s['wc_tracking_enabled'] ), __( 'Enable WooCommerce tracking', 'pixel-made-simple' ), 'wc_tracking_enabled' ); ?>
+				<p class="description"><?php esc_html_e( 'Automatically tracks ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce, deduplicated via the same event ID as in the browser. Purchase additionally uses a server-side fallback for orders completed via external payment gateways that skip the order-received page.', 'pixel-made-simple' ); ?></p>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row">
+							<?php esc_html_e( 'Product identifier', 'pixel-made-simple' ); ?>
+							<?php self::tip( __( 'Must match how your Meta catalog identifies products (content_id).', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<select name="pms_settings[wc_content_id_type]">
+								<option value="id" <?php selected( $s['wc_content_id_type'], 'id' ); ?>><?php esc_html_e( 'Product ID', 'pixel-made-simple' ); ?></option>
+								<option value="sku" <?php selected( $s['wc_content_id_type'], 'sku' ); ?>><?php esc_html_e( 'SKU (falls back to Product ID when empty)', 'pixel-made-simple' ); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<?php esc_html_e( 'Purchase value', 'pixel-made-simple' ); ?>
+							<?php self::tip( __( 'Whether the Purchase event value includes tax (gross, the amount actually paid) or excludes it (net).', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<select name="pms_settings[wc_purchase_value_type]">
+								<option value="gross" <?php selected( $s['wc_purchase_value_type'], 'gross' ); ?>><?php esc_html_e( 'Gross (incl. tax)', 'pixel-made-simple' ); ?></option>
+								<option value="net" <?php selected( $s['wc_purchase_value_type'], 'net' ); ?>><?php esc_html_e( 'Net (excl. tax)', 'pixel-made-simple' ); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Purchase Advanced Matching', 'pixel-made-simple' ); ?></th>
+						<td>
+							<?php self::toggle( 'pms_settings[wc_purchase_advanced_matching]', ! empty( $s['wc_purchase_advanced_matching'] ), __( 'Enable Purchase Advanced Matching', 'pixel-made-simple' ), false, 'wc_purchase_advanced_matching' ); ?>
+							<p class="description"><?php esc_html_e( 'Sends hashed billing details from the order (email, phone, name, address) to the Conversions API for better match quality. Mind data privacy.', 'pixel-made-simple' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php self::accordion_close(); ?>
+			<?php else : ?>
+				<?php
+				self::render_pro_teaser_box(
+					__( 'WooCommerce', 'pixel-made-simple' ),
+					__( 'Automatically track ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce — deduplicated via the same event ID as in the browser, with a server-side fallback for orders completed via external payment gateways. Available in Pixel Made Simple Pro.', 'pixel-made-simple' ),
+					'woocommerce'
 				);
 				?>
 			<?php endif; ?>

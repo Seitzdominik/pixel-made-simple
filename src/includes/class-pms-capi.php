@@ -308,6 +308,33 @@ class PMS_CAPI {
 	}
 
 	/**
+	 * Generischer Advanced-Matching-Hasher für Meta-Felder jenseits von
+	 * em/ph (fn/ln/ct/st/zp/country – siehe pro/class-pro-woo-purchase.php).
+	 * Meta-Vorgabe: kleingeschrieben, getrimmt; für city/zip zusätzlich ohne
+	 * Leerzeichen (Meta normalisiert diese beiden Felder serverseitig exakt
+	 * so vor dem eigenen Hash-Vergleich).
+	 *
+	 * @param string $value        Rohwert.
+	 * @param bool   $strip_spaces Leerzeichen zusätzlich entfernen (city/zip).
+	 * @return string SHA-256-Hash oder leerer String.
+	 */
+	public static function hash_field( $value, $strip_spaces = false ) {
+		// Längenbegrenzung zuerst (public, siehe hash_email()/hash_phone()):
+		// kein reales Namens-/Adressfeld ist länger als 100 Zeichen.
+		$value = strtolower( trim( substr( (string) $value, 0, 100 ) ) );
+
+		if ( $strip_spaces ) {
+			$value = preg_replace( '/\s+/', '', $value );
+		}
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		return hash( 'sha256', $value );
+	}
+
+	/**
 	 * user_data für die CAPI zusammenstellen.
 	 *
 	 * IP und User-Agent werden laut Meta-Spezifikation unverschlüsselt gesendet,

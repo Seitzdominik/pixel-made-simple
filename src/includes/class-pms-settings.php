@@ -155,6 +155,18 @@ class PMS_Settings {
 			// Event Log (Tab "Event Log"). Nur in Pro tatsächlich wählbar --
 			// siehe PMS_Logger::retention_days() für den Free/Pro-Unterschied.
 			'log_retention_days'   => 7,
+			// WooCommerce-Tracking (Pro-only, siehe pro/class-pro-woo.php).
+			// Nur wirksam, wenn WooCommerce selbst aktiv ist -- die Klasse
+			// initialisiert sich sonst gar nicht erst (siehe dortiger
+			// class_exists('WooCommerce')-Guard).
+			'wc_tracking_enabled'  => 0,
+			'wc_content_id_type'   => 'id',
+			// Purchase-Tracking (Pro-only, siehe pro/class-pro-woo-purchase.php).
+			// Privacy-by-Default: Advanced Matching aus Bestelldaten (Name/Adresse)
+			// ist bei Neuinstallation deaktiviert, aus demselben Grund wie
+			// form_tracking/utm_passthrough oben.
+			'wc_purchase_value_type'        => 'gross',
+			'wc_purchase_advanced_matching' => 0,
 		);
 
 		$settings = get_option( self::OPTION_SETTINGS, array() );
@@ -226,7 +238,35 @@ class PMS_Settings {
 			'log_retention_days'   => in_array( (int) ( $input['log_retention_days'] ?? 0 ), self::ALLOWED_LOG_RETENTION_DAYS, true )
 				? (int) $input['log_retention_days']
 				: self::DEFAULT_LOG_RETENTION_DAYS,
+			'wc_tracking_enabled'            => empty( $input['wc_tracking_enabled'] ) ? 0 : 1,
+			'wc_content_id_type'             => 'sku' === (string) ( $input['wc_content_id_type'] ?? '' ) ? 'sku' : 'id',
+			'wc_purchase_value_type'         => 'net' === (string) ( $input['wc_purchase_value_type'] ?? '' ) ? 'net' : 'gross',
+			'wc_purchase_advanced_matching'  => empty( $input['wc_purchase_advanced_matching'] ) ? 0 : 1,
 		);
+	}
+
+	/**
+	 * Konfigurierter WooCommerce content_id-Modus ("id" oder "sku") für
+	 * PMS_Pro_Woo_Product_Data::get_product_data(). Fällt bei fehlender SKU
+	 * pro Produkt trotzdem auf die ID zurück (siehe dortige Doku).
+	 *
+	 * @return string 'id' oder 'sku'.
+	 */
+	public static function wc_content_id_type() {
+		$settings = self::get();
+		return 'sku' === (string) ( $settings['wc_content_id_type'] ?? 'id' ) ? 'sku' : 'id';
+	}
+
+	/**
+	 * Konfigurierter Modus für den Purchase-"value" (Tab "E-Commerce",
+	 * PMS_Pro_Woo_Purchase): "gross" (Bestellsumme wie tatsächlich bezahlt,
+	 * inkl. Steuer) oder "net" (abzüglich der Bestellsteuer).
+	 *
+	 * @return string 'gross' oder 'net'.
+	 */
+	public static function wc_purchase_value_type() {
+		$settings = self::get();
+		return 'net' === (string) ( $settings['wc_purchase_value_type'] ?? 'gross' ) ? 'net' : 'gross';
 	}
 
 	/**

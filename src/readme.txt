@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.3
+Stable tag: 0.6.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -90,6 +90,12 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.4 =
+* Neu (Pro): **WooCommerce-Tracking.** Trackt automatisch `ViewContent` (Produktseite), `AddToCart` (Archiv-/Mini-Cart-AJAX-Buttons und Single-Product-Formulare, inkl. Variable Products) und `InitiateCheckout` (klassischer Checkout und Block-/Cart-Checkout) im Browser-Pixel und via Conversions API – dedupliziert über dieselbe Event-ID wie überall sonst im Plugin. Produktidentifikator wählbar (Produkt-ID oder SKU, Tab „E-Commerce"), Preise/Namen/Kategorien werden dabei immer serverseitig frisch aus WooCommerce aufgelöst statt vom Browser übernommen. Auf Produkt-/Archivseiten wird bewusst keine feste Event-ID serverseitig eingebacken (Cache-Sicherheit auf vollständig gecachten Seiten); ist beim Laden noch keine Marketing-Einwilligung erteilt, werden Events zurückgehalten und automatisch nachgeholt, sobald der Besucher im Cookie-Banner zustimmt. Nur in Pixel Made Simple Pro und nur bei aktivem WooCommerce.
+* Neu (Pro): **Purchase-Tracking mit Server-Side-Fallback.** Trackt `Purchase` auf der Danke-Seite (Browser-Pixel + Conversions API, mit derselben deterministischen Event-ID `pms_order_{Bestell-ID}` für beide) inkl. Positionen, Gesamtwert (Netto/Brutto wählbar, Tab „E-Commerce"), Steuer und Versand. Zusätzlicher Server-Side-Fallback (bei Zahlungsabschluss bzw. Bestellstatus „Abgeschlossen"/„In Bearbeitung") fängt Bestellungen ab, bei denen der Kunde nach der Zahlung nicht zur Danke-Seite zurückkehrt (z. B. externe Payment-Gateways) – beide Wege sind über ein Bestell-Flag gegenseitig gegen Doppelzählung abgesichert. Optionale Advanced Matching (Tab „E-Commerce", standardmäßig deaktiviert): sendet gehashte Rechnungsdaten (E-Mail, Telefon, Name, Adresse) für eine bessere Match-Qualität.
+* Admin-Oberfläche neu strukturiert: eigener Tab **„E-Commerce"** bündelt sämtliche WooCommerce-/Purchase-Einstellungen (vorher verstreut auf Tab „Allgemein"); Tab „Werkzeuge" heißt jetzt **„Import / Export"**; „Event Log" und „Import / Export" sind zusätzlich direkt als eigene Einträge im Seitenleisten-Menü erreichbar, nicht mehr nur über die Tab-Leiste.
+* Intern: `dev-tools/test-suite.php` und ein neues `dev-tools/test-frontend-woocommerce-js.js` decken die neue Produktdaten-Extraktion, das Purchase-Tracking (inkl. Dedup-Verhalten über beide Auslösewege), die neuen Sidebar-Menüpunkte und das Frontend-Skript ab (`npm test`/`composer test`; 245 → 328 Tests im PHP-Harness).
 
 = 0.6.3 =
 * Fix: Zusätzliche `function_exists()`-Absicherung um `pms_load_textdomain()` in beiden Hauptdateien, um einen Fatal Error „Cannot redeclare pms_load_textdomain()" beim gleichzeitigen Laden von Free und Pro sicher auszuschließen. Der bestehende Kollisionsschutz (siehe 0.6.2) verhindert diesen Fall bereits strukturell, da er per `return` abbricht, bevor die Funktion je deklariert wird – dieser zusätzliche Guard ist bewusste Doppelabsicherung nach demselben Muster, das an anderen Stellen der beiden Hauptdateien schon für `deactivate_plugins()`/`is_plugin_active()` verwendet wird.
