@@ -191,7 +191,7 @@ $foot = "</div></div>"
 	. "window.pmsFetchCalls=[];window.fetch=function(url,opts){window.pmsFetchCalls.push({url:url,body:opts&&opts.body});return Promise.resolve({json:function(){return Promise.resolve({success:true});}});};</script>"
 	. "<script>$admin_js</script></body></html>";
 
-foreach ( array( 'general', 'events', 'events-edit', 'advanced', 'log', 'tools', 'help' ) as $view ) {
+foreach ( array( 'general', 'events', 'events-edit', 'advanced', 'ecommerce', 'log', 'tools', 'help' ) as $view ) {
 	$_GET = array( 'page' => 'pms-settings' );
 	ob_start();
 	if ( 'help' === $view ) {
@@ -200,7 +200,11 @@ foreach ( array( 'general', 'events', 'events-edit', 'advanced', 'log', 'tools',
 		if ( 'events' === $view || 'events-edit' === $view ) {
 			$_GET['tab'] = 'events';
 		}
-		if ( 'advanced' === $view || 'log' === $view || 'tools' === $view ) {
+		// 'ecommerce' rendert hier bewusst OHNE WooCommerce-Stub (dieses Skript
+		// simuliert durchgängig eine Free-Installation, siehe PMS_IS_PRO oben) --
+		// zeigt also den seit v0.6.5 neuen "WooCommerce nicht erkannt"-Hinweis-
+		// Card-Zweig in render_ecommerce_tab(), nicht die Pro-Accordion.
+		if ( 'advanced' === $view || 'ecommerce' === $view || 'log' === $view || 'tools' === $view ) {
 			$_GET['tab'] = $view;
 		}
 		if ( 'events-edit' === $view ) {
@@ -208,6 +212,24 @@ foreach ( array( 'general', 'events', 'events-edit', 'advanced', 'log', 'tools',
 		}
 		PMS_Admin::render_page();
 	}
+	$body = ob_get_clean();
+	file_put_contents( __DIR__ . "/preview-$view.html", $head . $body . $foot );
+	echo "geschrieben: preview-$view.html\n";
+}
+
+// Die beiden Sidebar-Shortcuts (seit v0.6.4, seit v0.6.5 die einzige Route zu
+// "Event Log"/"Import / Export" -- siehe render_page()) haben eigene, wenn
+// auch denkbar simple Callbacks; separat gerendert, um sie nicht nur indirekt
+// über tab=log/tab=tools, sondern über ihre TATSÄCHLICHEN Einstiegspunkte zu prüfen.
+foreach (
+	array(
+		'event-log-shortcut'     => 'render_event_log_shortcut',
+		'import-export-shortcut' => 'render_import_export_shortcut',
+	) as $view => $method
+) {
+	$_GET = array( 'page' => 'pms-settings' );
+	ob_start();
+	call_user_func( array( 'PMS_Admin', $method ) );
 	$body = ob_get_clean();
 	file_put_contents( __DIR__ . "/preview-$view.html", $head . $body . $foot );
 	echo "geschrieben: preview-$view.html\n";

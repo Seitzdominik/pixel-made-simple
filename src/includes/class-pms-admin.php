@@ -437,29 +437,34 @@ class PMS_Admin {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'pixel-made-simple' ) );
 		}
 
+		// Seit v0.6.5 nur noch die vier "echten" Einstellungs-Tabs in der
+		// oberen Leiste -- "Event Log" und "Import / Export" sind seit v0.6.4
+		// eigene Einträge in der WP-Seitenleiste (siehe register_menu()) und
+		// waren hier nur noch eine redundante zweite Navigation zu genau
+		// demselben Ziel. "E-Commerce" ist jetzt IMMER sichtbar, auch ohne
+		// WooCommerce (siehe render_ecommerce_tab() für den Hinweis-Zweig,
+		// der in diesem Fall statt der echten Einstellungen rendert).
 		$tabs = array(
-			'general'  => __( 'General', 'pixel-made-simple' ),
-			'events'   => __( 'URL Events', 'pixel-made-simple' ),
-			'advanced' => __( 'Advanced Tracking', 'pixel-made-simple' ),
+			'general'   => __( 'General', 'pixel-made-simple' ),
+			'events'    => __( 'URL Events', 'pixel-made-simple' ),
+			'advanced'  => __( 'Advanced Tracking', 'pixel-made-simple' ),
+			'ecommerce' => __( 'E-Commerce', 'pixel-made-simple' ),
 		);
 
-		// Eigener Tab nur, wenn WooCommerce überhaupt aktiv ist -- dasselbe
-		// Prinzip wie die WooCommerce-Box selbst (siehe render_ecommerce_tab()):
-		// weder ein Toggle noch ein Upgrade-Teaser helfen auf einer Site, die
-		// das Feature ohnehin nicht nutzen könnte. Ein direkter Aufruf mit
-		// ?tab=ecommerce fällt in diesem Fall einfach auf "general" zurück
-		// (siehe die $tabs-Prüfung weiter unten).
-		if ( class_exists( 'WooCommerce' ) ) {
-			$tabs['ecommerce'] = __( 'E-Commerce', 'pixel-made-simple' );
-		}
-
-		$tabs['log']   = __( 'Event Log', 'pixel-made-simple' );
-		$tabs['tools'] = __( 'Import / Export', 'pixel-made-simple' ); // Umbenannt von "Tools" -- Slug bleibt 'tools' (siehe PMS_Tools::redirect()).
+		// 'log'/'tools' tauchen in der Leiste selbst nicht mehr auf, bleiben
+		// aber gültige Tab-Slugs für die Weiche unten -- die beiden Sidebar-
+		// Shortcuts (render_event_log_shortcut()/render_import_export_shortcut())
+		// rufen render_page() mit genau diesen $_GET['tab']-Werten auf, ohne
+		// dass die Slugs in $tabs (und damit in der Navigation) stehen müssen.
+		$valid_tabs = $tabs + array(
+			'log'   => __( 'Event Log', 'pixel-made-simple' ),
+			'tools' => __( 'Import / Export', 'pixel-made-simple' ), // Umbenannt von "Tools" -- Slug bleibt 'tools' (siehe PMS_Tools::redirect()).
+		);
 
 		$active_tab = 'general';
 		if ( isset( $_GET['tab'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nur Tab-Navigation.
 			$requested = sanitize_key( wp_unslash( $_GET['tab'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			if ( isset( $tabs[ $requested ] ) ) {
+			if ( isset( $valid_tabs[ $requested ] ) ) {
 				$active_tab = $requested;
 			}
 		}
@@ -1135,10 +1140,13 @@ class PMS_Admin {
 	 * Tab: E-Commerce. Bündelt WooCommerce-Tracking (ViewContent/AddToCart/
 	 * InitiateCheckout, seit v0.6.4) und Purchase-Tracking an einem Ort,
 	 * statt sie über Tab "Allgemein" zu verstreuen (siehe dortige Doku zur
-	 * Verschiebung). Nur über render_page() erreichbar, wenn WooCommerce
-	 * aktiv ist -- ein ?tab=ecommerce-Aufruf ohne WooCommerce fällt dort
-	 * bereits auf "general" zurück, ein defensiver class_exists()-Check hier
-	 * wäre deshalb toter Code.
+	 * Verschiebung).
+	 *
+	 * Seit v0.6.5 IMMER Teil der Tab-Leiste, auch ohne WooCommerce (vorher
+	 * fehlte der Tab auf Nicht-WooCommerce-Sites komplett, siehe render_page()) --
+	 * ohne WooCommerce rendert diese Methode stattdessen einen reinen
+	 * Hinweis-Card statt der Accordion/des Teasers, siehe erste Verzweigung
+	 * unten.
 	 *
 	 * @return void
 	 */
@@ -1149,15 +1157,17 @@ class PMS_Admin {
 			<?php settings_fields( 'pms_settings_group' ); ?>
 			<?php
 			$ecommerce_skip = array();
-			if ( PMS_Settings::is_pro() ) {
-				// Echte Felder gibt es nur in Pro (siehe unten) -- in Free zeigt
-				// dieser Tab stattdessen einen Teaser ohne echte Felder; dort
-				// MÜSSEN alle vier Keys stattdessen ganz normal über
-				// preserve_hidden_settings() erhalten bleiben (dasselbe Muster
-				// wie überall sonst in diesem Plugin), sonst würde das Speichern
-				// dieses Formulars eine unter Pro bereits gesetzte WooCommerce-/
-				// Purchase-Konfiguration bei einem Downgrade auf Free
-				// stillschweigend auf 0/leer zurücksetzen.
+			// Echte Felder gibt es nur, wenn Pro UND WooCommerce beide zutreffen
+			// (siehe unten) -- in jedem anderen Fall (Free, oder Pro ohne
+			// WooCommerce) zeigt dieser Tab stattdessen einen Teaser bzw.
+			// Hinweis-Card ohne echte Felder; dort MÜSSEN alle vier Keys
+			// stattdessen ganz normal über preserve_hidden_settings() erhalten
+			// bleiben (dasselbe Muster wie überall sonst in diesem Plugin),
+			// sonst würde das Speichern dieses Formulars eine bereits gesetzte
+			// WooCommerce-/Purchase-Konfiguration bei einem Downgrade auf Free
+			// ODER bei einer (vorübergehenden) WooCommerce-Deaktivierung
+			// stillschweigend auf 0/leer zurücksetzen.
+			if ( PMS_Settings::is_pro() && class_exists( 'WooCommerce' ) ) {
 				$ecommerce_skip[] = 'wc_tracking_enabled';
 				$ecommerce_skip[] = 'wc_content_id_type';
 				$ecommerce_skip[] = 'wc_purchase_value_type';
@@ -1168,7 +1178,13 @@ class PMS_Admin {
 
 			<h2 class="pms-section-title"><?php esc_html_e( 'E-Commerce', 'pixel-made-simple' ); ?></h2>
 
-			<?php if ( PMS_Settings::is_pro() ) : ?>
+			<?php if ( ! class_exists( 'WooCommerce' ) ) : ?>
+				<div class="pms-card">
+					<div class="pms-card-body">
+						<p><?php esc_html_e( 'WooCommerce was not detected on this site. Once WooCommerce is activated, the tracking options will appear here.', 'pixel-made-simple' ); ?></p>
+					</div>
+				</div>
+			<?php elseif ( PMS_Settings::is_pro() ) : ?>
 				<?php self::accordion_open( __( 'WooCommerce', 'pixel-made-simple' ), 'pms_settings[wc_tracking_enabled]', ! empty( $s['wc_tracking_enabled'] ), __( 'Enable WooCommerce tracking', 'pixel-made-simple' ), 'wc_tracking_enabled' ); ?>
 				<p class="description"><?php esc_html_e( 'Automatically tracks ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce, deduplicated via the same event ID as in the browser. Purchase additionally uses a server-side fallback for orders completed via external payment gateways that skip the order-received page.', 'pixel-made-simple' ); ?></p>
 				<table class="form-table" role="presentation">

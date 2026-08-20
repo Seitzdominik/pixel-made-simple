@@ -1961,8 +1961,27 @@ $GLOBALS['stub']['enqueued_scripts'] = array();
 PMS_Admin::enqueue_assets( 'irgendein_fremder_hook' );
 check( 'enqueue_assets(): lädt weiterhin NICHT auf fremden Admin-Seiten', array() === $GLOBALS['stub']['enqueued_scripts'] );
 
+/**
+ * Extrahiert nur den <nav class="nav-tab-wrapper">...</nav>-Ausschnitt aus
+ * einem render_page()-Output, damit die Abschnitt-21-Assertions gezielt die
+ * TAB-LEISTE prüfen können statt zufällig auf denselben Text im übrigen
+ * Seiteninhalt zu treffen.
+ */
+function extract_nav( $html ) {
+	$start = strpos( $html, '<nav' );
+	$end   = strpos( $html, '</nav>' );
+	if ( false === $start || false === $end ) {
+		return '';
+	}
+	return substr( $html, $start, $end - $start );
+}
+
 /* --- Sidebar-Shortcuts: wählen den richtigen Tab vor und rendern die
- * normale Haupt-Seite (kein eigenes Markup, siehe Klassen-Doku dort). --- */
+ * normale Haupt-Seite (kein eigenes Markup, siehe Klassen-Doku dort). Seit
+ * v0.6.5 stehen "Event Log"/"Import / Export" NICHT mehr in der oberen
+ * Tab-Leiste (siehe Abschnitt 21) -- die Shortcuts selbst funktionieren
+ * trotzdem weiter, nur ohne eine "aktive" Markierung in der (jetzt kleineren)
+ * Leiste, da keiner ihrer vier verbliebenen Einträge zu tab=log/tools passt. --- */
 
 unset( $_GET['tab'] );
 ob_start();
@@ -1970,14 +1989,53 @@ PMS_Admin::render_import_export_shortcut();
 $import_export_output = ob_get_clean();
 check( 'render_import_export_shortcut(): setzt tab=tools', 'tools' === ( $_GET['tab'] ?? null ) );
 check( 'render_import_export_shortcut(): rendert den Import/Export-Tab-Inhalt (nicht "Global Options" von Tab "Allgemein")', false !== strpos( $import_export_output, 'Export configuration' ) && false === strpos( $import_export_output, 'Global Options' ) );
-check( 'render_import_export_shortcut(): Tab-Leiste markiert "Import / Export" als aktiv', false !== strpos( $import_export_output, 'nav-tab-active' ) && false !== strpos( $import_export_output, 'Import / Export' ) );
+check( 'render_import_export_shortcut(): v0.6.5 -- KEIN Tab in der (jetzt kleineren) Leiste ist mehr "aktiv" markiert, da "Import / Export" dort nicht mehr auftaucht', false === strpos( extract_nav( $import_export_output ), 'nav-tab-active' ) );
 
 unset( $_GET['tab'] );
 ob_start();
 PMS_Admin::render_event_log_shortcut();
 $event_log_output = ob_get_clean();
 check( 'render_event_log_shortcut(): setzt tab=log', 'log' === ( $_GET['tab'] ?? null ) );
-check( 'render_event_log_shortcut(): rendert tatsächlich den Event-Log-Tab (PMS_Admin_Event_Log::render_tab())', false !== strpos( $event_log_output, 'nav-tab-active' ) );
+check( 'render_event_log_shortcut(): rendert tatsächlich den Event-Log-Tab (PMS_Admin_Event_Log::render_tab())', false !== strpos( $event_log_output, 'Clear log' ) );
+check( 'render_event_log_shortcut(): v0.6.5 -- ebenfalls kein "aktiver" Tab mehr in der Leiste', false === strpos( extract_nav( $event_log_output ), 'nav-tab-active' ) );
+
+echo "\n=== 21. Tab-Bereinigung (seit v0.6.5): Event Log/Import-Export raus aus der oberen Leiste, E-Commerce immer sichtbar ===\n";
+
+$GLOBALS['stub']['current_user_can'] = true;
+unset( $_GET['tab'] );
+ob_start();
+PMS_Admin::render_page();
+$general_output = ob_get_clean();
+$general_nav    = extract_nav( $general_output );
+
+check( 'Tab-Leiste enthält weiterhin "General"', false !== strpos( $general_nav, 'General' ) );
+check( 'Tab-Leiste enthält weiterhin "URL Events"', false !== strpos( $general_nav, 'URL Events' ) );
+check( 'Tab-Leiste enthält weiterhin "Advanced Tracking"', false !== strpos( $general_nav, 'Advanced Tracking' ) );
+check( 'Tab-Leiste enthält "E-Commerce" (WooCommerce ist in diesem Harness immer aktiv, siehe Stub-Doku oben)', false !== strpos( $general_nav, 'E-Commerce' ) );
+check( 'Tab-Leiste enthält "Event Log" NICHT mehr (jetzt reiner Sidebar-Shortcut)', false === strpos( $general_nav, 'Event Log' ) );
+check( 'Tab-Leiste enthält "Import / Export" NICHT mehr (jetzt reiner Sidebar-Shortcut)', false === strpos( $general_nav, 'Import / Export' ) );
+check( 'Normale Tab-Navigation funktioniert weiterhin: "General" ist als aktiv markiert', false !== strpos( $general_nav, 'nav-tab-active' ) );
+
+// direkter ?tab=log/?tab=tools-Aufruf (z. B. ein alter Bookmark) muss trotz
+// Entfernens aus der Leiste weiterhin den richtigen Tab-INHALT rendern --
+// die Slugs bleiben über $valid_tabs gültig (siehe render_page()), nur die
+// Navigation selbst verlinkt sie nicht mehr.
+$_GET['tab'] = 'tools';
+ob_start();
+PMS_Admin::render_page();
+$direct_tools_output = ob_get_clean();
+check( 'Direkter ?tab=tools-Aufruf (z. B. alter Bookmark) rendert weiterhin den Import/Export-Inhalt', false !== strpos( $direct_tools_output, 'Export configuration' ) );
+
+// render_ecommerce_tab() bisher nie über render_page() aufgerufen (siehe
+// CLAUDE.md-Hinweis zu Abschnitt 20) -- WooCommerce ist in diesem Harness
+// unconditional aktiv (siehe Stub-Doku oben), PMS_IS_PRO seit Abschnitt 17
+// true, greift also der Pro+WooCommerce-Accordion-Zweig.
+$_GET['tab'] = 'ecommerce';
+ob_start();
+PMS_Admin::render_page();
+$ecommerce_output = ob_get_clean();
+check( 'tab=ecommerce rendert die WooCommerce-Accordion (Pro+WooCommerce-Zweig), nicht den "nicht erkannt"-Hinweis', false !== strpos( $ecommerce_output, 'Enable WooCommerce tracking' ) && false === strpos( $ecommerce_output, 'was not detected' ) );
+check( 'tab=ecommerce ist in der Leiste als aktiv markiert', false !== strpos( extract_nav( $ecommerce_output ), 'nav-tab-active' ) );
 
 unset( $_GET['tab'], $_GET['page'] );
 $GLOBALS['stub']['registered_menu_pages']    = array();

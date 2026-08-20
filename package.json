@@ -1,6 +1,6 @@
 {
     "name": "pixel-made-simple",
-    "version": "0.6.4",
+    "version": "0.6.5",
     "private": true,
     "description": "Pixel Made Simple - lightweight Meta Pixel & Conversions API tracking for WordPress.",
     "scripts": {

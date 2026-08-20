@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.4
+Stable tag: 0.6.5
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -90,6 +90,12 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.5 =
+* Admin-Oberfläche weiter aufgeräumt: „Event Log" und „Import / Export" sind seit 0.6.4 eigene Einträge in der WordPress-Seitenleiste – ihre Reiter in der oberen Tab-Leiste der Haupt-Einstellungsseite waren damit eine reine Dopplung und wurden entfernt. Die obere Leiste zeigt jetzt nur noch „Allgemein", „URL-Events", „Erweitertes Tracking" und „E-Commerce". Alte Lesezeichen/Links auf `?tab=log` bzw. `?tab=tools` funktionieren unverändert weiter.
+* Tab „E-Commerce" ist jetzt immer sichtbar, auch ohne installiertes/aktives WooCommerce (vorher fehlte er auf Nicht-WooCommerce-Sites komplett). Ohne WooCommerce zeigt der Tab einen kurzen Hinweis, dass die Tracking-Optionen erscheinen, sobald WooCommerce aktiviert wird.
+* Fix: Die WooCommerce-/Purchase-Einstellungen auf Tab „E-Commerce" blieben bislang auch dann als verstecktes Feld ungeschützt, wenn Pro aktiv, aber WooCommerce nicht installiert war – ein Speichern in diesem Zustand hätte eine zuvor gesetzte Konfiguration stillschweigend auf die Standardwerte zurückgesetzt. Die Prüfung berücksichtigt jetzt korrekt beide Voraussetzungen (Pro UND WooCommerce).
+* Intern: `dev-tools/preview-admin.php` rendert jetzt auch den Tab „E-Commerce" sowie beide Sidebar-Shortcuts; `dev-tools/test-suite.php` deckt die bereinigte Tab-Leiste und die Persistenz-Korrektur ab (328 → 339 Tests).
 
 = 0.6.4 =
 * Neu (Pro): **WooCommerce-Tracking.** Trackt automatisch `ViewContent` (Produktseite), `AddToCart` (Archiv-/Mini-Cart-AJAX-Buttons und Single-Product-Formulare, inkl. Variable Products) und `InitiateCheckout` (klassischer Checkout und Block-/Cart-Checkout) im Browser-Pixel und via Conversions API – dedupliziert über dieselbe Event-ID wie überall sonst im Plugin. Produktidentifikator wählbar (Produkt-ID oder SKU, Tab „E-Commerce"), Preise/Namen/Kategorien werden dabei immer serverseitig frisch aus WooCommerce aufgelöst statt vom Browser übernommen. Auf Produkt-/Archivseiten wird bewusst keine feste Event-ID serverseitig eingebacken (Cache-Sicherheit auf vollständig gecachten Seiten); ist beim Laden noch keine Marketing-Einwilligung erteilt, werden Events zurückgehalten und automatisch nachgeholt, sobald der Besucher im Cookie-Banner zustimmt. Nur in Pixel Made Simple Pro und nur bei aktivem WooCommerce.
