@@ -2,7 +2,7 @@
 /**
  * Funktionaler Test-Harness für Pixel Made Simple.
  * Stubbt die benötigten WordPress-Funktionen und testet die echte Plugin-Logik
- * per require – kein echtes WordPress nötig. Stand: v0.6.6, 384 Tests.
+ * per require – kein echtes WordPress nötig. Stand: v0.7.0, 648 Tests.
  *
  * Für die rein clientseitige Logik in assets/frontend.js (UTM-Form-Fill),
  * die hier nicht erreichbar ist, siehe das analoge Node-Pendant
@@ -298,7 +298,39 @@ class Test_PMS_Wpdb {
 		return $before - count( $this->rows[ $table ] );
 	}
 
+	/**
+	 * Letzte an query() übergebene SQL -- damit Tests prüfen können, dass ein
+	 * Platzhalter tatsächlich durch prepare() ersetzt wurde (v0.7.0).
+	 *
+	 * @var string
+	 */
+	public $last_query = '';
+
+	/**
+	 * Minimaler prepare()-Ersatz: %s -> einfach gequoteter, escapter String,
+	 * %d -> int. Genau das Verhalten, auf das sich
+	 * PMS_Logger::cleanup_old_entries() seit v0.7.0 stützt -- mehr Syntax
+	 * (Named-Placeholders, %f, %i) wird bewusst nicht nachgebaut.
+	 */
+	public function prepare( $query, ...$args ) {
+		$args = ( 1 === count( $args ) && is_array( $args[0] ) ) ? $args[0] : $args;
+		$i    = 0;
+		return preg_replace_callback(
+			'/%[sd]/',
+			static function ( $m ) use ( $args, &$i ) {
+				$value = $args[ $i++ ] ?? '';
+				if ( '%d' === $m[0] ) {
+					return (string) (int) $value;
+				}
+				return "'" . addslashes( (string) $value ) . "'";
+			},
+			$query
+		);
+	}
+
 	public function query( $sql ) {
+		$this->last_query = (string) $sql;
+
 		$table = $this->extract_table( $sql );
 		if ( null === $table ) {
 			return false;
@@ -306,6 +338,23 @@ class Test_PMS_Wpdb {
 		if ( false !== stripos( $sql, 'TRUNCATE' ) || ( false !== stripos( $sql, 'DELETE' ) && false === stripos( $sql, 'WHERE' ) ) ) {
 			$this->rows[ $table ] = array();
 			return true;
+		}
+		// Seit v0.7.0 die einzige dynamische WHERE-Form, die PMS_Logger
+		// absetzt: DELETE ... WHERE created_at < '<GMT-Datum>' (siehe
+		// cleanup_old_entries()). String-Vergleich reicht, weil created_at
+		// durchgängig im sortierbaren Format Y-m-d H:i:s gespeichert wird.
+		if ( preg_match( "/^DELETE FROM \\S+ WHERE created_at < '([^']+)'$/i", trim( $sql ), $m ) ) {
+			$cutoff = $m[1];
+			$before = count( $this->rows[ $table ] ?? array() );
+			$this->rows[ $table ] = array_values(
+				array_filter(
+					$this->rows[ $table ] ?? array(),
+					static function ( $row ) use ( $cutoff ) {
+						return strcmp( (string) $row['created_at'], $cutoff ) >= 0;
+					}
+				)
+			);
+			return $before - count( $this->rows[ $table ] );
 		}
 		return false;
 	}
@@ -1317,24 +1366,10 @@ check(
 	} )()
 );
 
-$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode'] = 'all';
-$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls'] = '';
-check( 'Form-Fill: mode=all erlaubt jede Seite', true === PMS_Pro_UTM::form_fill_url_allowed( '/irgendwas/' ) );
-
-$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode'] = 'include';
-$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls'] = "/kontakt\n/lp/*";
-check( 'Form-Fill: include, exakt gelisteter Pfad erlaubt', true === PMS_Pro_UTM::form_fill_url_allowed( '/kontakt/' ) );
-check( 'Form-Fill: include, Wildcard-Muster erlaubt Unterseiten', true === PMS_Pro_UTM::form_fill_url_allowed( '/lp/campaign-1/' ) );
-check( 'Form-Fill: include, nicht gelistete Seite blockiert', false === PMS_Pro_UTM::form_fill_url_allowed( '/blog/artikel/' ) );
-
-$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode'] = 'exclude';
-check( 'Form-Fill: exclude, gelistete Seite blockiert', false === PMS_Pro_UTM::form_fill_url_allowed( '/kontakt/' ) );
-check( 'Form-Fill: exclude, nicht gelistete Seite erlaubt', true === PMS_Pro_UTM::form_fill_url_allowed( '/blog/artikel/' ) );
-
-$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_mode'] = 'include';
-$GLOBALS['stub']['options']['pms_settings']['utm_form_fill_urls'] = '';
-check( 'Form-Fill: include ohne hinterlegte Muster erlaubt nichts', false === PMS_Pro_UTM::form_fill_url_allowed( '/kontakt/' ) );
-
+// Die URL-Auswertung (all/include/exclude, Wildcards) liegt seit v0.5.7
+// ausschließlich in assets/frontend.js -- siehe dev-tools/test-frontend-js.js.
+// Die frühere PHP-Doppelung PMS_Pro_UTM::form_fill_url_allowed() wurde in
+// v0.7.0 als toter Code entfernt; PHP liefert nur noch Modus + Muster.
 $GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 0;
 check( 'Form-Fill: form_fill_enabled() spiegelt die Einstellung', false === PMS_Pro_UTM::form_fill_enabled() );
 $GLOBALS['stub']['options']['pms_settings']['enable_utm_form_fill'] = 1;
@@ -1799,6 +1834,15 @@ PMS_Logger::cleanup_old_entries();
 $remaining = PMS_Logger::get_entries();
 check( 'cleanup_old_entries(): Eintrag älter als die Retention (20 Tage bei 14 Tagen Limit) wird gelöscht', 1 === count( $remaining ) );
 check( 'cleanup_old_entries(): der verbleibende Eintrag ist der neue', 'new-evt' === ( $remaining[0]['event_id'] ?? '' ) );
+// v0.7.0: ein einziges, per $wpdb->prepare() vorbereitetes DELETE über den
+// created_at-Index statt "alle Zeilen holen + einzeln löschen".
+check(
+	'cleanup_old_entries(): EIN vorbereitetes DELETE ... WHERE created_at < \'<GMT>\' (kein roher Platzhalter, kein SELECT-all)',
+	1 === preg_match( "/^DELETE FROM wp_pms_event_log WHERE created_at < '\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}'$/", $GLOBALS['wpdb']->last_query ),
+	$GLOBALS['wpdb']->last_query
+);
+$cutoff_expected = gmdate( 'Y-m-d', strtotime( '-14 days' ) );
+check( 'cleanup_old_entries(): Stichtag = heute minus Retention (GMT)', false !== strpos( $GLOBALS['wpdb']->last_query, "'" . $cutoff_expected ) );
 
 $GLOBALS['wpdb']->rows = array();
 

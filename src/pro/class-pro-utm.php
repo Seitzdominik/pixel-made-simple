@@ -98,56 +98,16 @@ class PMS_Pro_UTM {
 	 * enabled() es überhaupt anlegt – ist utm_passthrough aus, greift nur die
 	 * URL-Parameter-Quelle.
 	 *
+	 * Die URL-Auswertung (all/include/exclude, Wildcards) passiert seit v0.5.7
+	 * ausschließlich in assets/frontend.js (utmFormFillAllowed()) anhand der
+	 * vom Browser aufgelösten URL -- PHP liefert nur noch Modus und Muster
+	 * (PMS_Settings::utm_form_fill_url_patterns()) per wp_localize_script().
+	 *
 	 * @return bool
 	 */
 	public static function form_fill_enabled() {
 		$settings = PMS_Settings::get();
 		return ! empty( $settings['enable_utm_form_fill'] );
-	}
-
-	/**
-	 * Ist der UTM-Form-Fill auf diesem Pfad aktiv?
-	 *
-	 * @param string $path Pfad (z. B. "/kontakt/").
-	 * @return bool
-	 */
-	public static function form_fill_url_allowed( $path ) {
-		$settings = PMS_Settings::get();
-		$mode     = (string) ( $settings['utm_form_fill_mode'] ?? 'all' );
-
-		if ( 'all' === $mode ) {
-			return true;
-		}
-
-		$matched = self::path_matches_patterns( (string) $path, PMS_Settings::utm_form_fill_url_patterns() );
-
-		return 'exclude' === $mode ? ! $matched : $matched;
-	}
-
-	/**
-	 * Pfad gegen eine Liste von Mustern prüfen (Teilstring-Treffer, ein
-	 * abschließendes "*" wirkt als einfacher Prefix-Platzhalter und wird vor
-	 * dem Vergleich entfernt, z. B. matcht "/lp/*" alles unter "/lp/").
-	 *
-	 * @param string   $path     Pfad.
-	 * @param string[] $patterns Muster.
-	 * @return bool
-	 */
-	private static function path_matches_patterns( $path, array $patterns ) {
-		if ( empty( $patterns ) ) {
-			return false;
-		}
-
-		$path = strtolower( $path );
-
-		foreach ( $patterns as $pattern ) {
-			$needle = strtolower( rtrim( (string) $pattern, '*' ) );
-			if ( '' !== $needle && false !== strpos( $path, $needle ) ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	/**

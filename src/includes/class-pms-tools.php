@@ -142,7 +142,7 @@ class PMS_Tools {
 		}
 
 		if ( isset( $data['events_enabled'] ) ) {
-			update_option( PMS_Settings::OPTION_EVENTS_ENABLED, empty( $data['events_enabled'] ) ? 0 : 1, false );
+			update_option( PMS_Settings::OPTION_EVENTS_ENABLED, empty( $data['events_enabled'] ) ? 0 : 1, true );
 		}
 
 		return true;

@@ -34,6 +34,15 @@ foreach ( $pms_sibling_plugins as $pms_sibling_plugin ) {
 	}
 }
 
+// Pro-exklusiver Zustand des vendorten Update-Checkers (YahnisElsts PUC):
+// Option "external_updates-<slug>" + Cron-Hook "puc_cron_check_updates-<slug>".
+// Gehört nur Pro, darf also unabhängig vom Free-Sibling weg, sobald Pro
+// selbst deinstalliert wird (Free legt beides nie an).
+if ( 'pixel-made-simple-pro/pixel-made-simple-pro.php' === WP_UNINSTALL_PLUGIN ) {
+	delete_option( 'external_updates-pixel-made-simple-pro' );
+	wp_clear_scheduled_hook( 'puc_cron_check_updates-pixel-made-simple-pro' );
+}
+
 if ( ! $pms_sibling_still_present ) {
 	delete_option( 'pms_settings' );
 	delete_option( 'pms_events' );
@@ -43,5 +52,5 @@ if ( ! $pms_sibling_still_present ) {
 	wp_clear_scheduled_hook( 'pms_cleanup_event_log_cron' );
 
 	global $wpdb;
-	$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'pms_event_log' );
+	$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'pms_event_log' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.NotPrepared -- Eigene Tabelle, Name aus $wpdb->prefix.
 }

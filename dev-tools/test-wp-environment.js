@@ -76,21 +76,31 @@ const PRO_SLUG = 'pixel-made-simple-pro/pixel-made-simple-pro.php';
 // diese beiden Listen ueberhaupt ein startfaehiges Plugin ergeben -- die
 // Release-Action selbst wurde laut CLAUDE.md noch nie gegen einen echten
 // Tag-Push verifiziert.
-const FREE_EXCLUDES = ['pixel-made-simple-pro.php', 'pro', 'plugin-update-checker'];
+//
+// Eintraege sind Pfade relativ zu src/ (Vorwaertsschraegstriche, ohne
+// fuehrenden Slash) -- ein Ordnername schliesst den ganzen Ordner aus. Seit
+// v0.7.0 auch verschachtelte Pfade: die beiden Pro-only-Frontend-Skripte
+// liegen unter assets/ und landeten bis dahin als totes JS im Free-ZIP.
+const FREE_EXCLUDES = [
+	'pixel-made-simple-pro.php',
+	'pro',
+	'plugin-update-checker',
+	'assets/pms-woocommerce.js',
+	'assets/pms-surecart.js',
+];
 const PRO_EXCLUDES = ['pixel-made-simple.php'];
 
-function stagePluginBuild(destDir, excludeTopLevelEntries) {
+function stagePluginBuild(destDir, excludeEntries) {
 	fs.rmSync(destDir, { recursive: true, force: true });
 	fs.mkdirSync(destDir, { recursive: true });
 	fs.cpSync(SRC_DIR, destDir, {
 		recursive: true,
 		filter(srcPath) {
-			const rel = path.relative(SRC_DIR, srcPath);
+			const rel = path.relative(SRC_DIR, srcPath).split(path.sep).join('/');
 			if (rel === '') {
 				return true;
 			}
-			const topLevelEntry = rel.split(path.sep)[0];
-			return !excludeTopLevelEntries.includes(topLevelEntry);
+			return !excludeEntries.some((entry) => rel === entry || rel.startsWith(entry + '/'));
 		},
 	});
 }
@@ -245,6 +255,14 @@ async function runPlaygroundChecks() {
 	// verdeckt -- beide Fehlerlisten werden gemeinsam ausgegeben.
 	failures.push(...(await runEcommerceHookChecks(runCLI)));
 
+	// Szenario 3 (seit v0.7.0): Free standalone -- einmal mit Playgrounds
+	// Standard-PHP (Referenz fuer "Tested up to"), einmal mit PHP 7.4
+	// ("Requires PHP" im Plugin-Header).
+	const freeDefault = await runFreeStandaloneChecks(runCLI);
+	failures.push(...freeDefault.failures);
+	const freeLegacyPhp = await runFreeStandaloneChecks(runCLI, { php: '7.4' });
+	failures.push(...freeLegacyPhp.failures);
+
 	if (failures.length > 0) {
 		console.error(`\n${failures.length} Pruefung(en) fehlgeschlagen:\n`);
 		failures.forEach((failure) => console.error(`  - ${failure}`));
@@ -258,6 +276,14 @@ async function runPlaygroundChecks() {
 	console.log('  - Tabelle pms_event_log und WordPress-Optionstabelle wurden angelegt.');
 	console.log('  - E-Commerce-Hooks (WooCommerce + SureCart) werden trotz alphabetischer');
 	console.log('    Ladereihenfolge registriert -- inkl. woocommerce_thankyou mit Prioritaet 10.');
+	console.log('  - Free standalone: Aktivierung, Frontend-Request (Pixel, URL-Event, frontend.js) und');
+	console.log('    alle Admin-Tabs ohne PHP-Warnung/Notice/Deprecation und ohne _doing_it_wrong().');
+	if (freeDefault.versions) {
+		console.log(`    Getestet mit WordPress ${freeDefault.versions.wp} / PHP ${freeDefault.versions.php}`);
+	}
+	if (freeLegacyPhp.versions) {
+		console.log(`    und zusaetzlich mit WordPress ${freeLegacyPhp.versions.wp} / PHP ${freeLegacyPhp.versions.php} (Mindestversion laut Plugin-Header).`);
+	}
 }
 
 /**
@@ -394,6 +420,330 @@ async function runEcommerceHookChecks(runCLI) {
 	fs.rmSync(outputDir, { recursive: true, force: true });
 
 	return evaluateEcommerceReport(report);
+}
+
+/**
+ * Szenario 3 "Free standalone" (seit v0.7.0).
+ *
+ * WordPress.org-Readiness-Pruefung: Die kostenlose Version muss OHNE Pro
+ * vollstaendig eigenstaendig laufen -- kein Fatal Error, keine PHP-Warnung/
+ * -Notice/-Deprecation aus Plugin-Dateien, kein _doing_it_wrong() (z. B.
+ * "Translation loading triggered too early", das WordPress seit 6.7 meldet),
+ * und zwar sowohl auf einem echten Frontend-Request (Pixel-Ausgabe,
+ * Formular-Grabber-Skript) als auch beim Rendern aller Admin-Tabs.
+ *
+ * Drei runPHP-Schritte in EINEM Blueprint (dieselbe Instanz, drei getrennte
+ * PHP-Prozesse, siehe include_once-Hinweis im Datei-Kopf):
+ *   1. Aktivierung + Konfiguration (WP_ADMIN), meldet WP-/PHP-Version.
+ *   2. Frontend-Request ohne WP_ADMIN: wp() + wp_head/wp_footer wie bei
+ *      einem echten Seitenaufruf -- hier greift PMS_Frontend::prepare().
+ *   3. Admin-Request mit WP_ADMIN: alle Tabs + Info-Seite rendern,
+ *      enqueue_assets() gegen eigenen und fremden Hook-Suffix.
+ *
+ * Fehler-Erfassung VOR wp-load.php: set_error_handler() sammelt alle
+ * Warnungen/Notices/Deprecations aus Dateien unter plugins/pixel-made-simple,
+ * und $wp_filter wird vor dem Laden mit einem doing_it_wrong_run-Listener
+ * vorbelegt (WP_Hook::build_preinitialized_hooks() uebernimmt ihn) -- so
+ * entgeht keine Meldung, auch nicht aus dem Bootstrap selbst.
+ *
+ * Laeuft zweimal: einmal mit Playgrounds Standard-PHP und einmal mit PHP 7.4,
+ * der im Plugin-Header deklarierten Mindestversion -- der Stub-Harness kann
+ * PHP-Versionsabhaengigkeiten nicht pruefen, er laeuft nur mit dem lokal
+ * installierten PHP.
+ */
+const FREE_ERROR_CAPTURE = `
+$GLOBALS['pms_test_errors']      = array();
+$GLOBALS['pms_test_doing_wrong'] = array();
+
+$GLOBALS['pms_test_handler'] = function ( $errno, $errstr, $errfile, $errline ) {
+	if ( false !== strpos( str_replace( '\\\\', '/', (string) $errfile ), '/plugins/pixel-made-simple' ) ) {
+		$GLOBALS['pms_test_errors'][] = $errno . ': ' . $errstr . ' in ' . basename( (string) $errfile ) . ':' . $errline;
+	}
+	return false;
+};
+set_error_handler( $GLOBALS['pms_test_handler'] );
+
+// Ist der eigene Handler am Ende des Requests noch aktiv? (Waere er von
+// WordPress/Playground ersetzt worden, bliebe die Fehlerliste leer, ohne
+// dass das etwas bedeutet.)
+function pms_test_handler_intact() {
+	$prev = set_error_handler( 'strlen' );
+	restore_error_handler();
+	return $prev === $GLOBALS['pms_test_handler'];
+}
+
+$GLOBALS['wp_filter']['doing_it_wrong_run'][10][] = array(
+	'function'      => function ( $function_name, $message, $version ) {
+		$GLOBALS['pms_test_doing_wrong'][] = $function_name . ': ' . wp_strip_all_tags( (string) $message );
+	},
+	'accepted_args' => 3,
+);
+`;
+
+const FREE_SETUP_SCRIPT = `<?php
+define( 'WP_ADMIN', true );
+${FREE_ERROR_CAPTURE}
+require_once '/wordpress/wp-load.php';
+require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+$report = array( 'errors' => array(), 'doing_it_wrong' => array() );
+
+try {
+	$result = activate_plugin( 'pixel-made-simple/pixel-made-simple.php' );
+	$report['activation_ok']    = ! is_wp_error( $result );
+	$report['activation_error'] = is_wp_error( $result ) ? $result->get_error_message() : null;
+} catch ( \\Throwable $e ) {
+	$report['activation_ok']    = false;
+	$report['activation_error'] = get_class( $e ) . ': ' . $e->getMessage();
+}
+
+// Realistische Free-Konfiguration: Meta-Pixel aktiv, Formular-Grabber aktiv,
+// ein URL-Event auf der Startseite. Consent-Erkennung bleibt an -- ohne
+// installiertes Banner gilt Consent als erteilt (siehe PMS_Consent).
+$settings = PMS_Settings::get();
+$settings['pixel_enabled'] = 1;
+$settings['pixel_id']      = '1234567890123456';
+$settings['form_tracking'] = 1;
+$settings['debug_bar']     = 1;
+update_option( 'pms_settings', PMS_Settings::sanitize_settings( $settings ) );
+
+PMS_Settings::save_events( array(
+	'homelead' => array(
+		'id'           => 'homelead',
+		'name'         => 'Startseite',
+		'event_type'   => 'Lead',
+		'match_type'   => 'exact',
+		'match_value'  => '/',
+		'active'       => 1,
+		'meta_enabled' => 1,
+	),
+) );
+
+$report['wp_version']        = get_bloginfo( 'version' );
+$report['php_version']       = PHP_VERSION;
+$report['log_db_version']    = get_option( 'pms_log_db_version' );
+$report['pro_classes_absent'] = ! class_exists( 'PMS_Pro_UTM' ) && ! class_exists( 'PMS_Pro_WooCommerce' );
+$report['errors']            = $GLOBALS['pms_test_errors'];
+$report['doing_it_wrong']    = $GLOBALS['pms_test_doing_wrong'];
+$report['handler_intact']    = array( pms_test_handler_intact() );
+
+file_put_contents( '/wordpress/wp-content/pms-test-output/free-report.json', wp_json_encode( $report, JSON_PRETTY_PRINT ) );
+`;
+
+const FREE_FRONTEND_SCRIPT = `<?php
+${FREE_ERROR_CAPTURE}
+$_SERVER['REQUEST_URI'] = '/';
+$_SERVER['HTTP_HOST']   = 'playground.wordpress.net';
+require_once '/wordpress/wp-load.php';
+
+$file   = '/wordpress/wp-content/pms-test-output/free-report.json';
+$report = json_decode( (string) file_get_contents( $file ), true );
+$report = is_array( $report ) ? $report : array();
+
+// Echter Frontend-Request: wp() setzt die Hauptabfrage auf und feuert den
+// "wp"-Hook (PMS_Frontend::prepare(), Prioritaet 20), wp_head()/wp_footer()
+// geben die Pixel-Skripte bzw. die per wp_enqueue_scripts angehaengten
+// Assets aus -- exakt die Hooks, auf denen das Plugin im Frontend haengt.
+wp();
+ob_start();
+wp_head();
+wp_footer();
+$html = ob_get_clean();
+
+$report['frontend'] = array(
+	'tracking_active'    => PMS_Frontend::is_active(),
+	'skip_reason'        => PMS_Frontend::get_skip_reason(),
+	'marker'             => false !== strpos( $html, '<!-- Pixel Made Simple -->' ),
+	'pixel_init'         => false !== strpos( $html, "fbq('init','1234567890123456')" ),
+	'pageview'           => false !== strpos( $html, "fbq('track','PageView')" ),
+	'url_event'          => 1 === preg_match( "/fbq\\\\('track','Lead',\\\\{\\\\},\\\\{eventID:'[0-9a-f-]{36}'\\\\}\\\\)/", $html ),
+	'frontend_js'        => false !== strpos( $html, 'assets/frontend.js' ),
+	'localized_settings' => false !== strpos( $html, 'pms_settings' ),
+	'no_pro_scripts'     => false === strpos( $html, 'pms-woocommerce' ) && false === strpos( $html, 'pms-surecart' ),
+	'no_debug_bar'       => false === strpos( $html, 'id="pms-debug"' ), // Nicht eingeloggt -> kein Admin-Debug.
+	'html_length'        => strlen( $html ),
+);
+$report['errors']         = array_merge( $report['errors'] ?? array(), $GLOBALS['pms_test_errors'] );
+$report['doing_it_wrong'] = array_merge( $report['doing_it_wrong'] ?? array(), $GLOBALS['pms_test_doing_wrong'] );
+$report['handler_intact'] = array_merge( $report['handler_intact'] ?? array(), array( pms_test_handler_intact() ) );
+
+file_put_contents( $file, wp_json_encode( $report, JSON_PRETTY_PRINT ) );
+`;
+
+const FREE_ADMIN_SCRIPT = `<?php
+define( 'WP_ADMIN', true );
+${FREE_ERROR_CAPTURE}
+$_SERVER['REQUEST_URI'] = '/wp-admin/admin.php?page=pms-settings';
+require_once '/wordpress/wp-load.php';
+require_once ABSPATH . 'wp-admin/includes/admin.php';
+
+$file   = '/wordpress/wp-content/pms-test-output/free-report.json';
+$report = json_decode( (string) file_get_contents( $file ), true );
+$report = is_array( $report ) ? $report : array();
+
+wp_set_current_user( 1 );
+set_current_screen( 'toplevel_page_pms-settings' );
+do_action( 'admin_init' );
+do_action( 'admin_menu' );
+
+$tabs  = array( 'general', 'events', 'advanced', 'ecommerce', 'log', 'tools' );
+$pages = array();
+foreach ( $tabs as $tab ) {
+	$_GET['tab'] = $tab;
+	ob_start();
+	PMS_Admin::render_page();
+	$out = ob_get_clean();
+	$pages[ $tab ] = array(
+		'rendered'   => false !== strpos( $out, 'pms-wrap pms-tab-' . $tab ),
+		'old_brand'  => false !== strpos( $out, 'Meta Pixel & CAPI Tracker' ),
+		'has_secret' => 'general' !== $tab && false !== strpos( $out, 'pms_settings[capi_token]' ),
+	);
+}
+unset( $_GET['tab'] );
+
+ob_start();
+PMS_Admin::render_help_page();
+$help = ob_get_clean();
+$pages['help'] = array(
+	'rendered'  => false !== strpos( $help, 'pms-tab-help' ) && false !== strpos( $help, 'support@pixelmadesimple.com' ),
+	'old_brand' => false !== strpos( $help, 'Meta Pixel & CAPI Tracker' ),
+	'has_secret' => false,
+);
+
+// Assets duerfen NUR auf den eigenen Screens geladen werden.
+PMS_Admin::enqueue_assets( 'index.php' );
+$foreign_enqueued = wp_script_is( 'pms-admin', 'enqueued' ) || wp_style_is( 'pms-admin', 'enqueued' );
+PMS_Admin::enqueue_assets( 'toplevel_page_pms-settings' );
+$own_enqueued = wp_script_is( 'pms-admin', 'enqueued' ) && wp_style_is( 'pms-admin', 'enqueued' );
+
+// Free-Gating auf Tab "Allgemein": Teaser statt echter Google-/TikTok-Felder.
+$_GET['tab'] = 'general';
+ob_start();
+PMS_Admin::render_page();
+$general = ob_get_clean();
+unset( $_GET['tab'] );
+
+$report['admin'] = array(
+	'pages'                => $pages,
+	'menu_registered'      => isset( $GLOBALS['admin_page_hooks']['pms-settings'] ),
+	'foreign_enqueued'     => $foreign_enqueued,
+	'own_enqueued'         => $own_enqueued,
+	'free_teaser'          => false !== strpos( $general, 'pms-pro-teaser' ),
+	// Das sichtbare Textfeld (id="pms-google-tag-id") darf in Free nicht
+	// existieren -- das Hidden-Feld aus preserve_hidden_settings() dagegen
+	// schon (es schuetzt eine unter Pro gespeicherte ID vor dem Ueberschreiben).
+	'free_no_google_field' => false === strpos( $general, 'id="pms-google-tag-id"' ),
+);
+
+$report['errors']         = array_merge( $report['errors'] ?? array(), $GLOBALS['pms_test_errors'] );
+$report['doing_it_wrong'] = array_merge( $report['doing_it_wrong'] ?? array(), $GLOBALS['pms_test_doing_wrong'] );
+$report['handler_intact'] = array_merge( $report['handler_intact'] ?? array(), array( pms_test_handler_intact() ) );
+
+file_put_contents( $file, wp_json_encode( $report, JSON_PRETTY_PRINT ) );
+`;
+
+function evaluateFreeReport(report, label) {
+	const failures = [];
+	const prefix = `[${label}] `;
+
+	if (!report.activation_ok) {
+		failures.push(`${prefix}Free-Aktivierung fehlgeschlagen: ${report.activation_error}`);
+	}
+	if (!report.pro_classes_absent) {
+		failures.push(`${prefix}Pro-Klassen sind im Free-Build geladen -- die Exclude-Liste greift nicht.`);
+	}
+	if (!report.log_db_version) {
+		failures.push(`${prefix}pms_log_db_version wurde bei der Aktivierung nicht gesetzt.`);
+	}
+
+	if (!Array.isArray(report.handler_intact) || report.handler_intact.length !== 3 || report.handler_intact.some((ok) => ok !== true)) {
+		failures.push(`${prefix}Der Test-Fehlerhandler war nicht in allen drei Schritten aktiv -- die Fehlerliste ist nicht aussagekraeftig (${JSON.stringify(report.handler_intact)}).`);
+	}
+	(report.errors || []).forEach((e) => failures.push(`${prefix}PHP-Fehler aus Plugin-Datei: ${e}`));
+	(report.doing_it_wrong || []).forEach((w) => failures.push(`${prefix}_doing_it_wrong(): ${w}`));
+
+	const f = report.frontend || {};
+	if (!f.tracking_active) {
+		failures.push(`${prefix}Frontend: Tracking nicht aktiv (skip_reason=${f.skip_reason || '?'}).`);
+	}
+	[ 'marker', 'pixel_init', 'pageview', 'url_event', 'frontend_js', 'localized_settings', 'no_pro_scripts', 'no_debug_bar' ].forEach((key) => {
+		if (!f[key]) {
+			failures.push(`${prefix}Frontend-Pruefung "${key}" fehlgeschlagen.`);
+		}
+	});
+
+	const a = report.admin || {};
+	Object.entries(a.pages || {}).forEach(([tab, res]) => {
+		if (!res.rendered) {
+			failures.push(`${prefix}Admin-Tab "${tab}" wurde nicht gerendert.`);
+		}
+		if (res.old_brand) {
+			failures.push(`${prefix}Admin-Tab "${tab}" enthaelt noch den alten Markennamen "Meta Pixel & CAPI Tracker".`);
+		}
+		if (res.has_secret) {
+			failures.push(`${prefix}Admin-Tab "${tab}" gibt den CAPI-Token als Feld aus (darf nur Tab "Allgemein").`);
+		}
+	});
+	if (!a.menu_registered) {
+		failures.push(`${prefix}Admin-Menue pms-settings wurde nicht registriert.`);
+	}
+	if (a.foreign_enqueued) {
+		failures.push(`${prefix}admin.css/admin.js werden auf einem fremden Admin-Screen geladen (index.php).`);
+	}
+	if (!a.own_enqueued) {
+		failures.push(`${prefix}admin.css/admin.js werden auf dem eigenen Screen NICHT geladen.`);
+	}
+	if (!a.free_teaser) {
+		failures.push(`${prefix}Free: Tab "Allgemein" zeigt keinen Pro-Teaser (Google Ads/TikTok).`);
+	}
+	if (!a.free_no_google_field) {
+		failures.push(`${prefix}Free: Tab "Allgemein" rendert ein echtes google_tag_id-Feld (Pro-only).`);
+	}
+
+	return failures;
+}
+
+async function runFreeStandaloneChecks(runCLI, options) {
+	const label = options && options.php ? `Free standalone, PHP ${options.php}` : 'Free standalone';
+	const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pms-wp-free-'));
+	const reportFile = path.join(outputDir, 'free-report.json');
+
+	console.log(`\nSzenario 3: ${label} -- Aktivierung, Frontend-Request, alle Admin-Tabs...`);
+
+	try {
+		await runCLI(Object.assign({
+			command: 'run-blueprint',
+			mount: [
+				{ hostPath: FREE_DIR, vfsPath: '/wordpress/wp-content/plugins/pixel-made-simple' },
+				{ hostPath: outputDir, vfsPath: '/wordpress/wp-content/pms-test-output' },
+			],
+			blueprint: {
+				steps: [
+					{ step: 'runPHP', code: FREE_SETUP_SCRIPT },
+					{ step: 'runPHP', code: FREE_FRONTEND_SCRIPT },
+					{ step: 'runPHP', code: FREE_ADMIN_SCRIPT },
+				],
+			},
+		}, options || {}));
+	} catch (err) {
+		console.error(`Playground-Blueprint (${label}) ist fehlgeschlagen:`);
+		console.error(err && err.message ? err.message : err);
+		fs.rmSync(outputDir, { recursive: true, force: true });
+		return { failures: [`Szenario "${label}" konnte nicht ausgefuehrt werden (Fatal Error?).`], versions: null };
+	}
+
+	if (!fs.existsSync(reportFile)) {
+		fs.rmSync(outputDir, { recursive: true, force: true });
+		return { failures: [`free-report.json (${label}) wurde nicht geschrieben.`], versions: null };
+	}
+
+	const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+	fs.rmSync(outputDir, { recursive: true, force: true });
+
+	return {
+		failures: evaluateFreeReport(report, label),
+		versions: { wp: report.wp_version, php: report.php_version },
+	};
 }
 
 async function main() {

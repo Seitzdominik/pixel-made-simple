@@ -107,7 +107,7 @@ class PMS_Pro_WooCommerce {
 
 		// Ab WP 6.3 per Loading-Strategy-API tatsächlich "defer" (WP core ignoriert
 		// unbekannte Strategy-Metadaten auf älteren Cores folgenlos -- sicher trotz
-		// "Requires at least: 6.0" im Plugin-Header).
+		// "Requires at least: 5.8" im Plugin-Header).
 		wp_script_add_data( 'pms-woocommerce', 'strategy', 'defer' );
 
 		$settings = PMS_Settings::get();

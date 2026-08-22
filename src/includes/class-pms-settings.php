@@ -151,15 +151,6 @@ class PMS_Settings {
 	}
 
 	/**
-	 * Abwärtskompatibler Alias (v1.x).
-	 *
-	 * @return string[]
-	 */
-	public static function event_types() {
-		return self::meta_event_types();
-	}
-
-	/**
 	 * Einstellungen mit Defaults.
 	 *
 	 * @return array
@@ -714,6 +705,13 @@ class PMS_Settings {
 	 * da die Admin-UI das Anlegen eines weiteren Events bereits vorher sperrt
 	 * (siehe PMS_Admin::render_event_form()/handle_save_event()).
 	 *
+	 * Seit v0.7.0 mit autoload=true (vorher false): PMS_Frontend::prepare()
+	 * liest die Events bei jedem getrackten Seitenaufruf -- nicht autogeladen
+	 * war das auf Sites ohne persistenten Object Cache eine eigene SELECT-
+	 * Abfrage pro Seite, für ein Array, das selbst in Pro selten mehr als ein
+	 * paar Kilobyte groß wird (siehe PMS_Logger::ensure_autoloaded_options()
+	 * für die einmalige Migration bestehender Installationen).
+	 *
 	 * @param array $events Events, keyed by id.
 	 * @return void
 	 */
@@ -722,7 +720,7 @@ class PMS_Settings {
 			$events = array_slice( $events, 0, self::FREE_EVENT_LIMIT, true );
 		}
 
-		update_option( self::OPTION_EVENTS, array_values( $events ), false );
+		update_option( self::OPTION_EVENTS, array_values( $events ), true );
 	}
 
 	/**

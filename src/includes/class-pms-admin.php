@@ -55,7 +55,7 @@ class PMS_Admin {
 
 	public static function register_menu() {
 		add_menu_page(
-			__( 'Meta Pixel & CAPI Tracker', 'pixel-made-simple' ),
+			__( 'Pixel Made Simple', 'pixel-made-simple' ),
 			__( 'Pixel Made Simple', 'pixel-made-simple' ),
 			self::CAPABILITY,
 			self::PAGE_SLUG,
@@ -67,7 +67,7 @@ class PMS_Admin {
 		// Ersten Submenü-Eintrag (Duplikat des Hauptmenüs) sinnvoll benennen.
 		add_submenu_page(
 			self::PAGE_SLUG,
-			__( 'Meta Pixel & CAPI Tracker', 'pixel-made-simple' ),
+			__( 'Pixel Made Simple', 'pixel-made-simple' ),
 			__( 'Settings', 'pixel-made-simple' ),
 			self::CAPABILITY,
 			self::PAGE_SLUG
@@ -164,9 +164,10 @@ class PMS_Admin {
 			'pms-admin',
 			'pmsAdmin',
 			array(
-				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
-				'nonce'     => wp_create_nonce( 'pms_toggle_autosave' ),
-				'savedText' => __( 'Saved.', 'pixel-made-simple' ),
+				'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+				'nonce'       => wp_create_nonce( 'pms_toggle_autosave' ),
+				'savedText'   => __( 'Saved.', 'pixel-made-simple' ),
+				'confirmText' => __( 'Are you sure?', 'pixel-made-simple' ),
 			)
 		);
 	}
@@ -252,7 +253,9 @@ class PMS_Admin {
 	 * @return void
 	 */
 	public static function render_notices() {
-		if ( ! isset( $_GET['page'] ) || self::PAGE_SLUG !== $_GET['page'] || ! isset( $_GET['pms_message'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nur Auswahl einer statischen Meldung.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Nur Auswahl einer statischen Meldung, keine Zustandsänderung.
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( self::PAGE_SLUG !== $page || ! isset( $_GET['pms_message'] ) ) {
 			return;
 		}
 
@@ -272,7 +275,8 @@ class PMS_Admin {
 			'log_cleared'        => array( 'success', __( 'Event log cleared.', 'pixel-made-simple' ) ),
 		);
 
-		$key = sanitize_key( wp_unslash( $_GET['pms_message'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$key = sanitize_key( wp_unslash( $_GET['pms_message'] ) );
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		if ( ! isset( $messages[ $key ] ) ) {
 			return;
@@ -2214,7 +2218,7 @@ class PMS_Admin {
 		self::require_capability();
 		check_admin_referer( 'pms_toggle_all_events' );
 
-		update_option( PMS_Settings::OPTION_EVENTS_ENABLED, empty( $_POST['events_enabled'] ) ? 0 : 1, false );
+		update_option( PMS_Settings::OPTION_EVENTS_ENABLED, empty( $_POST['events_enabled'] ) ? 0 : 1, true );
 
 		self::redirect_events( 'global_toggled' );
 	}

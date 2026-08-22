@@ -32,6 +32,8 @@ jobs:
             --exclude '/pixel-made-simple-pro.php' \
             --exclude '/pro/' \
             --exclude '/plugin-update-checker/' \
+            --exclude '/assets/pms-woocommerce.js' \
+            --exclude '/assets/pms-surecart.js' \
             src/ build/pixel-made-simple/
 
       - name: Zip

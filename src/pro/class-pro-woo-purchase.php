@@ -834,15 +834,11 @@ class PMS_Pro_Woo_Purchase {
 
 	/**
 	 * TikTok Events API (server-seitig, analog zu PMS_CAPI::send_events()
-	 * für Meta, aber TikTok-spezifisch -- siehe Klassen-Doku "Isolation":
-	 * kein zweiter Aufrufer existiert aktuell, eine eigene Klasse wäre
-	 * verfrühte Abstraktion). Respektiert denselben Consent-Gate wie Meta.
-	 *
-	 * Bewusst OHNE Event-Log-Eintrag (anders als PMS_CAPI::send_events()) --
-	 * das Event-Log-Schema/UI ist auf den Meta-Sprachgebrauch zugeschnitten
-	 * (source-Werte 'capi'/'both'/'browser'); eine vierte source würde auch
-	 * PMS_Admin_Event_Log::render_row() anfassen müssen. Bewusster Scope-Cut
-	 * dieser Session, siehe „Bekannte Trade-offs" in CLAUDE.md.
+	 * für Meta). Baut hier nur den TikTok-spezifischen Request-Body aus den
+	 * Bestelldaten; Versand UND Protokollierung (Live-Debug-Leiste + Event
+	 * Log mit HTTP-Status und Match Keys) übernimmt seit v0.6.11 zentral
+	 * PMS_Pro_TikTok_CAPI::send() -- gemeinsam mit dem SureCart-Pendant.
+	 * Respektiert denselben Consent-Gate wie Meta.
 	 *
 	 * @param WC_Order $order       Bestellung.
 	 * @param array    $custom_data Von build_order_custom_data().

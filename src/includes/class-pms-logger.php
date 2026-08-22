@@ -13,13 +13,19 @@ defined( 'ABSPATH' ) || exit;
 class PMS_Logger {
 
 	/**
-	 * Schema-Version der Tabelle. Bei einer künftigen Spaltenänderung hier
-	 * hochzählen -- maybe_upgrade_table() erkennt den Unterschied und ruft
-	 * dbDelta() automatisch erneut auf (deckt den häufigen Fall ab, dass ein
-	 * Update ohne erneute Aktivierung eingespielt wird, register_activation_hook
-	 * also gar nicht feuert).
+	 * Migrations-Version des Logs. Bei einer künftigen Spaltenänderung ODER
+	 * einer anderen einmalig nachzuziehenden Änderung hier hochzählen --
+	 * maybe_upgrade_table() erkennt den Unterschied und ruft dbDelta() sowie
+	 * die übrigen Migrationsschritte automatisch erneut auf (deckt den
+	 * häufigen Fall ab, dass ein Update ohne erneute Aktivierung eingespielt
+	 * wird, register_activation_hook also gar nicht feuert).
+	 *
+	 * 1.1.1 (v0.7.0): keine Schemaänderung, sondern eine reine
+	 * Autoload-Migration -- siehe ensure_autoloaded_options(). Der
+	 * Versionssprung ist nötig, damit Bestandsinstallationen den
+	 * Migrationszweig genau einmal durchlaufen.
 	 */
-	const DB_VERSION        = '1.1.0';
+	const DB_VERSION        = '1.1.1';
 	const DB_VERSION_OPTION = 'pms_log_db_version';
 
 	const CRON_HOOK = 'pms_cleanup_event_log_cron';
@@ -93,8 +99,9 @@ class PMS_Logger {
 	 */
 	public static function activate() {
 		self::create_table();
-		update_option( self::DB_VERSION_OPTION, self::DB_VERSION, false );
 		self::schedule_cron();
+		self::ensure_autoloaded_options();
+		update_option( self::DB_VERSION_OPTION, self::DB_VERSION, true );
 	}
 
 	/**
@@ -103,13 +110,55 @@ class PMS_Logger {
 	 * Installation oder Update ohne Deaktivieren/Aktivieren) -- kein
 	 * dbDelta()-Aufruf bei jedem normalen Seitenaufruf.
 	 *
+	 * Die Versions-Option selbst wird seit v0.7.0 AUTOGELADEN (dritter
+	 * Parameter true, vorher false): Dieser Vergleich läuft bei jedem einzelnen
+	 * Request -- als nicht autogeladene Option kostete er auf Sites ohne
+	 * persistenten Object Cache jedes Mal eine eigene SELECT-Abfrage auf
+	 * wp_options, obwohl der Wert ein paar Bytes groß ist und sich praktisch
+	 * nie ändert. Autogeladen ist er Teil der einen alloptions-Abfrage, die
+	 * WordPress ohnehin stellt.
+	 *
 	 * @return void
 	 */
 	public static function maybe_upgrade_table() {
 		if ( get_option( self::DB_VERSION_OPTION ) !== self::DB_VERSION ) {
 			self::create_table();
 			self::schedule_cron();
-			update_option( self::DB_VERSION_OPTION, self::DB_VERSION, false );
+			self::ensure_autoloaded_options();
+			update_option( self::DB_VERSION_OPTION, self::DB_VERSION, true );
+		}
+	}
+
+	/**
+	 * Einmalige Autoload-Migration (v0.7.0) für die drei kleinen Optionen,
+	 * die auf jedem Frontend-Seitenaufruf gelesen werden: pms_events und
+	 * pms_events_enabled wurden bis v0.6.12 mit autoload=false gespeichert
+	 * (PMS_Frontend::prepare() liest beide bei jedem getrackten Seitenaufruf
+	 * -- zwei zusätzliche SELECTs pro Seite ohne Object Cache), und eine noch
+	 * nie gespeicherte Option löst ebenfalls bei jedem Request eine Abfrage
+	 * aus, weil der "notoptions"-Cache von WordPress nicht persistent ist.
+	 *
+	 * Deshalb: fehlende Optionen mit ihrem Default anlegen (add_option() ist
+	 * ein No-Op, wenn die Option schon existiert) und bestehende per
+	 * wp_set_option_autoload() (WordPress 6.4+) auf autoload umstellen. Auf
+	 * älteren Cores flippt das Flag spätestens beim nächsten Speichern, weil
+	 * PMS_Settings::save_events()/PMS_Admin::handle_toggle_all_events() seit
+	 * v0.7.0 mit autoload=true schreiben.
+	 *
+	 * Bewusst hier statt in PMS_Settings: maybe_upgrade_table() ist der
+	 * einzige versionierte Migrationspfad des Plugins -- ein zweiter
+	 * Versionszähler nur für Optionen wäre unnötige Doppelung.
+	 *
+	 * @return void
+	 */
+	private static function ensure_autoloaded_options() {
+		add_option( PMS_Settings::OPTION_EVENTS, array(), '', true );
+		add_option( PMS_Settings::OPTION_EVENTS_ENABLED, 1, '', true );
+
+		if ( function_exists( 'wp_set_option_autoload' ) ) {
+			wp_set_option_autoload( PMS_Settings::OPTION_EVENTS, true );
+			wp_set_option_autoload( PMS_Settings::OPTION_EVENTS_ENABLED, true );
+			wp_set_option_autoload( PMS_Settings::OPTION_SETTINGS, true );
 		}
 	}
 
@@ -218,7 +267,7 @@ class PMS_Logger {
 			$platform = self::PLATFORM_META;
 		}
 
-		$wpdb->insert(
+		$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Eigene Tabelle.
 			self::table_name(),
 			array(
 				'created_at'     => current_time( 'mysql', true ), // GMT -- konsistente Basis für die Retention-Berechnung.
@@ -280,7 +329,7 @@ class PMS_Logger {
 		global $wpdb;
 
 		$table = self::table_name();
-		$rows  = $wpdb->get_results( 'SELECT * FROM ' . $table . ' ORDER BY created_at DESC LIMIT ' . self::MAX_FETCH, ARRAY_A );
+		$rows  = $wpdb->get_results( 'SELECT * FROM ' . $table . ' ORDER BY created_at DESC LIMIT ' . self::MAX_FETCH, ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Eigene Tabelle, keine Nutzereingabe (Name aus $wpdb->prefix, LIMIT ist eine Klassenkonstante).
 
 		if ( ! is_array( $rows ) ) {
 			return array();
@@ -335,30 +384,26 @@ class PMS_Logger {
 	}
 
 	/**
-	 * Abgelaufene Einträge löschen (Cron-Callback). Holt id+created_at aller
-	 * Zeilen ohne WHERE (siehe get_entries()-Doku) und löscht die
-	 * abgelaufenen einzeln über die strukturierte delete()-Methode -- bei der
-	 * durch die Retention klein gehaltenen Tabellengröße unproblematisch und
-	 * ohne eigenes SQL-WHERE einfacher korrekt zu halten.
+	 * Abgelaufene Einträge löschen (Cron-Callback).
+	 *
+	 * Seit v0.7.0 ein einziges, vorbereitetes DELETE über den created_at-Index
+	 * statt "alle Zeilen holen und einzeln löschen": Bei 30 Tagen Retention in
+	 * einem Shop mit ViewContent-Tracking sind das schnell zehntausende Zeilen
+	 * -- die alte Variante las sie komplett in PHP ein und schickte pro Zeile
+	 * ein eigenes DELETE. Der Stichtag wird in PHP berechnet (GMT, dieselbe
+	 * Basis wie created_at in record()) und als %s-Platzhalter übergeben; der
+	 * Tabellenname enthält keine Nutzereingabe (nur $wpdb->prefix), deshalb
+	 * ist ausschließlich der Wert zu preparen.
 	 *
 	 * @return void
 	 */
 	public static function cleanup_old_entries() {
 		global $wpdb;
 
-		$table     = self::table_name();
-		$cutoff_ts = strtotime( '-' . self::retention_days() . ' days', current_time( 'timestamp', true ) );
-		$rows      = $wpdb->get_results( 'SELECT id, created_at FROM ' . $table, ARRAY_A );
+		$table  = self::table_name();
+		$cutoff = gmdate( 'Y-m-d H:i:s', strtotime( '-' . self::retention_days() . ' days', time() ) );
 
-		if ( ! is_array( $rows ) ) {
-			return;
-		}
-
-		foreach ( $rows as $row ) {
-			if ( strtotime( $row['created_at'] . ' UTC' ) < $cutoff_ts ) {
-				$wpdb->delete( $table, array( 'id' => (int) $row['id'] ), array( '%d' ) );
-			}
-		}
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", $cutoff ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Eigene Tabelle, Name aus $wpdb->prefix.
 	}
 
 	/**
@@ -368,6 +413,6 @@ class PMS_Logger {
 	 */
 	public static function truncate() {
 		global $wpdb;
-		$wpdb->query( 'TRUNCATE TABLE ' . self::table_name() );
+		$wpdb->query( 'TRUNCATE TABLE ' . self::table_name() ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.NotPrepared -- Eigene Tabelle, Name aus $wpdb->prefix.
 	}
 }

@@ -1,10 +1,10 @@
 {
     "name": "pixel-made-simple",
-    "version": "0.6.12",
+    "version": "0.7.0",
     "private": true,
     "description": "Pixel Made Simple - lightweight Meta Pixel & Conversions API tracking for WordPress.",
     "scripts": {
-        "test": "node dev-tools/test-frontend-js.js && node dev-tools/test-frontend-woocommerce-js.js && node dev-tools/test-frontend-surecart-js.js",
+        "test": "node dev-tools/test-frontend-js.js && node dev-tools/test-frontend-woocommerce-js.js && node dev-tools/test-frontend-surecart-js.js && node dev-tools/test-admin-js.js",
         "build": "php dev-tools/build-translations.php",
         "test:wp": "node dev-tools/test-wp-environment.js",
         "prewp:serve": "node dev-tools/test-wp-environment.js --stage-only",

@@ -3,14 +3,14 @@
  * Plugin Name:       Pixel Made Simple Pro
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Erweitert Pixel Made Simple um serverseitiges CAPI-Tracking für Meta & TikTok, automatisiertes E-Commerce Tracking für WooCommerce & SureCart, Formular-Lead-Erfassung sowie erweiterte Event-Deduplizierung.
- * Version:           0.6.12
+ * Version:           0.7.0
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       pixel-made-simple
  * Domain Path:       /languages
- * Requires at least: 6.0
+ * Requires at least: 5.8
  * Requires PHP:      7.4
  *
  * Text Domain ist bewusst identisch mit der Free-Version (nicht
@@ -49,7 +49,7 @@ if ( defined( 'PMS_IS_PRO' ) && false === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', true );
-define( 'PMS_VERSION', '0.6.12' );
+define( 'PMS_VERSION', '0.7.0' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -130,7 +130,6 @@ require_once PMS_PLUGIN_DIR . 'includes/class-pms-forms.php';
 require_once PMS_PLUGIN_DIR . 'includes/class-pms-debug.php';
 require_once PMS_PLUGIN_DIR . 'includes/class-pms-tools.php';
 require_once PMS_PLUGIN_DIR . 'pro/class-pro-tiktok-capi.php';
-require_once PMS_PLUGIN_DIR . 'pro/class-pro-features.php';
 require_once PMS_PLUGIN_DIR . 'pro/class-pro-utm.php';
 require_once PMS_PLUGIN_DIR . 'pro/class-pro-woo-product-data.php';
 require_once PMS_PLUGIN_DIR . 'pro/class-pro-woo.php';
@@ -150,7 +149,6 @@ PMS_Logger::init();
 PMS_Frontend::init();
 PMS_Forms::init();
 PMS_Tools::init();
-PMS_Pro_Features::init();
 PMS_Pro_UTM::init();
 
 /*

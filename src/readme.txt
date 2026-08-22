@@ -1,97 +1,146 @@
 === Pixel Made Simple ===
 Contributors: dominikseitz
-Author: Dominik Seitz
-Author URI: https://sdv.design
-Tags: meta pixel, conversions api, google ads, google analytics, tiktok pixel, consent mode
-Requires at least: 6.0
-Tested up to: 6.8
+Tags: meta pixel, conversions api, google ads, tiktok pixel, consent mode
+Requires at least: 5.8
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.6.12
-License: GPL-2.0-or-later
+Stable tag: 0.7.0
+License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Schlankes, performantes Tracking für Meta Pixel & CAPI, Google Ads (Consent Mode v2) und TikTok Pixel – ohne Bloat, optimiert für Lead-Funnels.
+Lightweight Meta Pixel & Conversions API tracking with event deduplication, URL-based events, form lead tracking and GDPR cookie banner detection.
 
 == Description ==
 
-Ein bewusst minimalistischer Ersatz für überladene Tracking-Plugins wie PixelYourSite:
+Pixel Made Simple is a deliberately minimal alternative to bloated tracking plugins. No jQuery, no frameworks, no DOM listeners in the frontend – just the official platform loaders (loaded asynchronously) plus a few lines of inline code.
 
-* **PageSpeed-freundlich:** Nur die offiziellen Loader (asynchron) plus minimale Inline-Snippets. Kein jQuery, keine Frameworks, keine DOM-Listener im Frontend.
-* **3 Plattformen:** Meta Pixel + Conversions API (Server), Google Ads (gtag.js) inkl. Consent Mode v2, TikTok Pixel.
-* **URL-basierte Multi-Plattform-Events:** Ein Event, eine URL-Regel („Exakter Pfad" oder „URL enthält") – und pro Event frei wählbar, welche Plattformen feuern (Meta-Event-Typ, Google Conversion Label, TikTok-Event).
-* **Saubere Meta-Deduplizierung:** Für jedes Meta-Event wird serverseitig eine UUID generiert und identisch an Browser-Pixel (`eventID`) und Conversions API (`event_id`) übergeben. Meta verwirft das Duplikat automatisch.
-* **Conversions API fire-and-forget:** Serverseitiger Versand via `wp_remote_post()` nicht-blockierend – kein Einfluss auf die Ladezeit. user_data mit Client-IP, User-Agent, `_fbp`/`_fbc` (Fallback aus `fbclid`), optional SHA-256-gehashte E-Mail eingeloggter Nutzer.
-* **Google Consent Mode v2:** Setzt auf Wunsch `ad_storage`, `ad_user_data`, `ad_personalization` und `analytics_storage` vor dem Tag-Laden auf `denied` – dein Consent-Banner sendet das Update.
-* **Intelligente Cookie-Consent-Erkennung (DSGVO):** Erkennt installierte Cookie-Banner automatisch (Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies, WP Consent API) und blockiert Browser- und CAPI-Events bis zur Marketing-Einwilligung. Nach dem Klick auf „Akzeptieren" startet das Tracking sofort ohne Seiten-Reload. Websites ohne Banner werden niemals blockiert.
-* **Formular-Auto-Grabber (Zero-Config Lead-Tracking, standardmäßig deaktiviert):** Erkennt Formular-Absendungen automatisch (Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms und native HTML-Formulare) und feuert „Lead" oder „Contact" im Browser und via CAPI mit identischer Event-ID. E-Mail und Telefonnummer werden SHA-256-gehasht übergeben – für maximalen Match-Score ohne Klartext-Datenweitergabe. Granular steuerbar: Event-Typ wählbar, optionaler URL-Filter (auf nicht passenden Seiten wird das Skript gar nicht geladen) und automatischer Ausschluss von Suche, Kommentaren und Logins.
-* **First-Touch- & UTM-Attribution (standardmäßig deaktiviert):** Speichert utm_source, utm_medium, utm_campaign, utm_content, utm_term, fbclid und gclid beim Erstbesuch 30 Tage in einem First-Party-Cookie und sendet die UTM-Parameter bei jedem Server-Event als `custom_data` mit. Die fbclid wird ins `fbc`-Format übersetzt – Conversions bleiben auch Tage nach dem Anzeigenklick zugeordnet.
-* **Automatischer UTM-Formular-Fill (standardmäßig deaktiviert):** Schreibt die 3 Kernwerte Source, Campaign und Medium automatisch in passende Formularfelder (per name-Attribut wie `utm_source`/`source` oder CSS-Klasse wie `utm-source`/`pms-utm-source`, auch auf einem Wrapper-Element erkannt), bevor der Besucher absendet – die Kampagnendaten landen so direkt im CRM oder in der Benachrichtigungs-E-Mail. Source wird zuerst aus der aktuellen URL gelesen, dann aus dem Attribution-Cookie (Unterseiten-Navigation) und zuletzt aus einer Facebook-/Google-Klick-ID oder dem Referrer geschätzt (facebook/google/direct); Campaign und Medium werden nur bei explizitem Wert befüllt. Granular steuerbar über „Auf allen Seiten", „Nur auf bestimmten URLs" oder „Auf bestimmten URLs ausschließen" mit zeilenbasierten Pfad-Mustern (inkl. `*`-Platzhalter) – die URL-Auswertung übernimmt dabei ausschließlich der Browser.
-* **Live-Debug-Konsole für Admins:** Dezente Leiste am unteren Bildschirmrand mit Consent-Status (inkl. erkanntem Banner), gefeuerten Events, Event-IDs, CAPI-Antwort (⏳ → ✅ 200 OK) und verwendeten Match-Keys. Wird ausschließlich für eingeloggte Administratoren gerendert – reguläre Besucher erhalten kein einziges zusätzliches Byte.
-* **1-Klick Export & Import:** Komplette Konfiguration inkl. Event-Regeln als JSON exportieren und auf der nächsten Kundenwebsite importieren.
-* **Test-Code Auto-Expiry:** Der Meta Test Event Code deaktiviert sich nach 12 Stunden automatisch – kein versehentliches Test-Tracking im Live-Betrieb.
-* **Komfort:** Toggles speichern sofort per AJAX (nonce-gesichert, mit dezenter Bestätigung); das Einfügen eines CAPI-Tokens aktiviert die Conversions API automatisch.
-* **Sicherheit:** Nonces, Capability-Checks (`manage_options`), konsequente Sanitization/Escaping, CAPI-Token nur serverseitig.
-* **Übersetzbar (i18n):** Englische Quellstrings, POT-Vorlage und deutsche Übersetzung (`de_DE`) in `/languages`. Kompatibel mit Loco Translate, Poedit und Polylang/WPML-Sprachdateien.
+**What the free version does**
 
-Dieses Free-Plugin deckt den kompletten Funktionsumfang oben ab. **Pixel Made Simple Pro** (separates Plugin, selber Options-Key – Upgrade übernimmt deine bestehende Konfiguration nahtlos) ergänzt das um Zusatzfunktionen für Agenturen und Power-User.
+* **Meta Pixel + Conversions API (CAPI):** Browser pixel and server-side events from the same WordPress request. Every event gets one UUID that is passed to both `fbq()` (`eventID`) and the Conversions API (`event_id`), so Meta deduplicates the pair automatically.
+* **Fire-and-forget CAPI:** Server-side events are sent non-blocking via `wp_remote_post()` – no impact on page load time. `user_data` contains client IP, user agent, the `_fbp`/`_fbc` cookies (with a fallback from `fbclid`) and – optionally – the SHA-256 hashed email address of logged-in users.
+* **URL-based events:** Define up to two URL rules (“exact path” or “URL contains”) that fire a Meta standard event or a custom event, e.g. `Lead` on `/thank-you/`. Ideal for thank-you and confirmation pages.
+* **Automatic form lead tracking (off by default):** Detects submissions of Contact Form 7, Elementor Pro, Fluent Forms, WPForms, Gravity Forms, SureForms and plain HTML forms and fires `Lead` or `Contact` in the browser and via CAPI with the same event ID. Email and phone number are hashed with SHA-256 before they leave your server; raw values are never stored or logged. Optional URL filter and automatic exclusion of search, comment and login forms.
+* **GDPR cookie banner detection (on by default):** Recognises Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies and any banner that implements the WP Consent API, and holds back browser and server events until the visitor grants marketing consent. Tracking starts right after the click on “Accept” – no reload. Sites without a cookie banner are never blocked. A consent mode lets you choose whether server-side events wait for the banner as well (recommended) or only the browser pixel does.
+* **Event log:** A small table in your WordPress admin lists the most recent browser and CAPI events (event name, event ID, status, match keys) so you can verify your setup without leaving WordPress. Entries are deleted automatically after 3 days.
+* **Live debug bar for administrators:** A discreet bar at the bottom of the frontend shows consent status (including the detected banner), fired events, event IDs, the CAPI response and the match keys used. Rendered exclusively for logged-in administrators – regular visitors get zero additional bytes.
+* **Test event code with auto-expiry:** The Meta test event code is removed automatically after 12 hours, so no test traffic ends up in your live reports by accident.
+* **Privacy by default:** Form lead tracking is disabled on new installations, the CAPI access token is only ever used server-side and never rendered in the frontend, and the event log stores field *names* only – never values or hashes.
+* **Translation-ready:** English source strings, a POT template and a complete German translation (`de_DE`) are included.
+
+**Pixel Made Simple Pro**
+
+The free plugin is fully functional on its own. [Pixel Made Simple Pro](https://pixelmadesimple.com) is a separate plugin that shares the same settings (upgrading keeps your configuration) and adds: Google Ads (gtag.js incl. Consent Mode v2) and Google Analytics 4, TikTok Pixel and TikTok Events API, unlimited URL events, form leads to Google Ads and TikTok, first-touch/UTM attribution with automatic form fill, WooCommerce and SureCart e-commerce tracking (ViewContent, AddToCart, InitiateCheckout, Purchase with a server-side fallback), an event log with filters and up to 30 days retention, and JSON export/import of the whole configuration. Pro features are shown as clearly marked, non-intrusive teasers in the free version.
 
 == Installation ==
 
-1. ZIP über „Plugins → Installieren → Plugin hochladen" installieren und aktivieren.
-2. Unter „Pixel Made Simple" im Admin-Menü die gewünschten Plattformen aufklappen, IDs eintragen und per Master-Toggle aktivieren.
-3. Optional: CAPI Access Token hinterlegen und die Conversions API aktivieren.
-4. Im Tab „Events verwalten" URL-Regeln für Conversion-Seiten anlegen und den Plattformen zuweisen.
+1. Upload the plugin via *Plugins → Add New → Upload Plugin* and activate it, or install it from the WordPress.org plugin directory.
+2. Open *Pixel Made Simple* in the admin menu, expand *Meta (Facebook)*, enter your Pixel ID and switch the platform on.
+3. Optional: paste your Conversions API access token (Meta Events Manager → Data sources → Settings → Conversions API) – the Conversions API switches on automatically.
+4. In the *URL Events* tab, add rules for your thank-you or confirmation pages. For forms without a redirect, enable *Automatic form lead tracking* in the *Advanced Tracking* tab instead.
+5. Check the *Event Log* and the live debug bar (visible to administrators in the frontend) to verify that events arrive.
 
 == Frequently Asked Questions ==
 
-= Wie teste ich die Meta-Server-Events? =
+= Does the free version send anything to Google or TikTok? =
 
-Trage den Test Event Code aus dem Events Manager (Tab „Test-Events") ein. Die Server-Events erscheinen dort in Echtzeit. Vor dem Livegang den Code wieder entfernen. Für Debugging kann der Versand blockierend geschaltet werden, dann landet die Meta-Antwort bei aktivem `WP_DEBUG_LOG` im Debug-Log:
+No. The free version only loads the Meta Pixel and talks to the Meta Conversions API. Google Ads, Google Analytics 4 and TikTok are Pro features; the free plugin never loads their scripts or contacts their servers, even if settings from a previous Pro installation are still stored.
+
+= How do I test the Meta server events? =
+
+Enter the test event code from the Events Manager (tab *Test events*) in the *General* tab. Server events then show up there in real time. The code is removed automatically after 12 hours. For debugging you can make the request blocking, after which the raw Meta response is written to the debug log when `WP_DEBUG_LOG` is enabled:
 
 `add_filter( 'pms_capi_blocking', '__return_true' );`
 
-= Wie funktioniert das Zusammenspiel mit meinem Cookie-Banner? =
+= How does the plugin work with my cookie banner? =
 
-Die automatische Cookie-Banner-Erkennung (Standard: aktiv) prüft serverseitig die Consent-Cookies der gängigen Banner-Plugins und die WP Consent API. Ohne Marketing-Einwilligung werden die Browser-Skripte verzögert (sie lauschen auf die Banner-Events und starten sofort nach dem Klick auf „Akzeptieren") und die CAPI bricht vor dem HTTP-Request ab. Ist gar kein bekanntes Banner installiert, wird nichts blockiert.
+The automatic cookie banner detection (on by default) checks the consent cookies of the supported banner plugins and the WP Consent API on the server. Without marketing consent the browser scripts are deferred (they listen for the banner’s consent events and start right after the click on “Accept”) and the Conversions API request is not sent. If no supported banner is installed, nothing is blocked.
 
-Zusätzlich gilt: **Google Consent Mode v2** lädt gtag.js designgemäß sofort mit `denied`-Defaults – dein Banner sendet das `gtag('consent','update',...)`.
-
-Für nicht unterstützte Banner lässt sich das Consent-Ergebnis per Filter setzen:
+For unsupported banners you can provide the consent result yourself:
 
 `add_filter( 'pms_has_marketing_consent', function ( $consent ) { return my_marketing_consent(); } );`
 
-Und das gesamte Tracking serverseitig unterdrücken:
+And you can suppress all tracking server-side:
 
 `add_filter( 'pms_allow_tracking', function ( $allow ) { return my_consent_check(); } );`
 
-= Funktioniert das Plugin mit Page-Caching? =
+= Does the plugin work with page caching? =
 
-Die Browser-Pixel: ja. Die Conversions API wird jedoch nur ausgelöst, wenn PHP die Seite tatsächlich rendert. Bei aggressivem Full-Page-Caching sollten die Conversion-/Danke-Seiten vom Cache ausgenommen werden, damit CAPI-Events zuverlässig und mit frischer Event-ID gesendet werden.
+The browser pixel: yes. The Conversions API is only triggered when PHP actually renders the page. With aggressive full-page caching you should exclude your conversion/thank-you pages from the cache so that CAPI events are sent reliably and with a fresh event ID.
 
-= Welche Filter gibt es? =
+= Which filters are available? =
 
-* `pms_allow_tracking` – Tracking global erlauben/unterbinden.
-* `pms_has_marketing_consent` – Consent-Ergebnis der automatischen Banner-Erkennung überschreiben (bewacht den Browser-Pixel).
-* `pms_has_server_consent` – dasselbe für die serverseitigen Signale (Conversions API, TikTok Events API). Nur nötig, wenn der Consent-Modus auf „Nur Browser-Pixel blockieren“ steht – im strikten Modus liefert dieser Filter ohnehin dasselbe Ergebnis wie `pms_has_marketing_consent`.
-* `pms_consent_banner_active` – eigenes Banner bei der Erkennung registrieren.
-* `pms_consent_events` – zusätzliche Banner-Events für den Frontend-Listener.
-* `pms_capi_event_data` – einzelnes CAPI-Event vor dem Versand anpassen (z. B. `custom_data` mit Werten ergänzen).
-* `pms_capi_user_data` – `user_data`-Payload anpassen.
-* `pms_graph_api_version` – Graph-API-Version überschreiben (Zukunftssicherheit bei Meta-Deprecations).
-* `pms_capi_blocking` – CAPI-Request blockierend senden (Debugging).
-* `pms_tiktok_capi_blocking` – dasselbe für TikTok-Events-API-Requests (Debugging).
+* `pms_allow_tracking` – allow or suppress tracking globally.
+* `pms_has_marketing_consent` – override the result of the cookie banner detection (guards the browser pixel).
+* `pms_has_server_consent` – the same for server-side signals (Conversions API, TikTok Events API). Only relevant when the consent mode is set to “Block browser pixels only”.
+* `pms_consent_banner_active` – register your own banner with the detection.
+* `pms_consent_events` – additional banner events for the frontend listener.
+* `pms_capi_event_data` – modify a single CAPI event before it is sent (e.g. add `custom_data`).
+* `pms_capi_user_data` – modify the `user_data` payload.
+* `pms_normalize_phone` – adjust the normalised phone number before hashing (e.g. add a country code).
+* `pms_graph_api_version` – override the Graph API version.
+* `pms_capi_blocking` – send the CAPI request blocking (debugging).
+* `pms_tiktok_capi_blocking` – the same for TikTok Events API requests (Pro, debugging).
 
-Hinweis für Umsteiger von „Lightweight Meta Pixel & CAPI Tracker": Diese Filter hießen dort `lmpct_*`. Eigener Code (z. B. in der functions.php), der einen dieser Filter nutzt, muss auf den neuen `pms_*`-Namen umgestellt werden – siehe Changelog 1.0.0.
+Upgrading from “Lightweight Meta Pixel & CAPI Tracker”? These filters used to be called `lmpct_*`. Custom code that hooks into one of them must be updated to the `pms_*` names – see the 0.6.0 changelog entry.
 
-= Wie übersetze ich das Plugin (z. B. mit Loco Translate)? =
+= How do I translate the plugin? =
 
-Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage sowie die fertige deutsche Übersetzung (`-de_DE.po`/`.mo`). Eigene Übersetzungen in Loco Translate am besten unter „System" bzw. `wp-content/languages/loco/plugins/` speichern, damit sie Updates überleben.
+Source strings are English. The `/languages` folder contains the POT template and the finished German translation (`-de_DE.po`/`.mo`). Custom translations made with Loco Translate are best stored under “System” (`wp-content/languages/loco/plugins/`) so they survive updates.
 
-= Werden bei der Deinstallation alle Daten entfernt? =
+= Is all data removed on uninstall? =
 
-Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
+Yes, as soon as neither variant (free or Pro) is installed anymore. `uninstall.php` then deletes all plugin options including the stored access token, the event log table and the scheduled cleanup task. Switching from free to Pro (or back) keeps your configuration – both use the same option keys.
+
+== Screenshots ==
+
+1. General tab – Meta Pixel, Conversions API and the GDPR cookie banner detection with consent mode.
+2. URL Events tab – URL rules with per-event platform assignment.
+3. Advanced Tracking tab – automatic form lead tracking.
+4. Event Log – recent browser and CAPI events with status and match keys.
+5. Live debug bar for administrators in the frontend.
+
+== External services ==
+
+This plugin connects to third-party tracking services. Nothing is sent until you enter the respective ID/token and switch the platform on, and – with cookie banner detection enabled – not before the visitor has granted marketing consent.
+
+**Meta (Facebook) – Meta Pixel and Conversions API** (free version)
+
+* The browser loads the official pixel script from `https://connect.facebook.net/` and sends events to `https://www.facebook.com/tr` (including the `<noscript>` fallback image). This happens on every page view for which tracking is active.
+* The Conversions API request goes from your server to `https://graph.facebook.com/` whenever a URL event matches or a tracked form is submitted. It contains the event name, time, event ID, page URL, the visitor’s IP address and user agent, the `_fbp`/`_fbc` cookie values if present and – only where enabled – SHA-256 hashes of the email address/phone number (form leads, logged-in users) or of billing details (Pro e-commerce tracking).
+* Terms of service: https://www.facebook.com/legal/terms – Privacy policy: https://www.facebook.com/privacy/policy/ – Platform terms: https://developers.facebook.com/terms/
+
+**Google – Google Ads and Google Analytics 4** (Pro only)
+
+* The browser loads `gtag.js` from `https://www.googletagmanager.com/` and sends page views, conversions and e-commerce events to Google Ads / Google Analytics. With Consent Mode v2 enabled, all consent signals default to “denied” until your banner updates them. There is no server-side connection to Google.
+* Terms: https://policies.google.com/terms – Privacy: https://policies.google.com/privacy – Google Analytics terms: https://marketingplatform.google.com/about/analytics/terms/us/
+
+**TikTok – TikTok Pixel and Events API** (Pro only)
+
+* The browser loads the pixel from `https://analytics.tiktok.com/` and sends web events to TikTok. For purchases the server additionally sends an Events API request to `https://business-api.tiktok.com/` containing the event, event ID, IP address, user agent, order values and – only where enabled – hashed email/phone.
+* Terms: https://www.tiktok.com/legal/page/global/terms-of-service/en – Privacy: https://www.tiktok.com/legal/page/row/privacy-policy/en – Business products terms: https://ads.tiktok.com/i18n/official/policy/business-products-terms
+
+The settings pages link to https://pixelmadesimple.com (documentation, tutorials, Pro upgrade). These are plain links – no data is transmitted unless you click them. The free version contains no update checker or telemetry of its own; updates come from WordPress.org.
+
+== Privacy ==
+
+* Personal data is only ever sent to the platforms above, never stored by the plugin. Email addresses and phone numbers from form submissions are hashed (SHA-256) in memory and discarded.
+* The event log stores event names, event IDs, status codes and the *names* of the match keys used (e.g. `em, fbc`) – never the values.
+* The first-touch attribution cookie `pms_attribution` (Pro, off by default) stores UTM parameters and click IDs for 30 days in a first-party cookie.
+* Please check with your data protection officer whether the “Block browser pixels only” consent mode is permissible for your site; the default (“Fully GDPR compliant”) blocks server-side events as well.
 
 == Changelog ==
+
+= 0.7.0 =
+Audit-Release zur Vorbereitung auf das WordPress.org-Plugin-Verzeichnis (Coding Standards, Sicherheit, Performance, i18n, Paketierung). Keine neuen Tracking-Funktionen.
+
+* **Behoben (Pro): Die Aufbewahrungsdauer im Event Log ließ sich nicht speichern.** Das Dropdown (3/7/14/30 Tage) trug zwar das Autosave-Attribut, `admin.js` band den Speicher-Handler aber nur an Checkboxen – jede Änderung blieb ohne Wirkung, die Aufbewahrung stand faktisch immer auf 7 Tagen. Der Handler bedient jetzt alle Controls mit `data-pms-autosave`.
+* **Performance:** Drei kleine Optionen, die bei jedem Seitenaufruf gelesen werden (`pms_events`, `pms_events_enabled`, `pms_log_db_version`), werden jetzt mit WordPress' Autoload geladen statt je eine eigene Datenbankabfrage pro Request zu kosten – auf Sites ohne persistenten Object Cache bis zu drei SELECTs weniger pro Seitenaufruf. Bestehende Installationen werden beim ersten Aufruf nach dem Update einmalig umgestellt.
+* **Performance:** Die tägliche Bereinigung des Event Logs löscht abgelaufene Einträge jetzt mit einer einzigen, vorbereiteten `DELETE`-Abfrage über den bestehenden `created_at`-Index, statt alle Zeilen zu laden und einzeln zu löschen.
+* **Paketierung:** Das kostenlose ZIP enthält die beiden Pro-Frontend-Skripte (`pms-woocommerce.js`, `pms-surecart.js`) nicht mehr – sie wurden in der kostenlosen Version nie geladen.
+* **i18n:** Sechs bisher fest auf Deutsch hinterlegte Beschriftungen der Live-Debug-Leiste („CAPI: gesendet", „Pixel: wartet auf Consent" …) sind jetzt übersetzbar (englische Quellstrings, deutsche Übersetzung enthalten). Seitentitel des Admin-Menüs von „Meta Pixel & CAPI Tracker" auf „Pixel Made Simple" korrigiert.
+* **Aufgeräumt:** Leere Platzhalterklasse `PMS_Pro_Features`, der ungenutzte Alias `PMS_Settings::event_types()` und die seit 0.5.7 ungenutzte serverseitige URL-Prüfung des UTM-Formular-Fills (`PMS_Pro_UTM::form_fill_url_allowed()`, die Auswertung läuft im Browser) wurden entfernt; veraltete Code-Kommentare zur TikTok-Protokollierung korrigiert.
+* **readme.txt** für das WordPress.org-Verzeichnis überarbeitet: englische Beschreibung/Installation/FAQ, klare Trennung der Free- und Pro-Funktionen, neue Abschnitte „Screenshots", „External services" (alle kontaktierten Dienste inkl. übertragener Daten und Datenschutzlinks) und „Privacy", korrekte Header-Felder (`Requires at least: 5.8`, `Requires PHP: 7.4`, maximal fünf Tags).
+* `dev-tools/test-admin-js.js` ist ein neuer, vierter JS-Test-Harness für `admin.js` (27 Tests, Regressionstest für den Autosave-Fehler); `dev-tools/test-wp-environment.js` prüft in einem dritten Szenario die kostenlose Version vollständig eigenständig in einer echten WordPress-Instanz – Aktivierung, Frontend-Seitenaufruf und alle Admin-Tabs ohne PHP-Warnungen und ohne `_doing_it_wrong()` – einmal mit aktuellem PHP und einmal mit PHP 7.4 (653 → 648 PHP-Tests nach Entfernen der toten URL-Prüfung, 47/86/53/27 JS-Tests).
 
 = 0.6.12 =
 * Verbessert: **Einheitliche Plattform-Badges im Tab „URL-Events".** Die Spalte „Plattformen" zeigte Meta blau, Google Ads grün und TikTok grau – bei mehreren aktiven Plattformen standen so bis zu drei Farben in einer Zelle, ohne zusätzliche Information zu tragen (der Plattformname steht ohnehin im Badge). Alle drei nutzen jetzt dasselbe dezente Status-Grün. Im Event Log bleiben die Plattformfarben erhalten, da dort pro Zeile nur ein Badge steht und die Farbe beim Scannen der Spalte hilft.
@@ -283,3 +332,8 @@ Die folgenden Einträge sind unverändert die historischen Changelog-Einträge a
 
 = 1.0.0 =
 * Erstveröffentlichung.
+
+== Upgrade Notice ==
+
+= 0.7.0 =
+Maintenance release: fixes the Pro event-log retention setting, reduces database queries per page view, trims the free package and prepares the plugin for the WordPress.org directory. No changes to tracking behaviour.

@@ -36,15 +36,23 @@
 			} );
 		} );
 
-		// Einstellungs-Toggles sofort per AJAX speichern (nonce-gesichert).
+		// Einstellungs-Toggles UND -Dropdowns sofort per AJAX speichern
+		// (nonce-gesichert). Bewusst "[data-pms-autosave]" ohne Element-Typ:
+		// bis v0.6.12 griff der Selektor nur auf input-Elemente, wodurch das
+		// <select> für die Aufbewahrungsdauer im Event Log (Pro) zwar das
+		// Attribut trug, aber nie gespeichert wurde. Checkboxen senden 1/0,
+		// alle anderen Controls ihren aktuellen Wert -- die Whitelist in
+		// PMS_Admin::handle_toggle_autosave() entscheidet serverseitig, wie
+		// der Wert interpretiert wird.
 		if ( window.pmsAdmin && window.fetch ) {
-			document.querySelectorAll( 'input[data-pms-autosave]' ).forEach( function ( input ) {
-				input.addEventListener( 'change', function () {
+			document.querySelectorAll( '[data-pms-autosave]' ).forEach( function ( control ) {
+				control.addEventListener( 'change', function () {
+					var isCheckbox = 'checkbox' === String( control.type || '' ).toLowerCase();
 					var body = new URLSearchParams( {
 						action: 'pms_save_toggle',
 						nonce: window.pmsAdmin.nonce,
-						key: input.getAttribute( 'data-pms-autosave' ),
-						value: input.checked ? '1' : '0'
+						key: control.getAttribute( 'data-pms-autosave' ),
+						value: isCheckbox ? ( control.checked ? '1' : '0' ) : String( control.value )
 					} );
 					window.fetch( window.pmsAdmin.ajaxUrl, {
 						method: 'POST',
@@ -81,8 +89,10 @@
 		// Sicherheitsabfrage vor dem Löschen.
 		document.querySelectorAll( '.pms-delete-button' ).forEach( function ( button ) {
 			button.addEventListener( 'click', function ( event ) {
-				var message = button.getAttribute( 'data-pms-confirm' ) || 'Delete?';
-				if ( ! window.confirm( message ) ) {
+				// Fallback-Text kommt lokalisiert aus PHP (pmsAdmin.confirmText),
+				// nicht als hartcodierter englischer String.
+				var message = button.getAttribute( 'data-pms-confirm' ) || ( window.pmsAdmin && window.pmsAdmin.confirmText ) || '';
+				if ( message && ! window.confirm( message ) ) {
 					event.preventDefault();
 				}
 			} );

@@ -39,6 +39,10 @@ class PMS_CAPI {
 	 * @param string  $source_url       Aktuelle Seiten-URL.
 	 * @param array   $extra_user_data  Zusätzliche (bereits gehashte) user_data-Felder,
 	 *                                  z. B. em/ph aus dem Formular-Auto-Grabber.
+	 * @param bool    $browser_confirmed Hat der Browser-Pixel dasselbe Event
+	 *                                  nachweislich gefeuert? Schaltet die im
+	 *                                  Event Log protokollierte Quelle von
+	 *                                  'capi' auf 'both' (siehe PMS_Forms::handle_lead()).
 	 * @return array Status-Eintrag (auch im Log hinterlegt).
 	 */
 	public static function send_events( array $events, array $settings, $source_url, array $extra_user_data = array(), $browser_confirmed = false ) {

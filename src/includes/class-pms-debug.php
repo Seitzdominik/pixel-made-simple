@@ -125,16 +125,25 @@ class PMS_Debug {
 			// geladen ist (Free) oder in diesem Request nichts gesendet wurde.
 			'tiktokCapi'  => class_exists( 'PMS_Pro_TikTok_CAPI' ) ? PMS_Pro_TikTok_CAPI::get_log() : array(),
 			'attribution' => $attribution,
+			// Sämtliche sichtbaren Texte der Leiste kommen aus diesem Array --
+			// bis v0.6.12 standen sechs Pillen-Beschriftungen ("CAPI: gesendet",
+			// "Pixel: wartet auf Consent" ...) hartcodiert UND auf Deutsch im
+			// Inline-JS, obwohl die Quellsprache des Plugins Englisch ist.
 			'i18n'        => array(
-				'title'       => __( 'Pixel Made Simple – Live Debug', 'pixel-made-simple' ),
-				'consent'     => __( 'Consent', 'pixel-made-simple' ),
-				'browser'     => __( 'Browser', 'pixel-made-simple' ),
-				'capi'        => __( 'CAPI', 'pixel-made-simple' ),
-				'matchKeys'   => __( 'Match keys', 'pixel-made-simple' ),
-				'attribution' => __( 'Attribution', 'pixel-made-simple' ),
-				'noEvents'    => __( 'No events on this page yet.', 'pixel-made-simple' ),
-				'adminNote'   => __( 'Only visible to administrators.', 'pixel-made-simple' ),
-				'hide'        => __( 'Minimise', 'pixel-made-simple' ),
+				'title'              => __( 'Pixel Made Simple – Live Debug', 'pixel-made-simple' ),
+				'consent'            => __( 'Consent', 'pixel-made-simple' ),
+				'browser'            => __( 'Browser', 'pixel-made-simple' ),
+				'capi'               => __( 'CAPI', 'pixel-made-simple' ),
+				'matchKeys'          => __( 'Match keys', 'pixel-made-simple' ),
+				'attribution'        => __( 'Attribution', 'pixel-made-simple' ),
+				'noEvents'           => __( 'No events on this page yet.', 'pixel-made-simple' ),
+				'adminNote'          => __( 'Only visible to administrators.', 'pixel-made-simple' ),
+				'capiSent'           => __( 'CAPI: sent', 'pixel-made-simple' ),
+				'capiConsentBlocked' => __( 'CAPI: blocked by consent', 'pixel-made-simple' ),
+				'capiAdminExcluded'  => __( 'CAPI: administrator excluded', 'pixel-made-simple' ),
+				'capiSkipped'        => __( 'CAPI: skipped', 'pixel-made-simple' ),
+				'pixelWaiting'       => __( 'Pixel: waiting for consent', 'pixel-made-simple' ),
+				'eventsApiSent'      => __( 'Events API: sent', 'pixel-made-simple' ),
 			),
 		);
 	}
@@ -196,7 +205,7 @@ class PMS_Debug {
 #pms-debug .pms-muted{color:#8b949e}
 @media (max-width:600px){#pms-debug .pms-name{min-width:0;width:100%}}
 </style>
-<div id="pms-debug" class="pms-min" role="complementary" aria-label="Pixel Made Simple Debug">
+<div id="pms-debug" class="pms-min" role="complementary" aria-label="<?php echo esc_attr__( 'Pixel Made Simple – Live Debug', 'pixel-made-simple' ); ?>">
 	<div id="pms-debug-head">
 		<strong></strong>
 		<span class="pms-pill pms-neutral" data-pms="consent"></span>
@@ -220,16 +229,16 @@ class PMS_Debug {
 			. 'function esc(s){var e=document.createElement("span");e.textContent=String(s==null?"":s);return e.innerHTML;}'
 			. 'function pill(cls,txt){return \'<span class="pms-pill \'+cls+\'">\'+esc(txt)+"</span>";}'
 			. 'function capiPill(st,code,msg){if("ok"===st){return pill("pms-ok","CAPI: "+(code||200)+" OK");}'
-			. 'if("sent"===st){return pill("pms-ok","CAPI: gesendet");}'
+			. 'if("sent"===st){return pill("pms-ok",d.i18n.capiSent);}'
 			. 'if("pending"===st){return pill("pms-neutral","CAPI: \\u23f3");}'
-			. 'if("consent_blocked"===st||"no_consent"===st){return pill("pms-warn","CAPI: Consent blockiert");}'
+			. 'if("consent_blocked"===st||"no_consent"===st){return pill("pms-warn",d.i18n.capiConsentBlocked);}'
 			. 'if("off"===st||"browser_only"===st||"capi_inactive"===st){return pill("pms-neutral","CAPI: \\u2013");}'
-			. 'if("admin_excluded"===st){return pill("pms-warn","CAPI: Admin ausgeschlossen");}'
-			. 'if("skipped"===st){return pill("pms-warn","CAPI: übersprungen");}'
+			. 'if("admin_excluded"===st){return pill("pms-warn",d.i18n.capiAdminExcluded);}'
+			. 'if("skipped"===st){return pill("pms-warn",d.i18n.capiSkipped);}'
 			. 'return pill("pms-err","CAPI: "+(code?code+" ":"")+(msg||st));}'
 			. 'function addRow(ev){var row=document.createElement("div");row.className="pms-row";'
 			. 'var html=\'<span class="pms-name">\'+esc(ev.name)+"</span>";'
-			. 'html+=("fired"===ev.browser?pill("pms-ok","Pixel: \\u2705"):("deferred"===ev.browser?pill("pms-warn","Pixel: wartet auf Consent"):pill("pms-neutral","Pixel: \\u2013")));'
+			. 'html+=("fired"===ev.browser?pill("pms-ok","Pixel: \\u2705"):("deferred"===ev.browser?pill("pms-warn",d.i18n.pixelWaiting):pill("pms-neutral","Pixel: \\u2013")));'
 			. 'html+=capiPill(ev.capi,ev.code,ev.message);'
 			. 'if(ev.eventId){html+=" <code>"+esc(ev.eventId)+"</code>";}'
 			. 'if(ev.platforms&&ev.platforms.length){html+=\' <span class="pms-muted">\'+esc(ev.platforms.join(" · "))+"</span>";}'
@@ -246,7 +255,7 @@ class PMS_Debug {
 			. 'd.tiktokCapi.forEach(function(c){var row=document.createElement("div");row.className="pms-row";'
 			. 'var h=\'<span class="pms-name">\'+esc((c.events||[]).join(", ")||"-")+"</span>";'
 			. 'h+=pill("pms-neutral","TikTok");'
-			. 'h+=("ok"===c.status?pill("pms-ok","Events API: "+(c.code||200)+" OK"):("sent"===c.status?pill("pms-ok","Events API: gesendet"):pill("pms-err","Events API: "+(c.code?c.code+" ":"")+(c.message||c.status))));'
+			. 'h+=("ok"===c.status?pill("pms-ok","Events API: "+(c.code||200)+" OK"):("sent"===c.status?pill("pms-ok",d.i18n.eventsApiSent):pill("pms-err","Events API: "+(c.code?c.code+" ":"")+(c.message||c.status))));'
 			. 'if(c.match_keys&&c.match_keys.length){h+=\' <span class="pms-muted">\'+esc(d.i18n.matchKeys+": "+c.match_keys.join(", "))+"</span>";}'
 			. 'row.innerHTML=h;body.appendChild(row);});'
 			. 'if(d.attribution&&Object.keys(d.attribution).length){var a=document.createElement("div");a.className="pms-row";'

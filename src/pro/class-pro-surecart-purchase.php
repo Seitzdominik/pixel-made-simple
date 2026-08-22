@@ -484,9 +484,9 @@ class PMS_Pro_SureCart_Purchase {
 	 * gleiches Gating: Pixel aktiv + Events-API-Toggle + Access Token,
 	 * gleicher Consent-Fail-closed-Grundsatz, gleicher
 	 * pms_tiktok_capi_blocking-Debug-Filter), nur mit SureCarts eigenen
-	 * Feldnamen für die Bestell-/Kundendaten. Bewusst OHNE Event-Log-Eintrag,
-	 * identische Begründung wie beim WooCommerce-Pendant (siehe dortige
-	 * Doku und „Bekannte Trade-offs" in CLAUDE.md).
+	 * Feldnamen für die Bestell-/Kundendaten. Versand und Protokollierung
+	 * (Event Log, Live-Debug-Leiste) laufen seit v0.6.11 zentral über
+	 * PMS_Pro_TikTok_CAPI::send(), identisch zum WooCommerce-Pendant.
 	 *
 	 * @param object $checkout    SureCart-Checkout.
 	 * @param array  $custom_data Von PMS_Pro_SureCart::build_checkout_custom_data().
