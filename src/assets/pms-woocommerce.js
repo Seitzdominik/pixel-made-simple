@@ -71,6 +71,27 @@
 		} );
 	}
 
+	/**
+	 * Dasselbe contents[]-Format in TikToks Schema übersetzen (seit v0.6.10).
+	 *
+	 * TikToks Diagnostics bemängelt E-Commerce-Events ohne explizites
+	 * content_id INNERHALB von contents[] -- ein top-level content_id (so
+	 * feuerten ViewContent/AddToCart bis v0.6.9) zählt dafür nicht, und
+	 * InitiateCheckout trug bis dahin gar kein contents[]. Jedes Item trägt
+	 * deshalb content_id UND content_type; value/currency bleiben wie gehabt
+	 * auf der obersten Ebene des params-Objekts.
+	 */
+	function contentsToTiktokContents( contents ) {
+		return ( contents || [] ).map( function ( item ) {
+			return {
+				content_id: String( item.id ),
+				content_type: 'product',
+				quantity: item.quantity || 1,
+				price: item.item_price || 0
+			};
+		} );
+	}
+
 	/* -----------------------------------------------------------------
 	 * Consent-Queue
 	 * ------------------------------------------------------------------- */
@@ -95,12 +116,17 @@
 		} );
 	}
 
-	function enqueueOrFire( fn ) {
-		if ( hasConsent() ) {
-			fn();
-			return;
-		}
-		pendingQueue.push( fn );
+	/**
+	 * Flexibler Consent-Modus (cfg.consentMode === 'browser_only', seit
+	 * v0.6.10): serverseitige Signale laufen unabhängig vom Banner-Status,
+	 * nur der Browser-Pixel wartet weiterhin auf die Einwilligung. Siehe
+	 * PMS_Consent::has_server_consent() für die serverseitige Gegenstelle --
+	 * ohne diesen Zweig würde der CAPI-Request nie abgesetzt, weil dieses
+	 * Skript den KOMPLETTEN Dispatch (Pixel + AJAX) in die Consent-Queue
+	 * legt und der Server-Gate deshalb gar nicht erst erreicht wird.
+	 */
+	function serverDispatchAllowed() {
+		return 'browser_only' === cfg.consentMode;
 	}
 
 	( cfg.consentEvents || [] ).forEach( function ( name ) {
@@ -138,7 +164,7 @@
 		var eventId = uuid();
 		platforms = platforms || {};
 
-		function fire() {
+		function firePixels() {
 			var browserFired = false;
 
 			if ( platforms.meta && 'function' === typeof window.fbq ) {
@@ -161,6 +187,10 @@
 				capi: 'pending'
 			} );
 
+			return browserFired;
+		}
+
+		function sendServer( browserFired ) {
 			if ( ! window.fetch || ! cfg.ajaxUrl ) {
 				return;
 			}
@@ -199,7 +229,26 @@
 			} );
 		}
 
-		enqueueOrFire( fire );
+		if ( hasConsent() ) {
+			sendServer( firePixels() );
+			return;
+		}
+
+		if ( serverDispatchAllowed() ) {
+			// Server sofort (ohne Browser-Bestätigung -- der Pixel läuft ja
+			// noch nicht), Browser-Pixel erst nach der Einwilligung. Beide
+			// tragen dieselbe eventId, Meta/TikTok deduplizieren also wie
+			// gewohnt, falls der Besucher später doch noch zustimmt.
+			sendServer( false );
+			pendingQueue.push( function () {
+				firePixels();
+			} );
+			return;
+		}
+
+		pendingQueue.push( function () {
+			sendServer( firePixels() );
+		} );
 	}
 
 	/* -----------------------------------------------------------------
@@ -245,9 +294,16 @@
 				tiktok: {
 					event: 'ViewContent',
 					params: {
-						content_id: String( data.content_id ),
 						content_type: 'product',
-						content_name: data.content_name || '',
+						// contents[] statt eines reinen top-level content_id
+						// (seit v0.6.10, siehe contentsToTiktokContents()).
+						contents: [ {
+							content_id: String( data.content_id ),
+							content_type: 'product',
+							content_name: data.content_name || '',
+							quantity: data.quantity || 1,
+							price: data.value || 0
+						} ],
 						value: data.value || 0,
 						currency: data.currency || ''
 					}
@@ -293,8 +349,12 @@
 			tiktok: {
 				event: 'AddToCart',
 				params: {
-					content_id: String( productId ),
-					content_type: 'product'
+					content_type: 'product',
+					contents: [ {
+						content_id: String( productId ),
+						content_type: 'product',
+						quantity: qty || 1
+					} ]
 				}
 			}
 		} );
@@ -388,6 +448,7 @@
 				event: 'InitiateCheckout',
 				params: {
 					content_type: 'product',
+					contents: contentsToTiktokContents( data.contents ),
 					value: data.value || 0,
 					currency: data.currency || ''
 				}
@@ -462,6 +523,7 @@
 						event: 'InitiateCheckout',
 						params: {
 							content_type: 'product',
+							contents: contentsToTiktokContents( contents ),
 							value: value,
 							currency: currency
 						}

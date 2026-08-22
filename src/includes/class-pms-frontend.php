@@ -121,6 +121,24 @@ class PMS_Frontend {
 				'nonce'           => wp_create_nonce( PMS_Forms::NONCE_ACTION ),
 				'formTracking'    => $form_tracking_active,
 				'eventType'       => PMS_Forms::event_type(),
+				// Consent-Modus (seit v0.6.10): entscheidet in frontend.js, ob
+				// eine fehlende Einwilligung den kompletten Lead verwirft
+				// ('strict') oder nur den Browser-Pixel unterdrückt und den
+				// CAPI-Request trotzdem absetzt ('browser_only'). Server-seitig
+				// gilt derselbe Modus über PMS_Consent::has_server_consent().
+				'consentMode'     => PMS_Settings::consent_mode(),
+				// Multi-Platform-Formular-Leads (seit v0.6.10), rein
+				// browserseitig. Leer = Plattform nicht aktiv/nicht
+				// konfiguriert -- die *_active()-Prüfungen decken den
+				// Pro-Status gleich mit ab (Google/TikTok sind Pro-only), damit
+				// ein bei einem Downgrade übrig gebliebener Wert nicht doch
+				// noch ausgeliefert wird. Dasselbe Defense-in-Depth-Prinzip
+				// wie in print_scripts().
+				'tiktokEvent'     => self::tiktok_active() ? PMS_Settings::form_tiktok_event() : '',
+				'googleTagId'     => self::google_active()
+					? preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) self::$settings['google_tag_id'] )
+					: '',
+				'googleLabel'     => self::google_active() ? PMS_Settings::form_google_label() : '',
 				'urlFilter'       => PMS_Settings::form_url_filters(),
 				'excludeSystem'   => ! empty( self::$settings['form_exclude_system'] ),
 				'utmFormFill'     => $utm_form_fill_active,

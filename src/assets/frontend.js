@@ -62,6 +62,18 @@
 	// Konfigurierter Meta-Event-Typ (Lead oder Contact).
 	var EVENT_NAME = ( 'Contact' === cfg.eventType ) ? 'Contact' : 'Lead';
 
+	// Multi-Platform-Formular-Leads (seit v0.6.10): dieselbe Absendung feuert
+	// zusätzlich ein TikTok-Web-Event und -- sofern ein Conversion-Label
+	// konfiguriert ist -- eine Google-Ads-Conversion. Beide rein
+	// browserseitig, exakt wie bei den URL-Events (PMS_Frontend::
+	// build_google_js()/build_tiktok_js()); der AJAX-Roundtrip unten betrifft
+	// weiterhin ausschließlich die Meta-CAPI. Leere Werte = Plattform in den
+	// Einstellungen nicht aktiv/nicht konfiguriert (siehe
+	// PMS_Frontend::enqueue_frontend()), dann wird nichts gefeuert.
+	var TIKTOK_EVENT = String( cfg.tiktokEvent || '' );
+	var GOOGLE_TAG_ID = String( cfg.googleTagId || '' );
+	var GOOGLE_LABEL = String( cfg.googleLabel || '' );
+
 	// Optionaler URL-Filter: leer = gesamte Website.
 	var URL_FILTERS = Array.isArray( cfg.urlFilter ) ? cfg.urlFilter : [];
 
@@ -242,7 +254,13 @@
 			return; // Seite steht nicht im URL-Filter.
 		}
 
-		if ( ! hasConsent() ) {
+		// Flexibler Consent-Modus (seit v0.6.10, siehe
+		// PMS_Consent::has_server_consent()): ohne Einwilligung bleibt der
+		// Browser-Pixel aus, der CAPI-Request läuft aber weiter. Im
+		// Default-Modus 'strict' bleibt es beim bisherigen Komplett-Abbruch.
+		var pixelAllowed = hasConsent();
+
+		if ( ! pixelAllowed && 'browser_only' !== cfg.consentMode ) {
 			emit( 'pms:event', {
 				event: EVENT_NAME,
 				browser: 'blocked',
@@ -257,7 +275,7 @@
 		var eventId = uuid();
 		var browserFired = false;
 
-		if ( 'function' === typeof window.fbq ) {
+		if ( pixelAllowed && 'function' === typeof window.fbq ) {
 			// KEIN test_event_code hier (Bugfix v0.5.7): Meta's Pixel-SDK
 			// akzeptiert es nicht als custom_data-Feld und ignoriert das Event
 			// im Test-Stream. Der Test-Code bleibt CAPI-only (class-pms-capi.php).
@@ -265,10 +283,23 @@
 			browserFired = true;
 		}
 
+		// Google Ads: nur mit konfiguriertem Conversion-Label (dieselbe Regel
+		// wie bei URL-Events, siehe PMS_Settings::sanitize_event()).
+		if ( pixelAllowed && GOOGLE_TAG_ID && GOOGLE_LABEL && 'function' === typeof window.gtag ) {
+			window.gtag( 'event', 'conversion', { send_to: GOOGLE_TAG_ID + '/' + GOOGLE_LABEL } );
+		}
+
+		// TikTok: dieselbe event_id wie Meta -- TikToks Events API sendet für
+		// Formular-Leads zwar (noch) nichts serverseitig, die ID bleibt
+		// trotzdem konsistent zu allen anderen Zielen dieses Events.
+		if ( pixelAllowed && TIKTOK_EVENT && 'function' === typeof window.ttq ) {
+			window.ttq.track( TIKTOK_EVENT, {}, { event_id: eventId } );
+		}
+
 		emit( 'pms:event', {
 			event: EVENT_NAME,
 			eventId: eventId,
-			browser: browserFired ? 'fired' : 'no_pixel',
+			browser: browserFired ? 'fired' : ( pixelAllowed ? 'no_pixel' : 'blocked' ),
 			capi: 'pending',
 			source: sourceLabel,
 			hasEmail: !! data.email,

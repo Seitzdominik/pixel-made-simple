@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple Pro
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Pro add-on for Pixel Made Simple: everything in the free version plus [Pro-only features go here].
- * Version:           0.6.9
+ * Version:           0.6.10
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -49,7 +49,7 @@ if ( defined( 'PMS_IS_PRO' ) && false === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', true );
-define( 'PMS_VERSION', '0.6.9' );
+define( 'PMS_VERSION', '0.6.10' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

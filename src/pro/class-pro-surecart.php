@@ -186,6 +186,12 @@ class PMS_Pro_SureCart {
 				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
 				'nonce'         => wp_create_nonce( self::NONCE_ACTION ),
 				'consentEvents' => class_exists( 'PMS_Consent' ) ? array_values( PMS_Consent::consent_events() ) : array(),
+				// Consent-Modus (seit v0.6.10): steuert in diesem Skript, ob der
+				// CAPI-Request bei fehlender Einwilligung mit in die Consent-Queue
+				// wandert ('strict') oder sofort rausgeht, während nur der
+				// Browser-Pixel wartet ('browser_only'). Serverseitige
+				// Gegenstelle: PMS_Consent::has_server_consent().
+				'consentMode'   => PMS_Settings::consent_mode(),
 				// Google Ads (gtag) / TikTok Pixel (ttq) sind seit der
 				// WooCommerce-Multi-Platform-Erweiterung (v0.6.6) dasselbe
 				// Muster: eigenes *Enabled-Flag UND tatsächliche
@@ -454,7 +460,10 @@ class PMS_Pro_SureCart {
 			wp_send_json_error( array( 'reason' => 'tracking_disabled' ), 200 );
 		}
 
-		if ( ! PMS_Consent::has_marketing_consent() ) {
+		// Server-Gate (siehe PMS_Consent::has_server_consent()) -- dieser
+		// Endpunkt sendet ausschließlich die Meta-CAPI; über den Browser-Pixel
+		// hat pms-surecart.js bereits selbst entschieden.
+		if ( ! PMS_Consent::has_server_consent() ) {
 			wp_send_json_error( array( 'reason' => 'no_consent' ), 200 );
 		}
 

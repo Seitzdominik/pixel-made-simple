@@ -107,6 +107,24 @@
 			} );
 		} );
 
+		// Generische Klapp-Boxen ohne Master-Toggle (z. B. "Neues Event
+		// erstellen" im Tab "URL-Events", seit v0.6.10). Bewusst getrennt vom
+		// Accordion-Handler darüber: dort sitzt im Header ein Toggle-Switch,
+		// dessen Klicks NICHT klappen dürfen – hier gibt es keinen.
+		document.querySelectorAll( '[data-pms-collapsible] .pms-collapse-header' ).forEach( function ( header ) {
+			header.addEventListener( 'click', function () {
+				var box = header.closest( '[data-pms-collapsible]' );
+				if ( ! box ) {
+					return;
+				}
+				box.classList.toggle( 'closed' );
+				var button = header.querySelector( '.pms-accordion-button' );
+				if ( button ) {
+					button.setAttribute( 'aria-expanded', box.classList.contains( 'closed' ) ? 'false' : 'true' );
+				}
+			} );
+		} );
+
 		// Master-Toggle: blauer Akzent folgt dem Zustand, Aktivieren klappt die Box auf.
 		document.querySelectorAll( '.pms-accordion' ).forEach( function ( box ) {
 			var master = box.querySelector( '.pms-accordion-header .pms-toggle input' );

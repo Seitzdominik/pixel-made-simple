@@ -207,13 +207,76 @@
 }
 
 /* Einheitliche Breitenberechnung: Padding und Rahmen zählen zur max-width,
-   damit Toggle-Leiste, Tabelle und Cards exakt bündig abschließen. */
+   damit Toggle-Leiste, Tabelle und Cards exakt bündig abschließen.
+
+   Seit v0.6.10 gilt das ausdrücklich auch für ALLE Hinweis-/Notice-Boxen
+   (WP-Core-.notice, Info-Callout, Video-Box, Pro-Teaser). Ohne border-box
+   addieren sich deren Padding UND der 4px-Akzentbalken links auf die
+   max-width auf – die Box ragte dadurch sichtbar über die Accordions und
+   Tabellen daneben hinaus. */
 .pms-global-toggle-form,
 .pms-events-table,
 .pms-event-form-card,
 .pms-accordion,
-.pms-card {
+.pms-card,
+.pms-pro-teaser,
+.pms-info-callout,
+.pms-video-box,
+.pms-wrap .notice {
 	box-sizing: border-box;
+}
+
+/* Bündig zur 960px-Spalte aus Tabelle/Toggle-Leiste: mit border-box zählt
+   der Balken links jetzt mit, deshalb dieselbe Zahl wie dort statt der
+   früheren, von Hand gegengerechneten 928px. */
+.pms-wrap .notice.inline {
+	max-width: 960px;
+}
+
+/* Aufklärendes Info-Callout (z. B. DSGVO-Hinweis in der Consent-Box).
+   Ruhiger als eine WP-.notice: gehört inhaltlich zur Box, in der es steht,
+   und soll nicht wie eine Systemmeldung wirken. */
+.pms-info-callout {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	max-width: 640px;
+	margin: 12px 0;
+	padding: 12px 14px;
+	background: #f0f6fc;
+	border: 1px solid #c5d9ed;
+	border-left: 4px solid #72aee6;
+	border-radius: 3px;
+}
+
+.pms-info-callout .dashicons {
+	flex: 0 0 auto;
+	margin-top: 1px;
+	color: #2271b1;
+}
+
+.pms-info-callout-body p {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.6;
+	color: #3c434a;
+}
+
+/* Hinweis unter einem gerade abgelaufenen Test-Event-Code-Feld. Bewusst
+   dezenter als eine WP-.notice: Der Ablauf ist der geplante Normalfall, kein
+   Fehler -- aber das kommentarlos geleerte Feld braucht eine Erklärung. */
+.pms-expired-hint {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	color: #8a6d3b;
+}
+
+.pms-expired-hint .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+	color: #dba617;
 }
 
 /* Events-Tab */
@@ -231,10 +294,6 @@
 
 .pms-global-toggle-label {
 	vertical-align: middle;
-}
-
-.pms-wrap .notice.inline {
-	max-width: 928px;
 }
 
 .pms-events-table {
@@ -387,6 +446,83 @@
 
 .pms-card .pms-card-body {
 	padding: 4px 20px 16px;
+}
+
+/* Nicht erkannte Integration (Tab "E-Commerce": WooCommerce/SureCart nicht
+   installiert oder deaktiviert). Bewusst OHNE den blauen Balken der normalen
+   .pms-card – blau steht in dieser Oberfläche durchgehend für "aktiv". Gleiche
+   max-width wie .pms-accordion/.pms-pro-teaser, damit die Box in der Spalte
+   der übrigen Boxen bleibt statt 60px darüber hinauszuragen. */
+.pms-card-inactive {
+	max-width: 900px;
+	background: #fbfbfc;
+	border-left-color: #c3c4c7;
+}
+
+.pms-card-inactive > h2 {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: #646970;
+}
+
+.pms-card-inactive > h2 .dashicons-marker {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+	color: #8c8f94;
+}
+
+.pms-inactive-badge {
+	margin-left: 2px;
+	padding: 1px 8px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	color: #646970;
+	background: #f0f0f1;
+	border: 1px solid #c3c4c7;
+	border-radius: 10px;
+}
+
+/* Generische Klapp-Box ohne Master-Toggle (Event-Formular im Tab
+   "URL-Events"). Nutzt bewusst dieselbe Pfeil-Optik wie .pms-accordion,
+   ohne dessen Toggle-abhängige Zustandslogik zu erben. */
+.pms-collapse-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.pms-collapse-header:hover {
+	background: #f6f7f7;
+}
+
+.pms-collapsible.closed .pms-collapse-body {
+	display: none;
+}
+
+.pms-collapsible.closed > .pms-collapse-header {
+	border-bottom: 0;
+}
+
+/* Pfeil-Richtung: Gegenstück zu .pms-accordion.closed weiter oben – die
+   Klapp-Box trägt "closed" auf einem anderen Container, das dortige
+   Selektor-Paar greift hier also nicht. */
+.pms-collapsible.closed .pms-accordion-arrow::before {
+	content: "\f140"; /* dashicons-arrow-down-alt2 */
+}
+
+.pms-event-form-card > .pms-collapse-header {
+	padding-right: 10px;
+}
+
+.pms-collapse-title {
+	flex: 1 1 auto;
 }
 
 /* Buttons mit Dashicon (Tools-Tab) */

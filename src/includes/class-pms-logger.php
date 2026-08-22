@@ -196,6 +196,31 @@ class PMS_Logger {
 	}
 
 	/**
+	 * Gilt eine Log-Zeile als Fehler?
+	 *
+	 * Einzige Quelle der Wahrheit für beide Stellen, die das beantworten
+	 * müssen: den Filter "Nur Fehler" in get_entries() und das rote Badge in
+	 * PMS_Admin_Event_Log::render_status_badge(). Bis v0.6.9 hatten beide
+	 * ihre eigene, leicht unterschiedliche Bedingung -- ein 4xx/5xx ohne
+	 * Fehlertext (möglich, wenn Meta einen Statuscode ohne verwertbaren
+	 * error.message liefert) färbte das Badge nicht rot und tauchte auch im
+	 * Filter nicht auf.
+	 *
+	 * http_status=0 OHNE error_message ist ausdrücklich KEIN Fehler, sondern
+	 * der Fire-and-Forget-Normalfall (siehe PMS_CAPI::log()).
+	 *
+	 * @param array $row Zeile aus get_entries().
+	 * @return bool
+	 */
+	public static function is_error_row( array $row ) {
+		if ( '' !== (string) ( $row['error_message'] ?? '' ) ) {
+			return true;
+		}
+
+		return (int) ( $row['http_status'] ?? 0 ) >= 400;
+	}
+
+	/**
 	 * Protokollierte Events lesen (neueste zuerst).
 	 *
 	 * Holt bewusst eine feste, kleine Obergrenze (MAX_FETCH) OHNE dynamisches
@@ -205,7 +230,7 @@ class PMS_Logger {
 	 * unnötig.
 	 *
 	 * @param array $args {
-	 *     @type string $status     '' (alle) oder 'error' (nur Einträge mit error_message).
+	 *     @type string $status     '' (alle) oder 'error' (nur Fehlerzeilen, siehe is_error_row()).
 	 *     @type string $event_name '' (alle) oder exakter Event-Name.
 	 *     @type int    $limit      Max. Anzahl Ergebnisse (Default DISPLAY_LIMIT).
 	 * }
@@ -232,7 +257,7 @@ class PMS_Logger {
 						if ( '' !== $event_filter && $row['event_name'] !== $event_filter ) {
 							return false;
 						}
-						if ( 'error' === $status_filter && '' === (string) ( $row['error_message'] ?? '' ) ) {
+						if ( 'error' === $status_filter && ! self::is_error_row( $row ) ) {
 							return false;
 						}
 						return true;

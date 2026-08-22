@@ -230,11 +230,19 @@ class PMS_Admin_Event_Log {
 	}
 
 	/**
-	 * Status-Badge: Grün bei bestätigtem 2xx, Rot bei vorhandener
-	 * error_message (Tooltip mit Fehlertext), sonst neutral "Sent" --
-	 * http_status=0 ohne error_message bedeutet "abgeschickt, aber
-	 * Fire-and-Forget ohne Rückmeldung" (siehe PMS_CAPI::log()-Doku), nicht
-	 * zwingend ein Fehler.
+	 * Status-Badge, seit v0.6.10 mit vereinheitlichter Farbgebung:
+	 *
+	 * - GRÜN für jeden Erfolgsfall -- sowohl ein bestätigtes 2xx ("200 OK")
+	 *   als auch der Fire-and-Forget-Normalfall http_status=0 ohne
+	 *   error_message ("Gesendet"). Letzterer bekam bis v0.6.9 ein neutrales
+	 *   graues Badge, was in der Liste wie ein Zwischenzustand aussah, obwohl
+	 *   das Event tatsächlich rausging (siehe PMS_CAPI::log()-Doku: der
+	 *   Standard-Sendemodus wartet die Antwort bewusst nicht ab).
+	 * - ROT für jeden Fehlerfall -- vorhandene error_message (Tooltip trägt
+	 *   den Text) ODER ein 4xx/5xx-Statuscode. Deckungsgleich mit
+	 *   PMS_Logger::is_error_row(), das denselben Zustand für den Filter
+	 *   "Nur Fehler" auswertet.
+	 * - Neutral bleibt einzig der praktisch unerreichbare Rest (1xx/3xx).
 	 *
 	 * @param array $entry
 	 * @return void
@@ -243,10 +251,10 @@ class PMS_Admin_Event_Log {
 		$code    = (int) $entry['http_status'];
 		$message = (string) ( $entry['error_message'] ?? '' );
 
-		if ( '' !== $message ) {
+		if ( PMS_Logger::is_error_row( $entry ) ) {
 			printf(
-				'<span class="pms-badge pms-badge-log-error" title="%1$s">%2$s</span>',
-				esc_attr( $message ),
+				'<span class="pms-badge pms-badge-log-error"%1$s>%2$s</span>',
+				'' !== $message ? ' title="' . esc_attr( $message ) . '"' : '',
 				esc_html( $code > 0 ? $code . ' ' . __( 'Error', 'pixel-made-simple' ) : __( 'Error', 'pixel-made-simple' ) )
 			);
 			return;
@@ -257,7 +265,12 @@ class PMS_Admin_Event_Log {
 			return;
 		}
 
-		printf( '<span class="pms-badge pms-badge-log-neutral">%s</span>', esc_html__( 'Sent', 'pixel-made-simple' ) );
+		if ( 0 === $code ) {
+			printf( '<span class="pms-badge pms-badge-log-ok">%s</span>', esc_html__( 'Sent', 'pixel-made-simple' ) );
+			return;
+		}
+
+		printf( '<span class="pms-badge pms-badge-log-neutral">%s</span>', esc_html( (string) $code ) );
 	}
 
 	/**

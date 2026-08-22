@@ -801,8 +801,9 @@ class PMS_Pro_Woo_Purchase {
 		// PMS_CAPI::send_events() für Meta -- kein Sonderfall für
 		// Server-zu-Server-Kontexte (siehe Klassen-Doku "Bekannte
 		// Trade-offs" in CLAUDE.md für die ausführliche Begründung anhand
-		// des Meta-Pendants).
-		if ( class_exists( 'PMS_Consent' ) && ! PMS_Consent::has_marketing_consent() ) {
+		// des Meta-Pendants). Seit v0.6.10 respektiert dieser Gate zusätzlich
+		// den Consent-Modus (PMS_Consent::has_server_consent()).
+		if ( class_exists( 'PMS_Consent' ) && ! PMS_Consent::has_server_consent() ) {
 			return;
 		}
 
@@ -869,6 +870,18 @@ class PMS_Pro_Woo_Purchase {
 				),
 			),
 		);
+
+		// TikTok Test Event Code (seit v0.6.10): Pendant zu Metas
+		// test_event_code (siehe PMS_CAPI::send_events()). Top-Level-Feld des
+		// Events-API-Requests, NICHT Teil von data[] -- solange gesetzt,
+		// erscheinen die Events in TikToks "Test Events"-Ansicht statt im
+		// regulären Stream. Inklusive desselben 12h-Auto-Expiry wie bei Meta:
+		// ein vergessener Code darf echte Käufe nicht dauerhaft aus den
+		// Live-Berichten heraushalten (siehe PMS_Settings::expire_test_code()).
+		$tiktok_test_code = PMS_Settings::active_tiktok_test_event_code( $settings );
+		if ( '' !== $tiktok_test_code ) {
+			$body['test_event_code'] = $tiktok_test_code;
+		}
 
 		/**
 		 * Für Debugging auf blockierend schalten, analog zu

@@ -45,7 +45,11 @@ class PMS_CAPI {
 		$source = $browser_confirmed ? 'both' : 'capi';
 
 		// DSGVO: Ohne Marketing-Einwilligung wird kein Request abgesetzt.
-		if ( class_exists( 'PMS_Consent' ) && ! PMS_Consent::has_marketing_consent() ) {
+		// Seit v0.6.10 über den SERVER-Gate (has_server_consent()): im
+		// flexiblen Consent-Modus laufen serverseitige Signale unabhängig vom
+		// Banner-Status weiter, im Default-Modus 'strict' ist das Ergebnis
+		// unverändert identisch zu has_marketing_consent().
+		if ( class_exists( 'PMS_Consent' ) && ! PMS_Consent::has_server_consent() ) {
 			return self::log( $events, 'consent_blocked', 0, __( 'No marketing consent', 'pixel-made-simple' ), array(), $source );
 		}
 
@@ -226,6 +230,14 @@ class PMS_CAPI {
 	 * ignoriert und direkt aus der Datenbank entfernt, damit kein versehentliches
 	 * Test-Tracking im Live-Betrieb passiert.
 	 *
+	 * Seit v0.6.10 nur noch ein dünner Wrapper um
+	 * PMS_Settings::active_meta_test_event_code(): TikTok hat inzwischen
+	 * denselben Mechanismus (siehe pro/class-pro-woo-purchase.php), und die
+	 * Ablaufregel darf zwischen beiden Plattformen nicht auseinanderlaufen.
+	 * Der Wrapper bleibt trotzdem bestehen -- send_events() ist der einzige
+	 * Aufrufer, und der Methodenname erklärt an dieser Stelle mehr über die
+	 * Absicht als ein direkter PMS_Settings-Aufruf.
+	 *
 	 * Ausschließlich für die CAPI relevant (private): Der Test-Code wird bewusst
 	 * NICHT an den Browser-Pixel weitergereicht (siehe PMS_Frontend::build_meta_js(),
 	 * Bugfix v0.5.7 – Meta's Pixel-SDK akzeptiert ihn dort nicht als custom_data
@@ -235,22 +247,7 @@ class PMS_CAPI {
 	 * @return string Aktiver Test-Code oder leerer String.
 	 */
 	private static function active_test_event_code( array $settings ) {
-		$code = (string) ( $settings['test_event_code'] ?? '' );
-		if ( '' === $code ) {
-			return '';
-		}
-
-		$created_at = (int) ( $settings['test_code_created_at'] ?? 0 );
-		$max_age    = defined( 'HOUR_IN_SECONDS' ) ? 12 * HOUR_IN_SECONDS : 43200;
-
-		if ( $created_at > 0 && ( time() - $created_at ) > $max_age ) {
-			$settings['test_event_code']      = '';
-			$settings['test_code_created_at'] = 0;
-			update_option( PMS_Settings::OPTION_SETTINGS, $settings );
-			return '';
-		}
-
-		return $code;
+		return PMS_Settings::active_meta_test_event_code( $settings );
 	}
 
 	/**

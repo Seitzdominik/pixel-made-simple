@@ -122,12 +122,14 @@
 		} );
 	}
 
-	function enqueueOrFire( fn ) {
-		if ( hasConsent() ) {
-			fn();
-			return;
-		}
-		pendingQueue.push( fn );
+	/**
+	 * Flexibler Consent-Modus (cfg.consentMode === 'browser_only', seit
+	 * v0.6.10) -- identisch zu assets/pms-woocommerce.js, siehe dortigen
+	 * Kommentar und PMS_Consent::has_server_consent() für die
+	 * serverseitige Gegenstelle.
+	 */
+	function serverDispatchAllowed() {
+		return 'browser_only' === cfg.consentMode;
 	}
 
 	( cfg.consentEvents || [] ).forEach( function ( name ) {
@@ -175,7 +177,7 @@
 		var eventId = uuid();
 		platforms = platforms || {};
 
-		function fire() {
+		function firePixels() {
 			var browserFired = false;
 
 			if ( platforms.meta && 'function' === typeof window.fbq ) {
@@ -198,6 +200,10 @@
 				capi: 'pending'
 			} );
 
+			return browserFired;
+		}
+
+		function sendServer( browserFired ) {
 			if ( ! window.fetch || ! cfg.ajaxUrl ) {
 				return;
 			}
@@ -236,7 +242,24 @@
 			} );
 		}
 
-		enqueueOrFire( fire );
+		if ( hasConsent() ) {
+			sendServer( firePixels() );
+			return;
+		}
+
+		if ( serverDispatchAllowed() ) {
+			// Siehe assets/pms-woocommerce.js: Server sofort, Browser-Pixel
+			// erst nach der Einwilligung -- dieselbe eventId für beide.
+			sendServer( false );
+			pendingQueue.push( function () {
+				firePixels();
+			} );
+			return;
+		}
+
+		pendingQueue.push( function () {
+			sendServer( firePixels() );
+		} );
 	}
 
 	/* -----------------------------------------------------------------
@@ -283,9 +306,16 @@
 				tiktok: {
 					event: 'ViewContent',
 					params: {
-						content_id: String( data.content_id ),
 						content_type: 'product',
-						content_name: data.content_name || '',
+						// contents[] statt eines reinen top-level content_id
+						// (seit v0.6.10, siehe tiktokContentsPayload()).
+						contents: [ {
+							content_id: String( data.content_id ),
+							content_type: 'product',
+							content_name: data.content_name || '',
+							quantity: data.quantity || 1,
+							price: data.value || 0
+						} ],
 						value: data.value || 0,
 						currency: data.currency || ''
 					}
@@ -483,11 +513,21 @@
 		};
 	}
 
+	/**
+	 * contents[] in TikToks Schema. Seit v0.6.10 trägt jedes Item
+	 * zusätzlich content_type -- siehe contentsToTiktokContents() in
+	 * assets/pms-woocommerce.js für die Begründung (Diagnostics-Warnung).
+	 */
 	function tiktokContentsPayload( payload ) {
 		return {
 			content_type: 'product',
-			contents: payload.contents.map( function ( item ) {
-				return { content_id: item.id, quantity: item.quantity, price: item.item_price };
+			contents: ( payload.contents || [] ).map( function ( item ) {
+				return {
+					content_id: String( item.id ),
+					content_type: 'product',
+					quantity: item.quantity || 1,
+					price: item.item_price || 0
+				};
 			} ),
 			value: payload.value,
 			currency: payload.currency
@@ -527,8 +567,12 @@
 			tiktok: {
 				event: 'AddToCart',
 				params: {
-					content_id: id,
-					content_type: 'product'
+					content_type: 'product',
+					contents: [ {
+						content_id: id,
+						content_type: 'product',
+						quantity: qty
+					} ]
 				}
 			}
 		} );
@@ -553,11 +597,7 @@
 			},
 			tiktok: {
 				event: 'InitiateCheckout',
-				params: {
-					content_type: 'product',
-					value: payload.value,
-					currency: payload.currency
-				}
+				params: tiktokContentsPayload( payload )
 			}
 		} );
 	}

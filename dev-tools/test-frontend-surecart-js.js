@@ -251,6 +251,14 @@ console.log( '\n=== 1. ViewContent: liest #pms-surecart-view-content-data und fe
 	check( '1.1 fbq(track, ViewContent) feuert mit den richtigen Werten', win.fbqCalls.length === 1 && 'ViewContent' === win.fbqCalls[ 0 ][ 1 ] && 89.99 === win.fbqCalls[ 0 ][ 2 ].value );
 	check( '1.2 gtag(event, view_item) feuert', win.gtagCalls.length === 1 && 'view_item' === win.gtagCalls[ 0 ][ 1 ] );
 	check( '1.3 ttq.track(ViewContent) feuert', win.ttqCalls.length === 1 && 'ViewContent' === win.ttqCalls[ 0 ][ 0 ] );
+	// Seit v0.6.10 in contents[] statt als top-level content_id (TikTok-
+	// Diagnostics-Warnung, siehe tiktokContentsPayload() in pms-surecart.js).
+	check( '1.3b ttq ViewContent: contents[] mit explizitem content_id/content_type', (function () {
+		const p = win.ttqCalls[ 0 ] && win.ttqCalls[ 0 ][ 1 ];
+		return !! p && Array.isArray( p.contents ) && 1 === p.contents.length
+			&& 'prod_501' === p.contents[ 0 ].content_id && 'product' === p.contents[ 0 ].content_type
+			&& undefined === p.content_id;
+	})() );
 	check( '1.4 AJAX-Request an pms_surecart_track mit product_id', win.fetchCalls.length === 1 && win.fetchCalls[ 0 ].body.indexOf( 'action=pms_surecart_track' ) !== -1 && win.fetchCalls[ 0 ].body.indexOf( 'product_id=prod_501' ) !== -1 );
 }
 
@@ -352,6 +360,10 @@ console.log( '\n=== 4. AddToCart: beobachtete einzelne LineItem-POST-Antwort ===
 
 	check( '4.1 fbq(track, AddToCart) feuert mit der Price-ID als content_id', win.fbqCalls.length === 1 && 'AddToCart' === win.fbqCalls[ 0 ][ 1 ] && [ 'price_501' ] + '' === win.fbqCalls[ 0 ][ 2 ].content_ids + '' );
 	check( '4.2 ttq.track(AddToCart) feuert', win.ttqCalls.some( ( c ) => 'AddToCart' === c[ 0 ] ) );
+	check( '4.2b ttq AddToCart: contents[] mit content_id (Price-ID) und quantity', (function () {
+		const c = win.ttqCalls.find( ( x ) => 'AddToCart' === x[ 0 ] );
+		return !! c && Array.isArray( c[ 1 ].contents ) && 'price_501' === c[ 1 ].contents[ 0 ].content_id && 2 === c[ 1 ].contents[ 0 ].quantity;
+	})() );
 	check( '4.3 gtag(event, add_to_cart) feuert mit quantity=2', win.gtagCalls.some( ( c ) => 'add_to_cart' === c[ 1 ] && 2 === c[ 2 ].items[ 0 ].quantity ) );
 	check( '4.4 AJAX an pms_surecart_track mit price_id (kein product_id bekannt)', win.fetchCalls.some( ( c ) => c.body.indexOf( 'action=pms_surecart_track' ) !== -1 && c.body.indexOf( 'price_id=price_501' ) !== -1 ) );
 }
@@ -406,6 +418,12 @@ console.log( '\n=== 5. InitiateCheckout: Checkout-Snapshot (status=draft) + Line
 	check( '5.2 value/currency korrekt aus dem Checkout-Snapshot (Minor Units / 100)', 55 === meta.value && 'EUR' === meta.currency );
 	check( '5.3 contents enthält beide Positionen mit historischem item_price (total_amount/quantity)', 2 === meta.contents.length && 20 === meta.contents[ 0 ].item_price && 15 === meta.contents[ 1 ].item_price );
 	check( '5.4 gtag(event, begin_checkout) feuert mit denselben Items', win.gtagCalls.some( ( c ) => 'begin_checkout' === c[ 1 ] && 2 === c[ 2 ].items.length ) );
+	check( '5.4b ttq InitiateCheckout: contents[] je Position mit content_id (Diagnostics-Fix v0.6.10)', (function () {
+		const c = win.ttqCalls.find( ( x ) => 'InitiateCheckout' === x[ 0 ] );
+		return !! c && Array.isArray( c[ 1 ].contents ) && 2 === c[ 1 ].contents.length
+			&& 'price_501' === c[ 1 ].contents[ 0 ].content_id && 'price_777' === c[ 1 ].contents[ 1 ].content_id
+			&& 55 === c[ 1 ].value && 'EUR' === c[ 1 ].currency;
+	})() );
 	check( '5.5 AJAX an pms_surecart_track mit checkout_id (Server löst den Rest serverseitig auf)', win.fetchCalls.some( ( c ) => c.body.indexOf( 'action=pms_surecart_track' ) !== -1 && c.body.indexOf( 'checkout_id=chk_ic_1' ) !== -1 ) );
 
 	// Erneutes Beobachten desselben Checkouts (z. B. Mengenänderung) darf
@@ -455,6 +473,14 @@ console.log( '\n=== 6. Purchase: Checkout-Snapshot mit status=paid, deterministi
 
 	check( '6.1 fbq(track, Purchase) feuert mit der deterministischen event_id "pms_sc_order_chk_paid_1"', win.fbqCalls.some( ( c ) => 'Purchase' === c[ 1 ] && 'pms_sc_order_chk_paid_1' === c[ 3 ].eventID ) );
 	check( '6.2 ttq.track(CompletePayment) feuert mit derselben event_id', win.ttqCalls.some( ( c ) => 'CompletePayment' === c[ 0 ] && 'pms_sc_order_chk_paid_1' === c[ 2 ].event_id ) );
+	// contents[] ist hier bewusst LEER: Purchase feuert sofort beim ersten
+	// "paid"-Snapshot, ohne auf die Line-Items zu warten (siehe evaluate() in
+	// pms-surecart.js -- value/currency stehen bereits im Snapshot, nur die
+	// Aufschlüsselung fehlt dann). Die befüllte Variante prüft 6.2c unten.
+	check( '6.2b ttq CompletePayment: value/currency gesetzt, contents[] vorhanden (ggf. leer)', (function () {
+		const c = win.ttqCalls.find( ( x ) => 'CompletePayment' === x[ 0 ] );
+		return !! c && Array.isArray( c[ 1 ].contents ) && 55 === c[ 1 ].value && 'EUR' === c[ 1 ].currency;
+	})() );
 	check( '6.3 gtag(event, conversion) feuert mit send_to = TagID/Label und transaction_id', win.gtagCalls.some( ( c ) => 'conversion' === c[ 1 ] && 'AW-123456789/AbCdEfGh' === c[ 2 ].send_to && 'pms_sc_order_chk_paid_1' === c[ 2 ].transaction_id ) );
 	check( '6.4 KEIN AJAX-Roundtrip an pms_surecart_track für Purchase (läuft serverseitig über die WP-Hooks)', ! win.fetchCalls.some( ( c ) => c.body.indexOf( 'action=pms_surecart_track' ) !== -1 ) );
 
@@ -463,6 +489,38 @@ console.log( '\n=== 6. Purchase: Checkout-Snapshot mit status=paid, deterministi
 	await win.fetch( checkoutUrl ).then( ( r ) => r.json() );
 	await flushMicrotasks();
 	check( '6.5 Dedup: ein zweiter beobachteter "paid"-Snapshot feuert NICHT erneut', win.fbqCalls.filter( ( c ) => 'Purchase' === c[ 1 ] ).length === 1 );
+}
+
+{
+	// Line-Items VOR dem "paid"-Snapshot beobachtet (die Reihenfolge, in der
+	// SureCarts Checkout-UI sie in der Praxis nachlädt): jetzt trägt das
+	// TikTok-Payload eine vollständige contents[]-Aufschlüsselung -- und
+	// jede Position ein explizites content_id (Diagnostics-Fix v0.6.10).
+	const checkoutUrl = 'https://example.com/wp-json/surecart/v1/checkouts/chk_paid_2';
+	const lineItemsUrl = 'https://example.com/wp-json/surecart/v1/line_items?checkout=chk_paid_2';
+
+	const { window: win } = run(
+		{ tiktokEnabled: true },
+		{
+			fetchResponses: {
+				[ checkoutUrl ]: { id: 'chk_paid_2', status: 'paid', total_amount: 5500, currency: 'eur' },
+				[ lineItemsUrl ]: { data: [ { id: 'li_1', quantity: 1, price: 'price_501', total_amount: 5500, checkout: 'chk_paid_2' } ] },
+			},
+		}
+	);
+	win.pmsInitialized = true;
+
+	await win.fetch( lineItemsUrl ).then( ( r ) => r.json() );
+	await win.fetch( checkoutUrl ).then( ( r ) => r.json() );
+	await flushMicrotasks();
+
+	check( '6.2c ttq CompletePayment: contents[] mit content_id UND content_type je Position', (function () {
+		const c = win.ttqCalls.find( ( x ) => 'CompletePayment' === x[ 0 ] );
+		return !! c && Array.isArray( c[ 1 ].contents ) && 1 === c[ 1 ].contents.length
+			&& 'price_501' === c[ 1 ].contents[ 0 ].content_id
+			&& 'product' === c[ 1 ].contents[ 0 ].content_type
+			&& 55 === c[ 1 ].contents[ 0 ].price;
+	})() );
 }
 
 {
@@ -609,6 +667,74 @@ console.log( '\n=== 8. currencyMinorUnitDivisor wird für die Preisumrechnung ge
 	const meta = win.fbqCalls.find( ( c ) => 'InitiateCheckout' === c[ 1 ] );
 	check( '8.1 currencyMinorUnitDivisor=1: value bleibt 5500 (kein /100)', !! meta && 5500 === meta[ 2 ].value );
 }
+
+/* ---------------------------------------------------------------------
+ * 9. Flexibler Consent-Modus (consentMode: 'browser_only', v0.6.10)
+ * ------------------------------------------------------------------- */
+
+console.log( '\n=== 9. Consent-Modus "browser_only": Server sofort, Browser-Pixel erst nach der Einwilligung ===' );
+
+function scViewContentEl() {
+	return {
+		id: 'pms-surecart-view-content-data',
+		nodeName: 'SCRIPT',
+		textContent: JSON.stringify( {
+			product_id: 'prod_901',
+			content_id: 'prod_901',
+			content_name: 'Kurs',
+			content_category: '',
+			value: 49,
+			currency: 'EUR',
+			quantity: 1,
+		} ),
+	};
+}
+
+{
+	const { window: win, document: doc } = run(
+		{ consentMode: 'browser_only', consentEvents: [ 'cmplz_fire_categories' ], tiktokEnabled: true },
+		{ elements: [ scViewContentEl() ], hasConsent: false, autoTimeout: true }
+	);
+	await flushMicrotasks();
+
+	const trackCalls = () => win.fetchCalls.filter( ( c ) => c.body.indexOf( 'action=pms_surecart_track' ) !== -1 );
+
+	check( '9.1 browser_only ohne Consent: AJAX-/CAPI-Request geht sofort raus', 1 === trackCalls().length );
+	check( '9.2 browser_only ohne Consent: kein fbq()/ttq-Aufruf', 0 === win.fbqCalls.length && 0 === win.ttqCalls.length );
+
+	const params = new URLSearchParams( trackCalls()[ 0 ].body );
+	check( '9.3 browser_only: Server-Request meldet browser_fired=0', '0' === params.get( 'browser_fired' ) );
+
+	win.pmsHasConsent = function () {
+		return true;
+	};
+	doc.dispatchEvent( { type: 'cmplz_fire_categories' } );
+	await flushMicrotasks();
+
+	check( '9.4 browser_only + nachträglicher Consent: Browser-Pixel wird nachgeholt', 1 === win.fbqCalls.length );
+	check( '9.5 browser_only + nachträglicher Consent: KEIN zweiter Server-Request', 1 === trackCalls().length );
+	check( '9.6 browser_only: nachgeholter Pixel trägt dieselbe event_id wie der Server-Request', win.fbqCalls[ 0 ][ 3 ].eventID === params.get( 'event_id' ) );
+}
+
+{
+	// Gegenprobe im Default-Modus: alles wandert weiterhin gemeinsam in die Queue.
+	const { window: win, document: doc } = run(
+		{ consentMode: 'strict', consentEvents: [ 'cmplz_fire_categories' ] },
+		{ elements: [ scViewContentEl() ], hasConsent: false, autoTimeout: true }
+	);
+	await flushMicrotasks();
+
+	check( '9.7 strict ohne Consent: weder Pixel noch Server-Request', 0 === win.fbqCalls.length && 0 === win.fetchCalls.length );
+
+	win.pmsHasConsent = function () {
+		return true;
+	};
+	doc.dispatchEvent( { type: 'cmplz_fire_categories' } );
+	await flushMicrotasks();
+
+	check( '9.8 strict + nachträglicher Consent: beides wird gemeinsam nachgeholt', 1 === win.fbqCalls.length && 1 === win.fetchCalls.length );
+}
+
 
 console.log( '\n==============================' );
 console.log( 'Ergebnis: ' + pass + ' bestanden, ' + fail + ' fehlgeschlagen' );

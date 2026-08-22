@@ -68,13 +68,30 @@ function sanitize_text_field( $s ) { return trim( strip_tags( (string) $s ) ); }
 function sanitize_textarea_field( $s ) { return trim( strip_tags( (string) $s ) ); }
 function wp_unslash( $v ) { return $v; }
 function current_user_can( $c ) { return true; }
+// Seit v0.6.10 kann das Rendern von Tab "Allgemein" schreiben: ein abgelaufener
+// Test-Event-Code wird dabei geleert (PMS_Settings::expire_test_code()).
+// update_option() muss dafür tatsächlich etwas merken -- ein reines No-Op
+// würde dazu führen, dass get_option() unten weiterhin den abgelaufenen Wert
+// liefert und der Ablauf-Hinweis in der Vorschau nie zu sehen wäre, obwohl er
+// in einer echten Installation erscheint.
+$GLOBALS['pms_preview_option_overrides'] = array();
+function update_option( $name, $value, $autoload = null ) {
+	$GLOBALS['pms_preview_option_overrides'][ $name ] = $value;
+	return true;
+}
 function get_option( $name, $default = false ) {
+	if ( array_key_exists( $name, $GLOBALS['pms_preview_option_overrides'] ) ) {
+		return $GLOBALS['pms_preview_option_overrides'][ $name ];
+	}
 	// Anpassen für andere Vorschau-Szenarien (z. B. form_url_filter leeren,
 	// um den Konflikt-Hinweis auszublenden).
 	if ( 'pms_settings' === $name ) {
 		return array(
 			'pixel_enabled' => 1, 'pixel_id' => '1234567890123456', 'capi_enabled' => 1,
 			'capi_token' => 'EAAB...preview...token', 'test_event_code' => 'TEST12345',
+			// Frisch gesetzt -> der 12h-Ablauf greift in der Vorschau nicht.
+			// Auf time() - 13 * 3600 setzen, um den Ablauf-Hinweis zu sehen.
+			'test_code_created_at' => time(),
 			'exclude_admins' => 1, 'hash_email' => 0, 'consent_detection' => 1,
 			'google_enabled' => 1, 'google_tag_id' => 'AW-123456789', 'google_consent_mode' => 1,
 			'tiktok_enabled' => 0, 'tiktok_pixel_id' => '',
@@ -121,10 +138,14 @@ function plugin_basename( $f ) { return basename( $f ); }
 
 /**
  * Minimaler $wpdb-Ersatz nur für PMS_Logger::get_entries() (Event-Log-Tab-
- * Vorschau) -- liefert drei feste Beispielzeilen, die die drei Status-Badge-
- * Varianten (neutral/ok/error) und source-Varianten abdecken. insert()/
- * delete()/query() werden vom reinen Tab-Rendering nie aufgerufen, aber
- * sicherheitshalber als No-Ops vorhanden.
+ * Vorschau) -- liefert drei feste Beispielzeilen, die die Status-Badge-
+ * Varianten und source-Varianten abdecken: Fire-and-Forget (http_status 0
+ * ohne Fehlertext -> grün "Gesendet"), bestätigtes 2xx (-> grün "200 OK")
+ * und ein 4xx mit Fehlertext (-> rot). Seit v0.6.10 gibt es für die ersten
+ * beiden bewusst KEINE Farbunterscheidung mehr (siehe
+ * PMS_Admin_Event_Log::render_status_badge()). insert()/delete()/query()
+ * werden vom reinen Tab-Rendering nie aufgerufen, aber sicherheitshalber als
+ * No-Ops vorhanden.
  */
 class PMS_Preview_Wpdb {
 	public $prefix = 'wp_';

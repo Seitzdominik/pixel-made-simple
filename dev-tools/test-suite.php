@@ -3039,6 +3039,396 @@ $GLOBALS['stub']['wc_orders']      = array();
 wc_test_reset();
 $GLOBALS['stub']['options']['pms_settings'] = array();
 
+echo "\n=== 26. v0.6.10: Consent-Modus, TikTok-Test-Code/contents[], Multi-Platform-Formular-Leads, Event-Log-Badges ===\n";
+
+/* --- 26a. PMS_Settings: Sanitizing/Defaults/Helper der vier neuen Keys --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+check( '26a.1 consent_mode: Default ist "strict" (Verhalten vor v0.6.10)', 'strict' === PMS_Settings::get()['consent_mode'] );
+check( '26a.2 consent_mode: unbekannter Wert fällt auf "strict" zurück', 'strict' === PMS_Settings::sanitize_settings( array( 'consent_mode' => 'egal' ) )['consent_mode'] );
+check( '26a.3 consent_mode: "browser_only" wird übernommen', 'browser_only' === PMS_Settings::sanitize_settings( array( 'consent_mode' => 'browser_only' ) )['consent_mode'] );
+check( '26a.4 consent_mode(): liest den gespeicherten Wert', (function () {
+	$GLOBALS['stub']['options']['pms_settings'] = array_merge( PMS_Settings::get(), array( 'consent_mode' => 'browser_only' ) );
+	$mode = PMS_Settings::consent_mode();
+	$GLOBALS['stub']['options']['pms_settings'] = array();
+	return 'browser_only' === $mode;
+})() );
+
+check( '26a.5 tiktok_test_event_code: Default leer', '' === PMS_Settings::get()['tiktok_test_event_code'] );
+check( '26a.6 tiktok_test_event_code: nur alphanumerisch (wie der Meta-Test-Code)', 'TEST12345' === PMS_Settings::sanitize_settings( array( 'tiktok_test_event_code' => ' TEST-123_45 ' ) )['tiktok_test_event_code'] );
+
+check( '26a.7 form_tiktok_event: Default "SubmitForm"', 'SubmitForm' === PMS_Settings::get()['form_tiktok_event'] );
+check( '26a.8 form_tiktok_event: Wert außerhalb der kuratierten Liste fällt zurück', 'SubmitForm' === PMS_Settings::sanitize_settings( array( 'form_tiktok_event' => 'CompletePayment' ) )['form_tiktok_event'] );
+check( '26a.9 form_tiktok_event: gültiger Wert wird übernommen', 'Contact' === PMS_Settings::sanitize_settings( array( 'form_tiktok_event' => 'Contact' ) )['form_tiktok_event'] );
+check( '26a.10 form_google_label: Zeichen-Whitelist wie bei den anderen Conversion-Labels (alphanumerisch plus _ und -)', 'AbCd_12-34' === PMS_Settings::sanitize_settings( array( 'form_google_label' => 'AbCd_12-34<>"/ !' ) )['form_google_label'] );
+check( '26a.11 form_tiktok_event_types(): kuratierte Teilmenge, keine Shop-Events', PMS_Settings::form_tiktok_event_types() === array( 'SubmitForm', 'Contact', 'CompleteRegistration', 'Subscribe' ) );
+
+/* --- 26b. PMS_Consent::has_server_consent(): der eigentliche Modus-Schalter.
+ * "Kein Consent" wird -- wie in Abschnitt 22e -- über den WP-Consent-API-Stub
+ * erzwungen (höchste Priorität in evaluate(), siehe Abschnitt 6); dafür muss
+ * consent_detection an sein, sonst greift der Fast-Path in
+ * has_marketing_consent() schon vor jeder Auswertung. --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge( PMS_Settings::get(), array( 'consent_detection' => 1, 'consent_mode' => 'strict' ) );
+$GLOBALS['stub']['wp_consent'] = false;
+reset_consent_cache();
+
+check( '26b.1 strict + kein Consent: Browser-Gate blockt', false === PMS_Consent::has_marketing_consent() );
+check( '26b.2 strict + kein Consent: Server-Gate blockt ebenfalls (unverändertes Verhalten)', false === PMS_Consent::has_server_consent() );
+
+$GLOBALS['stub']['options']['pms_settings']['consent_mode'] = 'browser_only';
+reset_consent_cache();
+
+check( '26b.3 browser_only + kein Consent: Browser-Gate blockt WEITERHIN', false === PMS_Consent::has_marketing_consent() );
+check( '26b.4 browser_only + kein Consent: Server-Gate lässt durch (der eigentliche Zweck)', true === PMS_Consent::has_server_consent() );
+
+// Escape-Hatch: pms_has_server_consent kann den flexiblen Modus wieder zumachen.
+$GLOBALS['stub']['filters']['pms_has_server_consent'] = static function ( $consent, $strict ) {
+	return false;
+};
+check( '26b.5 Filter pms_has_server_consent kann den flexiblen Modus überstimmen', false === PMS_Consent::has_server_consent() );
+unset( $GLOBALS['stub']['filters']['pms_has_server_consent'] );
+
+$GLOBALS['stub']['wp_consent'] = true;
+reset_consent_cache();
+check( '26b.6 Consent erteilt: beide Gates identisch true (Modus ohne Wirkung)', true === PMS_Consent::has_marketing_consent() && true === PMS_Consent::has_server_consent() );
+
+/* --- 26c. Ende-zu-Ende: derselbe Seitenaufruf ohne Consent sendet im
+ * flexiblen Modus die CAPI, im strikten nicht -- und der Browser-Pixel bleibt
+ * in BEIDEN Fällen zurückgehalten (Consent-Bootstrap statt Sofort-Ausgabe). --- */
+
+$GLOBALS['stub']['options']['pms_events_enabled'] = 1;
+$GLOBALS['stub']['options']['pms_events']         = array(
+	array(
+		'id' => 'ev-consentmode', 'name' => 'Consent-Modus', 'event_type' => 'Lead', 'match_type' => 'exact',
+		'match_value' => '/consent-modus/', 'active' => 1, 'meta_enabled' => 1, 'google_enabled' => 0, 'tiktok_enabled' => 0,
+	),
+);
+$_SERVER['REQUEST_URI'] = '/consent-modus/';
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'pixel_enabled' => 1, 'pixel_id' => '1234567890', 'capi_enabled' => 1, 'capi_token' => 'test-token',
+		'consent_detection' => 1, 'consent_mode' => 'strict',
+	)
+);
+$GLOBALS['stub']['wp_consent'] = false;
+
+$strict_html = run_frontend();
+check( '26c.1 strict + kein Consent: KEIN CAPI-Request', 0 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( '26c.2 strict + kein Consent: Browser-Pixel steckt im Consent-Bootstrap', false !== strpos( $strict_html, 'pmsInitTracking' ) );
+
+$GLOBALS['stub']['options']['pms_settings']['consent_mode'] = 'browser_only';
+$flex_html = run_frontend();
+check( '26c.3 browser_only + kein Consent: CAPI-Request geht raus', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( '26c.4 browser_only + kein Consent: Browser-Pixel wartet trotzdem auf den Bootstrap', false !== strpos( $flex_html, 'pmsInitTracking' ) );
+$flex_body = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+check( '26c.5 browser_only: gesendetes Event trägt den Namen des gematchten Events', 'Lead' === ( $flex_body['data'][0]['event_name'] ?? '' ) );
+
+$GLOBALS['stub']['wp_consent'] = true;
+reset_consent_cache();
+$GLOBALS['stub']['captured_posts'] = array();
+
+/* --- 26d. enqueue_frontend(): consentMode + die drei neuen Plattform-Felder
+ * für den Formular-Grabber. Google/TikTok sind Pro-only -- die Werte dürfen
+ * nur rausgehen, wenn die jeweilige Plattform TATSÄCHLICH aktiv ist. --- */
+
+$GLOBALS['stub']['options']['pms_events']   = array();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'pixel_enabled' => 1, 'pixel_id' => '1234567890', 'form_tracking' => 1,
+		'consent_detection' => 0, 'consent_mode' => 'browser_only',
+		'form_tiktok_event' => 'Contact', 'form_google_label' => 'FormLabel1',
+		'google_enabled' => 0, 'google_tag_id' => '', 'tiktok_enabled' => 0, 'tiktok_pixel_id' => '',
+	)
+);
+$cfg_off = run_enqueue();
+check( '26d.1 consentMode wird an frontend.js lokalisiert', 'browser_only' === ( $cfg_off['consentMode'] ?? '' ) );
+check( '26d.2 TikTok inaktiv: tiktokEvent bleibt leer, obwohl konfiguriert', '' === ( $cfg_off['tiktokEvent'] ?? 'x' ) );
+check( '26d.3 Google inaktiv: googleTagId/googleLabel bleiben leer, obwohl ein Label konfiguriert ist', '' === ( $cfg_off['googleTagId'] ?? 'x' ) && '' === ( $cfg_off['googleLabel'] ?? 'x' ) );
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	$GLOBALS['stub']['options']['pms_settings'],
+	array( 'google_enabled' => 1, 'google_tag_id' => 'AW-123456789', 'tiktok_enabled' => 1, 'tiktok_pixel_id' => 'TT123' )
+);
+$cfg_on = run_enqueue();
+check( '26d.4 Beide Plattformen aktiv: tiktokEvent trägt den konfigurierten Event-Typ', 'Contact' === ( $cfg_on['tiktokEvent'] ?? '' ) );
+check( '26d.5 Beide Plattformen aktiv: googleTagId/googleLabel werden ausgeliefert', 'AW-123456789' === ( $cfg_on['googleTagId'] ?? '' ) && 'FormLabel1' === ( $cfg_on['googleLabel'] ?? '' ) );
+
+/* --- 26e. TikTok Events API: test_event_code als TOP-LEVEL-Feld (nicht in
+ * data[]) und contents[] mit explizitem content_id -- Ende-zu-Ende über
+ * track_thankyou(), wie in Abschnitt 22e. --- */
+
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled' => 1, 'pixel_enabled' => 0, 'capi_enabled' => 0, 'capi_token' => '',
+		'consent_detection'   => 0,
+		'tiktok_enabled'      => 1, 'tiktok_pixel_id' => 'TT123', 'tiktok_capi_enabled' => 1,
+		'tiktok_access_token' => 'tt-token', 'tiktok_test_event_code' => 'TEST12345',
+	)
+);
+reset_consent_cache();
+$GLOBALS['stub']['captured_posts'] = array();
+
+$tt_order = make_test_order( array( 'id' => 4001 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order->get_id() );
+ob_get_clean();
+
+$tt_post = $GLOBALS['stub']['captured_posts'][0] ?? array( 'url' => '', 'args' => array() );
+$tt_body = json_decode( $tt_post['args']['body'] ?? '', true );
+check( '26e.1 TikTok Events API wird angesprochen', false !== strpos( (string) $tt_post['url'], 'business-api.tiktok.com' ) );
+check( '26e.2 test_event_code steht auf oberster Ebene des Requests', 'TEST12345' === ( $tt_body['test_event_code'] ?? '' ) );
+check( '26e.3 test_event_code steckt NICHT zusätzlich in data[0]', ! isset( $tt_body['data'][0]['test_event_code'] ) );
+check( '26e.4 contents[] trägt für jede Position ein explizites content_id', (function () use ( $tt_body ) {
+	$contents = $tt_body['data'][0]['properties']['contents'] ?? array();
+	if ( 2 !== count( $contents ) ) {
+		return false;
+	}
+	foreach ( $contents as $item ) {
+		if ( ! isset( $item['content_id'] ) || '' === (string) $item['content_id'] ) {
+			return false;
+		}
+	}
+	return true;
+})() );
+
+$GLOBALS['stub']['options']['pms_settings']['tiktok_test_event_code'] = '';
+$GLOBALS['stub']['captured_posts'] = array();
+$tt_order2 = make_test_order( array( 'id' => 4002 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order2->get_id() );
+ob_get_clean();
+$tt_body2 = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+check( '26e.5 Kein Test-Code konfiguriert -> Feld fehlt komplett (kein leerer String)', ! array_key_exists( 'test_event_code', (array) $tt_body2 ) );
+
+// Browser-Pixel auf der Danke-Seite: dieselbe contents[]-Anforderung.
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	$GLOBALS['stub']['options']['pms_settings'],
+	array( 'tiktok_capi_enabled' => 0, 'tiktok_access_token' => '' )
+);
+$tt_order3 = make_test_order( array( 'id' => 4003 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $tt_order3->get_id() );
+$tt_pixel_html = ob_get_clean();
+check( '26e.6 Browser-ttq.track(CompletePayment) enthält contents[] mit content_id', false !== strpos( $tt_pixel_html, '"contents":[{"content_id":"501"' ) );
+
+wc_test_reset();
+$GLOBALS['stub']['wc_orders']      = array();
+$GLOBALS['stub']['captured_posts'] = array();
+
+/* --- 26f. PMS_Logger::is_error_row(): eine Quelle für Badge UND Filter. --- */
+
+check( '26f.1 Fehlertext vorhanden -> Fehler', true === PMS_Logger::is_error_row( array( 'http_status' => 0, 'error_message' => 'boom' ) ) );
+check( '26f.2 4xx ohne Fehlertext -> Fehler (bis v0.6.9 nicht als solcher erkannt)', true === PMS_Logger::is_error_row( array( 'http_status' => 400, 'error_message' => null ) ) );
+check( '26f.3 http_status 0 ohne Fehlertext -> KEIN Fehler (Fire-and-Forget)', false === PMS_Logger::is_error_row( array( 'http_status' => 0, 'error_message' => null ) ) );
+check( '26f.4 2xx -> kein Fehler', false === PMS_Logger::is_error_row( array( 'http_status' => 200, 'error_message' => '' ) ) );
+
+/* --- 26g. Admin-UI: Consent-Callout + Modus-Auswahl (Tab "Allgemein"),
+ * TikTok-Test-Code-Feld, Multi-Platform-Formularfelder (Tab "Erweitertes
+ * Tracking"), einklappbares Event-Formular (Tab "URL-Events"). PMS_IS_PRO ist
+ * ab Abschnitt 17 true, dieser Abschnitt prüft also den Pro-Zweig. --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array( 'consent_mode' => 'browser_only', 'tiktok_test_event_code' => 'TESTABC', 'form_google_label' => 'FormLbl', 'form_tiktok_event' => 'Contact' )
+);
+$GLOBALS['stub']['options']['pms_events'] = array();
+$GLOBALS['stub']['current_user_can']      = true;
+
+$_GET['page'] = PMS_Admin::PAGE_SLUG;
+$_GET['tab']  = 'general';
+ob_start();
+PMS_Admin::render_page();
+$g26 = ob_get_clean();
+
+check( '26g.1 Tab "Allgemein": DSGVO-Info-Callout wird gerendert', false !== strpos( $g26, 'pms-info-callout' ) && false !== strpos( $g26, 'About GDPR blocking:' ) );
+check( '26g.2 Tab "Allgemein": Consent-Modus-Auswahl mit beiden Optionen', false !== strpos( $g26, 'name="pms_settings[consent_mode]"' ) && false !== strpos( $g26, 'value="strict"' ) && false !== strpos( $g26, 'value="browser_only"' ) );
+check( '26g.3 Tab "Allgemein": gespeicherter Modus ist vorausgewählt', 1 === preg_match( '/value="browser_only"\s+selected="selected"/', $g26 ) );
+check( '26g.4 Tab "Allgemein": TikTok-Test-Code ist ein echtes Textfeld mit gespeichertem Wert', 1 === preg_match( '/<input type="text"[^>]*name="pms_settings\[tiktok_test_event_code\]"/', $g26 ) && false !== strpos( $g26, 'value="TESTABC"' ) );
+
+$_GET['tab'] = 'ecommerce';
+ob_start();
+PMS_Admin::render_page();
+$e26 = ob_get_clean();
+check( '26g.5 Fremder Tab schützt consent_mode als Hidden-Feld', 1 === preg_match( '/<input type="hidden" name="pms_settings\[consent_mode\]" value="browser_only"/', $e26 ) );
+check( '26g.6 Fremder Tab schützt tiktok_test_event_code als Hidden-Feld', 1 === preg_match( '/<input type="hidden" name="pms_settings\[tiktok_test_event_code\]" value="TESTABC"/', $e26 ) );
+
+$_GET['tab'] = 'advanced';
+ob_start();
+PMS_Admin::render_page();
+$a26 = ob_get_clean();
+check( '26g.7 Tab "Erweitertes Tracking" (Pro): TikTok-Event-Dropdown mit name-Attribut', false !== strpos( $a26, 'name="pms_settings[form_tiktok_event]"' ) && false !== strpos( $a26, 'value="SubmitForm"' ) );
+check( '26g.8 Tab "Erweitertes Tracking" (Pro): Google-Label-Feld trägt den gespeicherten Wert', false !== strpos( $a26, 'name="pms_settings[form_google_label]"' ) && false !== strpos( $a26, 'value="FormLbl"' ) );
+check( '26g.9 Tab "Erweitertes Tracking" (Pro): kein Hidden-Duplikat der beiden Keys (echte Felder vorhanden)', 0 === preg_match( '/<input type="hidden" name="pms_settings\[form_google_label\]"/', $a26 ) );
+check( '26g.10 Tab "Erweitertes Tracking": Meta-Event-Dropdown existiert unverändert daneben', false !== strpos( $a26, 'name="pms_settings[form_event_type]"' ) );
+
+$_GET['tab'] = 'events';
+ob_start();
+PMS_Admin::render_page();
+$ev26 = ob_get_clean();
+check( '26g.11 Tab "URL-Events": Event-Formular ist einklappbar und startet ZU', false !== strpos( $ev26, 'pms-event-form-card pms-collapsible closed' ) && false !== strpos( $ev26, 'data-pms-collapsible' ) );
+check( '26g.12 Tab "URL-Events": Klapp-Button meldet aria-expanded="false"', false !== strpos( $ev26, 'aria-expanded="false"' ) );
+check( '26g.13 Tab "URL-Events": Formularinhalt liegt im .pms-collapse-body', false !== strpos( $ev26, 'class="pms-collapse-body"' ) );
+
+$GLOBALS['stub']['options']['pms_events'] = array(
+	array(
+		'id' => 'ev-edit26', 'name' => 'Bearbeiten-Test', 'event_type' => 'Lead', 'match_type' => 'exact',
+		'match_value' => '/danke/', 'active' => 1, 'meta_enabled' => 1, 'google_enabled' => 0, 'tiktok_enabled' => 0,
+	),
+);
+$_GET['edit'] = 'ev-edit26';
+ob_start();
+PMS_Admin::render_page();
+$ev26e = ob_get_clean();
+unset( $_GET['edit'] );
+check( '26g.14 Tab "URL-Events" im Bearbeiten-Modus: Formular startet OFFEN', false === strpos( $ev26e, 'pms-collapsible closed' ) && false !== strpos( $ev26e, 'pms-event-form-card pms-collapsible"' ) );
+check( '26g.15 Tab "URL-Events" im Bearbeiten-Modus: aria-expanded="true"', false !== strpos( $ev26e, 'aria-expanded="true"' ) );
+
+/* --- 26h. TikTok Test Event Code: 12h-Auto-Expiry (v0.6.10).
+ * Gegenstück zu den Meta-Checks in Abschnitt 4 -- beide laufen seit v0.6.10
+ * über dieselbe Implementierung (PMS_Settings::expire_test_code()), deshalb
+ * prüft dieser Abschnitt zusätzlich, dass sie sich nicht gegenseitig ins
+ * Gehege kommen. --- */
+
+// Zeitstempel-Vergabe in sanitize_settings(), analog zu Abschnitt 4 für Meta.
+$GLOBALS['stub']['options']['pms_settings'] = array();
+$tt_out = PMS_Settings::sanitize_settings( array( 'tiktok_test_event_code' => 'TESTTT1' ) );
+check( '26h.1 Neuer TikTok-Test-Code setzt einen Zeitstempel', abs( time() - $tt_out['tiktok_test_code_created_at'] ) < 5 );
+
+$GLOBALS['stub']['options']['pms_settings'] = array( 'tiktok_test_event_code' => 'TESTTT1', 'tiktok_test_code_created_at' => 12345 );
+$tt_out = PMS_Settings::sanitize_settings( array( 'tiktok_test_event_code' => 'TESTTT1' ) );
+check( '26h.2 Unveränderter TikTok-Test-Code behält seinen Zeitstempel', 12345 === $tt_out['tiktok_test_code_created_at'] );
+
+$tt_out = PMS_Settings::sanitize_settings( array( 'tiktok_test_event_code' => 'TESTTT2' ) );
+check( '26h.3 Geänderter TikTok-Test-Code erneuert den Zeitstempel', abs( time() - $tt_out['tiktok_test_code_created_at'] ) < 5 );
+
+$tt_out = PMS_Settings::sanitize_settings( array( 'tiktok_test_event_code' => '' ) );
+check( '26h.4 Leerer TikTok-Test-Code setzt den Zeitstempel auf 0', 0 === $tt_out['tiktok_test_code_created_at'] );
+
+// Meta und TikTok dürfen sich beim gemeinsamen Zeitstempel-Durchlauf nicht
+// gegenseitig überschreiben (beide Codes gleichzeitig, unterschiedlich alt).
+$GLOBALS['stub']['options']['pms_settings'] = array(
+	'test_event_code' => 'METAOLD', 'test_code_created_at' => 111,
+	'tiktok_test_event_code' => 'TTOLD', 'tiktok_test_code_created_at' => 222,
+);
+$both_out = PMS_Settings::sanitize_settings( array( 'test_event_code' => 'METAOLD', 'tiktok_test_event_code' => 'TTNEW' ) );
+check( '26h.5 Beide Codes gleichzeitig: Meta behält seinen Zeitstempel, TikTok bekommt einen frischen', 111 === $both_out['test_code_created_at'] && abs( time() - $both_out['tiktok_test_code_created_at'] ) < 5 );
+
+// active_tiktok_test_event_code(): Ablaufgrenze + Selbstheilung der Option.
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array( 'tiktok_test_event_code' => 'TESTTT9', 'tiktok_test_code_created_at' => time() - ( 11 * 3600 ) )
+);
+check( '26h.6 11h alter TikTok-Code gilt weiterhin', 'TESTTT9' === PMS_Settings::active_tiktok_test_event_code() );
+check( '26h.7 11h alter TikTok-Code bleibt in der Datenbank stehen', 'TESTTT9' === PMS_Settings::get()['tiktok_test_event_code'] );
+
+$GLOBALS['stub']['options']['pms_settings']['tiktok_test_code_created_at'] = time() - ( 13 * 3600 );
+check( '26h.8 13h alter TikTok-Code gilt nicht mehr', '' === PMS_Settings::active_tiktok_test_event_code() );
+$tt_saved = $GLOBALS['stub']['options']['pms_settings'];
+check( '26h.9 Abgelaufener TikTok-Code wird in der Datenbank geleert (Code UND Zeitstempel)', '' === $tt_saved['tiktok_test_event_code'] && 0 === $tt_saved['tiktok_test_code_created_at'] );
+
+// Zeitstempel 0 = "kein Ablauf bekannt" (nur bei von Hand gesetzten Werten).
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array( 'tiktok_test_event_code' => 'MANUAL1', 'tiktok_test_code_created_at' => 0 )
+);
+check( '26h.10 Zeitstempel 0 lässt den Code stehen (kein Ablauf berechenbar)', 'MANUAL1' === PMS_Settings::active_tiktok_test_event_code() );
+
+// Das Ablaufen einer Plattform darf die andere nicht mitreißen.
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'test_event_code' => 'METAFRESH', 'test_code_created_at' => time() - 60,
+		'tiktok_test_event_code' => 'TTEXPIRED', 'tiktok_test_code_created_at' => time() - ( 13 * 3600 ),
+	)
+);
+check( '26h.11 Abgelaufener TikTok-Code: Meta-Code bleibt unangetastet', '' === PMS_Settings::active_tiktok_test_event_code() && 'METAFRESH' === PMS_Settings::get()['test_event_code'] );
+
+// Ende-zu-Ende: der abgelaufene Code darf den Events-API-Request nicht mehr erreichen.
+// current_user_can hier explizit zurücksetzen -- Abschnitt 26g hat es für die
+// Admin-Rendering-Checks auf true gestellt, und should_process() würde sonst
+// wegen exclude_admins (Default 1) aussteigen (dieselbe Falle wie in 24e).
+$GLOBALS['stub']['current_user_can'] = false;
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled' => 1, 'pixel_enabled' => 0, 'capi_enabled' => 0, 'capi_token' => '',
+		'consent_detection'   => 0,
+		'tiktok_enabled'      => 1, 'tiktok_pixel_id' => 'TT123', 'tiktok_capi_enabled' => 1,
+		'tiktok_access_token' => 'tt-token',
+		'tiktok_test_event_code' => 'TESTEXP', 'tiktok_test_code_created_at' => time() - ( 13 * 3600 ),
+	)
+);
+reset_consent_cache();
+$GLOBALS['stub']['captured_posts'] = array();
+
+$exp_order = make_test_order( array( 'id' => 4101 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $exp_order->get_id() );
+ob_get_clean();
+$exp_body = json_decode( $GLOBALS['stub']['captured_posts'][0]['args']['body'] ?? '', true );
+check( '26h.12 Ende-zu-Ende: abgelaufener Code fehlt im Events-API-Request komplett', is_array( $exp_body ) && ! array_key_exists( 'test_event_code', $exp_body ) );
+check( '26h.13 Ende-zu-Ende: der Request selbst geht trotzdem raus (nur ohne Test-Markierung)', is_array( $exp_body ) && 'CompletePayment' === ( $exp_body['data'][0]['event'] ?? '' ) );
+
+wc_test_reset();
+$GLOBALS['stub']['wc_orders']      = array();
+$GLOBALS['stub']['captured_posts'] = array();
+
+/* --- 26i. Admin: Der Ablauf räumt schon beim Öffnen der Einstellungsseite
+ * auf -- bis v0.6.9 hing das (für Meta) ausschließlich am nächsten
+ * CAPI-Request. --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'test_event_code' => 'METAEXP', 'test_code_created_at' => time() - ( 13 * 3600 ),
+		'tiktok_test_event_code' => 'TTEXP', 'tiktok_test_code_created_at' => time() - ( 13 * 3600 ),
+	)
+);
+$GLOBALS['stub']['current_user_can'] = true;
+$_GET['page'] = PMS_Admin::PAGE_SLUG;
+$_GET['tab']  = 'general';
+
+ob_start();
+PMS_Admin::render_page();
+$exp_html = ob_get_clean();
+
+check( '26i.1 Tab "Allgemein": abgelaufene Codes werden beim Rendern aus der Datenbank geleert', '' === PMS_Settings::get()['test_event_code'] && '' === PMS_Settings::get()['tiktok_test_event_code'] );
+check( '26i.2 Tab "Allgemein": beide Felder rendern leer, nicht mit dem abgelaufenen Wert', false === strpos( $exp_html, 'METAEXP' ) && false === strpos( $exp_html, 'TTEXP' ) );
+check( '26i.3 Tab "Allgemein": Ablauf-Hinweis erscheint zweimal (einmal je Feld)', 2 === substr_count( $exp_html, 'pms-expired-hint' ) );
+
+// Gegenprobe: frische Codes bleiben stehen und erzeugen keinen Hinweis.
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'test_event_code' => 'METAOK', 'test_code_created_at' => time() - 60,
+		'tiktok_test_event_code' => 'TTOK', 'tiktok_test_code_created_at' => time() - 60,
+	)
+);
+ob_start();
+PMS_Admin::render_page();
+$fresh_html = ob_get_clean();
+
+check( '26i.4 Frische Codes bleiben in den Feldern stehen', false !== strpos( $fresh_html, 'value="METAOK"' ) && false !== strpos( $fresh_html, 'value="TTOK"' ) );
+check( '26i.5 Frische Codes erzeugen keinen Ablauf-Hinweis', false === strpos( $fresh_html, 'pms-expired-hint' ) );
+
+unset( $_GET['tab'], $_GET['page'] );
+$GLOBALS['stub']['current_user_can']        = false;
+$GLOBALS['stub']['options']['pms_settings'] = array();
+
+unset( $_GET['tab'], $_GET['page'] );
+$GLOBALS['stub']['current_user_can']        = false;
+$GLOBALS['stub']['options']['pms_settings'] = array();
+$GLOBALS['stub']['options']['pms_events']   = array();
+
+
 echo "\n==============================\n";
 echo 'Ergebnis: ' . $GLOBALS['t_pass'] . ' bestanden, ' . $GLOBALS['t_fail'] . " fehlgeschlagen\n";
 exit( $GLOBALS['t_fail'] > 0 ? 1 : 0 );

@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, google analytics, tiktok pixel, c
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.9
+Stable tag: 0.6.10
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,13 +71,15 @@ Die Browser-Pixel: ja. Die Conversions API wird jedoch nur ausgelöst, wenn PHP 
 = Welche Filter gibt es? =
 
 * `pms_allow_tracking` – Tracking global erlauben/unterbinden.
-* `pms_has_marketing_consent` – Consent-Ergebnis der automatischen Banner-Erkennung überschreiben.
+* `pms_has_marketing_consent` – Consent-Ergebnis der automatischen Banner-Erkennung überschreiben (bewacht den Browser-Pixel).
+* `pms_has_server_consent` – dasselbe für die serverseitigen Signale (Conversions API, TikTok Events API). Nur nötig, wenn der Consent-Modus auf „Nur Browser-Pixel blockieren“ steht – im strikten Modus liefert dieser Filter ohnehin dasselbe Ergebnis wie `pms_has_marketing_consent`.
 * `pms_consent_banner_active` – eigenes Banner bei der Erkennung registrieren.
 * `pms_consent_events` – zusätzliche Banner-Events für den Frontend-Listener.
 * `pms_capi_event_data` – einzelnes CAPI-Event vor dem Versand anpassen (z. B. `custom_data` mit Werten ergänzen).
 * `pms_capi_user_data` – `user_data`-Payload anpassen.
 * `pms_graph_api_version` – Graph-API-Version überschreiben (Zukunftssicherheit bei Meta-Deprecations).
 * `pms_capi_blocking` – CAPI-Request blockierend senden (Debugging).
+* `pms_tiktok_capi_blocking` – dasselbe für TikTok-Events-API-Requests (Debugging).
 
 Hinweis für Umsteiger von „Lightweight Meta Pixel & CAPI Tracker": Diese Filter hießen dort `lmpct_*`. Eigener Code (z. B. in der functions.php), der einen dieser Filter nutzt, muss auf den neuen `pms_*`-Namen umgestellt werden – siehe Changelog 1.0.0.
 
@@ -90,6 +92,17 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.10 =
+* Neu: **Consent-Modus (Tab „Allgemein" → Box „Automatische Cookie-Banner-Erkennung").** Ein aufklärendes Hinweisfeld erklärt, was die DSGVO-Blockade konkret bewirkt, darunter lässt sich zwischen zwei Modi wählen: „Vollständig DSGVO-konform (empfohlen für die EU)" blockiert wie bisher Browser-Pixel UND serverseitige Signale bis zur Einwilligung; „Nur Browser-Pixel blockieren" hält lediglich die Pixel zurück, während Conversions API und TikTok Events API unabhängig vom Banner-Status senden. Voreinstellung ist der strikte Modus – bestehende Installationen ändern ihr Verhalten durch das Update also nicht. Willigt der Besucher nachträglich ein, wird der Browser-Pixel im flexiblen Modus mit derselben Event-ID nachgeholt, sodass Meta/TikTok weiterhin deduplizieren.
+* Neu (Pro): **TikTok Test Event Code** (Tab „Allgemein" → Box „TikTok"). Ist er gesetzt, werden Events-API-Anfragen als Testereignisse markiert und erscheinen in TikToks „Test Events"-Ansicht statt in den Livedaten. Er wird – genau wie der Meta-Test-Code – nach 12 Stunden automatisch deaktiviert, damit ein vergessener Code keine echten Käufe dauerhaft aus den Live-Berichten heraushält.
+* Verbessert: **Abgelaufene Test-Event-Codes werden jetzt schon beim Öffnen der Einstellungen aufgeräumt.** Bisher wurde ein abgelaufener Meta-Test-Code erst beim nächsten Conversions-API-Request geleert – auf einer ruhigen Website konnte er also noch tagelang im Feld stehen, obwohl er längst wirkungslos war. Beide Felder (Meta und TikTok) leeren sich jetzt beim Aufruf des Tabs „Allgemein" selbst und zeigen einen kurzen Hinweis, dass der Code wegen Zeitablauf entfernt wurde.
+* Behoben (Pro): **TikTok-Diagnostics-Warnung „content_id fehlt".** ViewContent und AddToCart sendeten die Produkt-ID bisher als einzelnes Feld statt innerhalb des `contents`-Arrays, InitiateCheckout trug gar kein `contents`. Alle E-Commerce-Events (ViewContent, AddToCart, InitiateCheckout, CompletePayment) übermitteln jetzt für jede Position ein explizites `content_id` samt `content_type` – für WooCommerce wie für SureCart, im Browser-Pixel wie in der Events API.
+* Neu (Pro): **Formular-Leads an Google Ads und TikTok.** Das automatische Formular-Tracking (Tab „Erweitertes Tracking") hat neben dem bestehenden Meta-Event-Typ jetzt zusätzlich eine Auswahl für den TikTok-Event-Typ (SubmitForm, Contact, CompleteRegistration, Subscribe) sowie ein Feld für ein Google-Ads-Conversion-Label. Beide Plattformen feuern für dieselbe Absendung mit derselben Event-ID mit; ohne Conversion-Label wird – wie bei den URL-Events – kein Google-Ads-Event gesendet.
+* Verbessert: **Oberfläche.** Hinweis- und Infoboxen berechnen ihre Breite jetzt einheitlich inklusive Innenabstand und Akzentbalken, sodass sie exakt bündig mit den übrigen Boxen abschließen statt seitlich herauszuragen. Die Hinweisboxen für nicht erkanntes WooCommerce/SureCart im Tab „E-Commerce" tragen keinen blauen Aktiv-Balken mehr, sondern sind mit dem Zusatz „Nicht erkannt" klar als inaktiv gekennzeichnet.
+* Verbessert: Der Bereich „Neues Event erstellen" im Tab „URL-Events" ist jetzt einklappbar und startet zugeklappt – die Ereignisliste rückt damit in den Vordergrund. Beim Bearbeiten eines vorhandenen Events öffnet er sich automatisch.
+* Verbessert: **Statusanzeige im Event Log.** Erfolgreich abgeschickte Ereignisse werden jetzt einheitlich grün dargestellt („Gesendet" bzw. „200 OK"); bisher bekam der Normalfall ohne Serverantwort ein neutrales graues Feld und wirkte dadurch wie ein Zwischenzustand. Fehler erscheinen weiterhin rot – neu auch dann, wenn die Plattform einen Fehlercode ohne Fehlertext liefert, was bislang weder farblich noch im Filter „Nur Fehler" auffiel.
+* `dev-tools/test-suite.php` deckt Consent-Modus, TikTok-Test-Code inkl. 12-Stunden-Ablauf, die neuen Formularfelder und die Oberflächenänderungen ab (508 → 578 PHP-Tests); die drei JS-Test-Harnesses prüfen die neuen `contents`-Nutzlasten sowie das Zusammenspiel von Browser-Pixel und Serverversand im flexiblen Consent-Modus (30/64/40 → 44/82/53 Tests).
 
 = 0.6.9 =
 * **Behoben (Pro): WooCommerce- und SureCart-Tracking wurden überhaupt nicht ausgeführt.** Die E-Commerce-Integrationen wurden beim Start des Plugins initialisiert – also zu einem Zeitpunkt, zu dem WordPress WooCommerce bzw. SureCart noch gar nicht geladen hatte, weil es Plugins in alphabetischer Reihenfolge lädt und „pixel-made-simple-pro" vor beiden liegt. Ihre Prüfung „Ist WooCommerce überhaupt aktiv?" fiel dadurch immer negativ aus, und es wurde kein einziger Hook registriert – ohne jede Fehlermeldung. Betroffen waren sämtliche Shop-Events beider Plattformen (ViewContent, AddToCart, InitiateCheckout und Purchase). Die Initialisierung erfolgt jetzt erst, nachdem WordPress alle Plugins geladen hat.

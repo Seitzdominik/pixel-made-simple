@@ -314,6 +314,27 @@ class PMS_Admin {
 	}
 
 	/**
+	 * Hinweis unter einem Test-Event-Code-Feld, dessen Code beim Öffnen dieser
+	 * Seite gerade wegen Zeitablauf geleert wurde (seit v0.6.10). Ohne diesen
+	 * Hinweis wäre das Feld nach 12 Stunden kommentarlos leer, und der Nutzer
+	 * würde nach einem vermeintlich verlorenen Wert suchen.
+	 *
+	 * @param bool $expired Ob der Code in diesem Aufruf abgelaufen ist.
+	 * @return void
+	 */
+	private static function render_test_code_expiry_hint( $expired ) {
+		if ( ! $expired ) {
+			return;
+		}
+		?>
+		<p class="description pms-expired-hint">
+			<span class="dashicons dashicons-clock" aria-hidden="true"></span>
+			<?php esc_html_e( 'The test code was older than 12 hours and has been removed automatically. Events are being sent as live data again.', 'pixel-made-simple' ); ?>
+		</p>
+		<?php
+	}
+
+	/**
 	 * Info-Tooltip (Dashicon mit reiner CSS-Hover-Box).
 	 *
 	 * @param string $text Hilfetext.
@@ -529,6 +550,8 @@ class PMS_Admin {
 				'form_url_filter',
 				'form_exclude_system',
 				'debug_bar',
+				// form_tiktok_event/form_google_label folgen weiter unten
+				// -- sie haben nur in Pro ein echtes (nicht gesperrtes) Feld.
 				// Bewusst NICHT über ein verstecktes Feld auf diesem (oder jedem
 				// anderen) Tab mitgeschickt: Der CAPI-Token soll ausschließlich
 				// im Tab "Allgemein" im Seitenquelltext auftauchen. Fehlt der
@@ -551,6 +574,14 @@ class PMS_Admin {
 				$advanced_skip[] = 'enable_utm_form_fill';
 				$advanced_skip[] = 'utm_form_fill_mode';
 				$advanced_skip[] = 'utm_form_fill_urls';
+				// Dieselbe Downgrade-Falle für die beiden Multi-Platform-Keys
+				// des Formular-Grabbers (seit v0.6.10): in Free rendert dieser
+				// Tab sie zwar sichtbar, aber gesperrt UND ohne name-Attribut
+				// -- der Browser sendet sie also nicht mit, und ohne den
+				// Hidden-Feld-Schutz würde das Speichern dieses Formulars eine
+				// unter Pro gesetzte Konfiguration stillschweigend leeren.
+				$advanced_skip[] = 'form_tiktok_event';
+				$advanced_skip[] = 'form_google_label';
 			}
 			self::preserve_hidden_settings( $s, $advanced_skip );
 			?>
@@ -583,6 +614,49 @@ class PMS_Admin {
 							<?php endforeach; ?>
 						</select>
 						<p class="description"><?php esc_html_e( 'Meta event fired on form submission. Use “Contact” for general enquiries and “Lead” for genuine acquisition forms.', 'pixel-made-simple' ); ?></p>
+					</td>
+				</tr>
+				<?php
+				// Multi-Platform-Formular-Leads (seit v0.6.10). Google Ads und
+				// TikTok sind Pro-only Plattformen (siehe render_general_tab()),
+				// die Box "Automatic form lead tracking" selbst ist es aber
+				// nicht -- deshalb hier NICHT die ganze Box durch einen Teaser
+				// ersetzen, sondern nur diese beiden Zeilen gesperrt rendern
+				// (dasselbe "sichtbar, aber gesperrt"-Muster wie die Filter im
+				// Event-Log-Tab). In Free bewusst OHNE name-Attribut: sonst
+				// stünde derselbe Schlüssel doppelt im Formular (einmal hier,
+				// einmal als Hidden-Feld aus preserve_hidden_settings()).
+				$forms_pro = PMS_Settings::is_pro();
+				?>
+				<tr>
+					<th scope="row">
+						<label for="pms-form-tiktok-event"><?php esc_html_e( 'TikTok event type', 'pixel-made-simple' ); ?></label>
+						<?php if ( ! $forms_pro ) : ?>
+							<?php self::tip( __( 'Sending form leads to TikTok is a Pro feature.', 'pixel-made-simple' ) ); ?>
+						<?php endif; ?>
+					</th>
+					<td>
+						<select id="pms-form-tiktok-event" <?php echo $forms_pro ? 'name="pms_settings[form_tiktok_event]"' : 'disabled'; ?>>
+							<?php foreach ( PMS_Settings::form_tiktok_event_types() as $type ) : ?>
+								<option value="<?php echo esc_attr( $type ); ?>" <?php selected( $s['form_tiktok_event'], $type ); ?>>
+									<?php echo esc_html( $type ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<p class="description"><?php esc_html_e( 'TikTok web event fired for the same submission, using the same event ID as the Meta event. Only fires when the TikTok Pixel is enabled in tab “General”.', 'pixel-made-simple' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">
+						<label for="pms-form-google-label"><?php esc_html_e( 'Google Ads conversion label (form leads)', 'pixel-made-simple' ); ?></label>
+						<?php self::tip( __( 'Optional. Google Ads → Conversions → your lead action → “Use tag” → the part after the slash in send_to. Leave empty to skip the Google Ads conversion for form leads.', 'pixel-made-simple' ) ); ?>
+					</th>
+					<td>
+						<input type="text" id="pms-form-google-label" class="regular-text code"
+							<?php echo $forms_pro ? 'name="pms_settings[form_google_label]"' : 'disabled'; ?>
+							value="<?php echo esc_attr( $s['form_google_label'] ); ?>"
+							placeholder="AbCdEfGhIjK123" autocomplete="off" />
+						<p class="description"><?php esc_html_e( 'Only fires when Google Ads is enabled in tab “General” and a label is set here.', 'pixel-made-simple' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -958,7 +1032,29 @@ class PMS_Admin {
 	}
 
 	private static function render_general_tab() {
+		// Test-Event-Codes ZUERST auf Ablauf prüfen, bevor irgendetwas
+		// gerendert wird (seit v0.6.10, siehe PMS_Settings::expire_test_code()).
+		// Die Helfer leeren einen abgelaufenen Code direkt in der Datenbank --
+		// dadurch räumt schon das Öffnen dieser Seite auf, auch wenn seit dem
+		// Ablauf kein einziges Event mehr gefeuert wurde (bis v0.6.9 hing das
+		// Aufräumen des Meta-Codes ausschließlich am nächsten CAPI-Request).
+		//
+		// Danach $s bewusst NEU laden statt den Vorher-Stand weiterzureichen:
+		// preserve_hidden_settings() weiter unten schreibt die Werte als
+		// Hidden-Felder ins Formular, und ein dort noch enthaltener,
+		// abgelaufener Code würde beim nächsten Speichern mit frischem
+		// Zeitstempel wieder auferstehen.
+		$before            = PMS_Settings::get();
+		$meta_code_before  = (string) $before['test_event_code'];
+		$tiktok_code_before = (string) $before['tiktok_test_event_code'];
+
+		PMS_Settings::active_meta_test_event_code( $before );
+		PMS_Settings::active_tiktok_test_event_code( $before );
+
 		$s = PMS_Settings::get();
+
+		$meta_code_expired   = ( '' !== $meta_code_before && '' === (string) $s['test_event_code'] );
+		$tiktok_code_expired = ( '' !== $tiktok_code_before && '' === (string) $s['tiktok_test_event_code'] );
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>">
 			<?php settings_fields( 'pms_settings_group' ); ?>
@@ -968,12 +1064,21 @@ class PMS_Admin {
 			$general_skip = array(
 				'exclude_admins',
 				'consent_detection',
+				// Seit v0.6.10: echtes <select> in der Consent-Box weiter unten,
+				// nicht Pro-gated (eine DSGVO-Grundeinstellung gehört in beide
+				// Varianten) -- deshalb unconditional aus dem Skip-Array.
+				'consent_mode',
 				'pixel_enabled',
 				'pixel_id',
 				'capi_enabled',
 				'capi_token',
 				'test_event_code',
+				// Die beiden *_created_at-Zeitstempel werden von
+				// sanitize_settings() ohnehin immer aus dem gespeicherten Stand
+				// neu berechnet (siehe dort) -- als Hidden-Feld hätten sie
+				// keinerlei Wirkung, gehören also auf beiden Tabs in den Skip.
 				'test_code_created_at',
+				'tiktok_test_code_created_at',
 				'hash_email',
 				// tiktok_access_token wird -- wie capi_token oben -- IMMER
 				// ausgenommen, unabhängig von is_pro() weiter unten: ein Secret
@@ -986,7 +1091,7 @@ class PMS_Admin {
 				// Google/GA4/TikTok haben auf DIESEM Tab nur dann noch echte Felder,
 				// wenn Pro tatsächlich rendert (siehe unten) -- in Free zeigt der
 				// Tab stattdessen Teaser-Boxen ohne echte Felder; dort MÜSSEN diese
-				// sieben Keys stattdessen ganz normal über preserve_hidden_settings()
+				// acht Keys stattdessen ganz normal über preserve_hidden_settings()
 				// erhalten bleiben (dasselbe Muster wie schon bei den UTM-Keys im
 				// Tab "Erweitertes Tracking"), sonst würde das Speichern dieses
 				// Formulars eine unter Pro bereits gesetzte Google/TikTok-
@@ -1004,6 +1109,11 @@ class PMS_Admin {
 				$general_skip[] = 'tiktok_enabled';
 				$general_skip[] = 'tiktok_pixel_id';
 				$general_skip[] = 'tiktok_capi_enabled';
+				// tiktok_test_event_code (seit v0.6.10) hat -- anders als der
+				// Access Token darunter -- ein ganz normales Textfeld in der
+				// TikTok-Box und ist kein Secret, folgt also demselben
+				// Pro-only-Downgrade-Muster wie tiktok_pixel_id.
+				$general_skip[] = 'tiktok_test_event_code';
 				// tiktok_access_token steht NICHT hier, sondern schon oben in der
 				// unconditional-Liste (wie capi_token) -- ein Secret-Feld darf nie
 				// als Hidden-Feld erscheinen, unabhängig vom Pro-Status.
@@ -1041,6 +1151,34 @@ class PMS_Admin {
 			);
 			?>
 			<p class="description"><?php esc_html_e( 'Automatically detects installed cookie banners and blocks browser and CAPI events until consent is given. Supports Must Have Plugins Cookie Bar, Borlabs Cookie, Complianz, Real Cookie Banner, CookieYes, Cookiebot, SureCookies and any banner using the WP Consent API. Automatic blocking cannot be guaranteed for unlisted third-party banners. Sites without a cookie banner are never blocked.', 'pixel-made-simple' ); ?></p>
+
+			<div class="pms-info-callout">
+				<span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
+				<div class="pms-info-callout-body">
+					<p><strong><?php esc_html_e( 'About GDPR blocking:', 'pixel-made-simple' ); ?></strong>
+					<?php esc_html_e( 'When this mode is active, both client-side pixels and server-side CAPI calls are blocked until the visitor consents in the cookie banner. Without consent no data is transmitted to Meta, Google or TikTok. This can visibly reduce the conversion numbers reported in your ad account.', 'pixel-made-simple' ); ?></p>
+				</div>
+			</div>
+
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row">
+						<label for="pms-consent-mode"><?php esc_html_e( 'Consent mode', 'pixel-made-simple' ); ?></label>
+						<?php self::tip( __( 'Only takes effect while a cookie banner is actually blocking. Once consent is given, both modes behave identically.', 'pixel-made-simple' ) ); ?>
+					</th>
+					<td>
+						<select id="pms-consent-mode" name="pms_settings[consent_mode]">
+							<option value="<?php echo esc_attr( PMS_Settings::CONSENT_MODE_STRICT ); ?>" <?php selected( $s['consent_mode'], PMS_Settings::CONSENT_MODE_STRICT ); ?>>
+								<?php esc_html_e( 'Fully GDPR compliant (recommended for the EU)', 'pixel-made-simple' ); ?>
+							</option>
+							<option value="<?php echo esc_attr( PMS_Settings::CONSENT_MODE_BROWSER_ONLY ); ?>" <?php selected( $s['consent_mode'], PMS_Settings::CONSENT_MODE_BROWSER_ONLY ); ?>>
+								<?php esc_html_e( 'Block browser pixels only', 'pixel-made-simple' ); ?>
+							</option>
+						</select>
+						<p class="description"><?php esc_html_e( '“Fully GDPR compliant” blocks pixels and CAPI until consent is given. “Block browser pixels only” keeps the server-side signals (Conversions API, TikTok Events API) running independently of the banner status – check with your data protection officer before enabling it.', 'pixel-made-simple' ); ?></p>
+					</td>
+				</tr>
+			</table>
 			<?php self::accordion_close(); ?>
 
 			<h2 class="pms-section-title"><?php esc_html_e( 'Platforms', 'pixel-made-simple' ); ?></h2>
@@ -1085,6 +1223,7 @@ class PMS_Admin {
 						<input type="text" id="pms-test-code" class="regular-text code"
 							name="pms_settings[test_event_code]" value="<?php echo esc_attr( $s['test_event_code'] ); ?>"
 							placeholder="TEST12345" autocomplete="off" />
+						<?php self::render_test_code_expiry_hint( $meta_code_expired ); ?>
 						<p class="description"><?php esc_html_e( 'The test code is automatically deactivated after 12 hours to prevent accidental test tracking on a live site.', 'pixel-made-simple' ); ?></p>
 					</td>
 				</tr>
@@ -1163,6 +1302,19 @@ class PMS_Admin {
 							<textarea id="pms-tiktok-access-token" class="large-text code" rows="4" spellcheck="false" autocomplete="off"
 								name="pms_settings[tiktok_access_token]"><?php echo esc_textarea( $s['tiktok_access_token'] ); ?></textarea>
 							<p class="description"><?php esc_html_e( 'Secret key. Used exclusively server-side and never rendered in the frontend.', 'pixel-made-simple' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="pms-tiktok-test-code"><?php esc_html_e( 'TikTok Test Event Code', 'pixel-made-simple' ); ?></label>
+							<?php self::tip( __( 'TikTok Events Manager → your pixel → Test Events → copy the test event code. Clear it again after testing!', 'pixel-made-simple' ) ); ?>
+						</th>
+						<td>
+							<input type="text" id="pms-tiktok-test-code" class="regular-text code"
+								name="pms_settings[tiktok_test_event_code]" value="<?php echo esc_attr( $s['tiktok_test_event_code'] ); ?>"
+								placeholder="TEST12345" autocomplete="off" />
+							<?php self::render_test_code_expiry_hint( $tiktok_code_expired ); ?>
+							<p class="description"><?php esc_html_e( 'Optional. While set, Events API requests are marked as test events and appear under “Test Events” instead of your live data. Like the Meta test code above, it is automatically deactivated after 12 hours.', 'pixel-made-simple' ); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -1258,9 +1410,22 @@ class PMS_Admin {
 			<h2 class="pms-section-title"><?php esc_html_e( 'E-Commerce', 'pixel-made-simple' ); ?></h2>
 
 			<?php if ( ! class_exists( 'WooCommerce' ) ) : ?>
-				<div class="pms-card">
+				<?php
+				// Nicht erkannte Integration: bewusst OHNE den blauen
+				// Aktiv-Balken der normalen .pms-card (siehe assets/admin.css,
+				// Modifier .pms-card-inactive) -- ein blauer Akzent signalisiert
+				// in diesem Plugin durchgehend "aktiv", was hier das Gegenteil
+				// der Wahrheit wäre. Gleiche max-width wie die Accordions
+				// daneben, damit nichts über das Layout hinausragt.
+				?>
+				<div class="pms-card pms-card-inactive">
+					<h2>
+						<span class="dashicons dashicons-marker" aria-hidden="true"></span>
+						WooCommerce
+						<span class="pms-inactive-badge"><?php esc_html_e( 'Not detected', 'pixel-made-simple' ); ?></span>
+					</h2>
 					<div class="pms-card-body">
-						<p><?php esc_html_e( 'WooCommerce was not detected on this site. Once WooCommerce is activated, the tracking options will appear here.', 'pixel-made-simple' ); ?></p>
+						<p class="description"><?php esc_html_e( 'WooCommerce was not detected on this site. Once WooCommerce is activated, the tracking options will appear here.', 'pixel-made-simple' ); ?></p>
 					</div>
 				</div>
 			<?php elseif ( PMS_Settings::is_pro() ) : ?>
@@ -1326,9 +1491,22 @@ class PMS_Admin {
 			// dortige Kommentare für die Begründung.
 			?>
 			<?php if ( ! class_exists( 'SureCart' ) && ! function_exists( 'surecart' ) ) : ?>
-				<div class="pms-card">
+				<?php
+				// Nicht erkannte Integration: bewusst OHNE den blauen
+				// Aktiv-Balken der normalen .pms-card (siehe assets/admin.css,
+				// Modifier .pms-card-inactive) -- ein blauer Akzent signalisiert
+				// in diesem Plugin durchgehend "aktiv", was hier das Gegenteil
+				// der Wahrheit wäre. Gleiche max-width wie die Accordions
+				// daneben, damit nichts über das Layout hinausragt.
+				?>
+				<div class="pms-card pms-card-inactive">
+					<h2>
+						<span class="dashicons dashicons-marker" aria-hidden="true"></span>
+						SureCart
+						<span class="pms-inactive-badge"><?php esc_html_e( 'Not detected', 'pixel-made-simple' ); ?></span>
+					</h2>
 					<div class="pms-card-body">
-						<p><?php esc_html_e( 'SureCart was not detected on this site. Once SureCart is activated, the tracking options will appear here.', 'pixel-made-simple' ); ?></p>
+						<p class="description"><?php esc_html_e( 'SureCart was not detected on this site. Once SureCart is activated, the tracking options will appear here.', 'pixel-made-simple' ); ?></p>
 					</div>
 				</div>
 			<?php elseif ( PMS_Settings::is_pro() ) : ?>
@@ -1544,9 +1722,21 @@ class PMS_Admin {
 				'tiktok_event'   => 'CompleteRegistration',
 			)
 		);
+
+		// Seit v0.6.10 einklappbar und standardmäßig ZU: die Event-Tabelle
+		// darüber ist der eigentliche Einstieg in diesen Tab, das Formular
+		// nur gelegentlich gebraucht. Beim Bearbeiten (Link "Bearbeiten" in
+		// der Tabelle, springt per #pms-event-form hierher) startet es
+		// dagegen offen -- sonst wäre die Bearbeitung unsichtbar. Der
+		// Klapp-Mechanismus ist bewusst NICHT .pms-accordion: das Muster dort
+		// hängt an einem Master-Toggle im Header (siehe accordion_open()),
+		// den es hier nicht gibt. Siehe [data-pms-collapsible] in
+		// assets/admin.js.
+		$form_classes = 'pms-event-form-card pms-collapsible' . ( $is_edit ? '' : ' closed' );
 		?>
-		<div class="pms-event-form-card" id="pms-event-form">
-			<h2>
+		<div class="<?php echo esc_attr( $form_classes ); ?>" id="pms-event-form" data-pms-collapsible>
+			<h2 class="pms-collapse-header">
+				<span class="pms-collapse-title">
 				<?php
 				if ( $is_edit ) {
 					/* translators: %s: event name */
@@ -1555,9 +1745,14 @@ class PMS_Admin {
 					esc_html_e( 'Create New Event', 'pixel-made-simple' );
 				}
 				?>
+				</span>
+				<button type="button" class="pms-accordion-button" aria-expanded="<?php echo $is_edit ? 'true' : 'false'; ?>">
+					<span class="screen-reader-text"><?php esc_html_e( 'Toggle panel: Create New Event', 'pixel-made-simple' ); ?></span>
+					<span class="pms-accordion-arrow" aria-hidden="true"></span>
+				</button>
 			</h2>
 
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="pms-collapse-body">
 				<input type="hidden" name="action" value="pms_save_event" />
 				<input type="hidden" name="event_id" value="<?php echo esc_attr( $values['id'] ); ?>" />
 				<?php wp_nonce_field( 'pms_save_event' ); ?>

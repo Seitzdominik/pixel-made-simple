@@ -300,7 +300,12 @@ console.log( '\n=== 1. ViewContent: liest #pms-woo-view-content-data und feuert 
 	check( 'ttq.track(\'ViewContent\', ...) wird genau einmal aufgerufen', 1 === r.window.ttqCalls.length );
 	const tCall = r.window.ttqCalls[ 0 ] || [];
 	check( 'ttq-Aufruf: Event-Name ist ViewContent', 'ViewContent' === tCall[ 0 ] );
-	check( 'ttq-Aufruf: content_id/value/currency gesetzt', tCall[ 1 ] && '55' === tCall[ 1 ].content_id && 19.99 === tCall[ 1 ].value && 'EUR' === tCall[ 1 ].currency );
+	// Seit v0.6.10 in einem contents[]-Array statt als top-level content_id
+	// (TikTok-Diagnostics-Warnung, siehe contentsToTiktokContents()).
+	check( 'ttq-Aufruf: value/currency auf oberster Ebene', tCall[ 1 ] && 19.99 === tCall[ 1 ].value && 'EUR' === tCall[ 1 ].currency );
+	check( 'ttq-Aufruf: contents[] trägt ein explizites content_id (Diagnostics-Fix v0.6.10)', tCall[ 1 ] && Array.isArray( tCall[ 1 ].contents ) && 1 === tCall[ 1 ].contents.length && '55' === tCall[ 1 ].contents[ 0 ].content_id );
+	check( 'ttq-Aufruf: contents[0] trägt content_type/quantity/price', tCall[ 1 ] && 'product' === tCall[ 1 ].contents[ 0 ].content_type && 1 === tCall[ 1 ].contents[ 0 ].quantity && 19.99 === tCall[ 1 ].contents[ 0 ].price );
+	check( 'ttq-Aufruf: KEIN top-level content_id mehr (zählte für TikToks Diagnostics nicht)', tCall[ 1 ] && undefined === tCall[ 1 ].content_id );
 	check( 'ttq-Aufruf: dieselbe event_id wie im fbq()-Aufruf (plattformübergreifende Dedup)', tCall[ 2 ] && tCall[ 2 ].event_id === ( call[ 3 ] && call[ 3 ].eventID ) );
 
 	const body = ( r.window.fetchCalls[ 0 ] || {} ).body || '';
@@ -338,7 +343,7 @@ console.log( '\n=== 2. AddToCart: jQuery "added_to_cart" (Archiv-/Mini-Cart-Butt
 
 	check( 'ttq.track(\'AddToCart\', ...) wird aufgerufen', 1 === r.window.ttqCalls.length );
 	const tCall = r.window.ttqCalls[ 0 ] || [];
-	check( 'ttq AddToCart: content_id gesetzt, KEIN value', tCall[ 1 ] && '77' === tCall[ 1 ].content_id && undefined === tCall[ 1 ].value );
+	check( 'ttq AddToCart: contents[] mit content_id/quantity, KEIN value (kein sicherer Preis im Archiv-Kontext)', tCall[ 1 ] && Array.isArray( tCall[ 1 ].contents ) && '77' === tCall[ 1 ].contents[ 0 ].content_id && 2 === tCall[ 1 ].contents[ 0 ].quantity && undefined === tCall[ 1 ].value );
 
 	const body = ( r.window.fetchCalls[ 0 ] || {} ).body || '';
 	const params = new URLSearchParams( body );
@@ -433,7 +438,11 @@ console.log( '\n=== 4. InitiateCheckout: Classic Checkout liest #pms-woo-checkou
 
 	check( 'ttq.track(\'InitiateCheckout\') wird gefeuert', 1 === r.window.ttqCalls.length );
 	const tCall = r.window.ttqCalls[ 0 ] || [];
-	check( 'ttq InitiateCheckout: value/currency gesetzt (kein eigenes contents[]-Feld im TikTok-Schema)', tCall[ 1 ] && 59.98 === tCall[ 1 ].value && 'EUR' === tCall[ 1 ].currency );
+	check( 'ttq InitiateCheckout: value/currency gesetzt', tCall[ 1 ] && 59.98 === tCall[ 1 ].value && 'EUR' === tCall[ 1 ].currency );
+	// Seit v0.6.10: bis dahin trug InitiateCheckout gar kein contents[], was
+	// TikToks Diagnostics als fehlendes content_id bemängelte.
+	check( 'ttq InitiateCheckout: contents[] mit content_id je Position (Diagnostics-Fix v0.6.10)', tCall[ 1 ] && Array.isArray( tCall[ 1 ].contents ) && 2 === tCall[ 1 ].contents.length && '10' === tCall[ 1 ].contents[ 0 ].content_id && '20' === tCall[ 1 ].contents[ 1 ].content_id );
+	check( 'ttq InitiateCheckout: contents[] trägt price/quantity aus derselben Nutzlast wie Meta/Google', tCall[ 1 ] && 39.99 === tCall[ 1 ].contents[ 0 ].price && 1 === tCall[ 1 ].contents[ 0 ].quantity );
 
 	const body = ( r.window.fetchCalls[ 0 ] || {} ).body || '';
 	const params = new URLSearchParams( body );
@@ -580,6 +589,81 @@ console.log( '\n=== 7. Google Ads & TikTok: Enabled-Flag-Gating ===' );
 	const r = run( { googleEnabled: true, tiktokEnabled: true }, { elements: [ payload ], noGtag: true, noTtq: true } );
 
 	check( 'Fehlendes window.gtag/window.ttq: kein Crash, Meta-Pixel feuert weiterhin', 1 === r.window.fbqCalls.length );
+}
+
+/* ---------------------------------------------------------------------
+ * 8. Flexibler Consent-Modus (consentMode: 'browser_only', v0.6.10)
+ * ------------------------------------------------------------------- */
+
+console.log( '\n=== 8. Consent-Modus "browser_only": Server sofort, Browser-Pixel erst nach der Einwilligung ===' );
+
+function viewContentPayload() {
+	const payload = el( {
+		tag: 'script',
+		textContent: JSON.stringify( { product_id: 1, content_id: '1', content_name: 'X', content_category: '', value: 1, currency: 'EUR', quantity: 1 } ),
+	} );
+	payload.id = 'pms-woo-view-content-data';
+	return payload;
+}
+
+{
+	const r = run(
+		{ consentMode: 'browser_only', consentEvents: [ 'cmplz_fire_categories' ], googleEnabled: true, tiktokEnabled: true },
+		{ elements: [ viewContentPayload() ], hasConsent: false, autoTimeout: true }
+	);
+
+	check( 'browser_only ohne Consent: AJAX-/CAPI-Request geht SOFORT raus', 1 === r.window.fetchCalls.length );
+	check( 'browser_only ohne Consent: kein fbq()-Aufruf', 0 === r.window.fbqCalls.length );
+	check( 'browser_only ohne Consent: kein gtag()-Aufruf', 0 === r.window.gtagCalls.length );
+	check( 'browser_only ohne Consent: kein ttq.track()-Aufruf', 0 === r.window.ttqCalls.length );
+
+	const params = new URLSearchParams( ( r.window.fetchCalls[ 0 ] || {} ).body || '' );
+	const serverEventId = params.get( 'event_id' );
+	check( 'browser_only: der Server-Request meldet browser_fired=0 (der Pixel lief ja nicht)', '0' === params.get( 'browser_fired' ) );
+
+	// Der Besucher willigt nachträglich ein -> der Browser-Pixel wird nachgeholt,
+	// OHNE einen zweiten Server-Request auszulösen.
+	r.window.pmsHasConsent = function () {
+		return true;
+	};
+	r.document.dispatchEvent( { type: 'cmplz_fire_categories' } );
+
+	check( 'browser_only + nachträglicher Consent: Browser-Pixel wird nachgeholt', 1 === r.window.fbqCalls.length );
+	check( 'browser_only + nachträglicher Consent: KEIN zweiter Server-Request', 1 === r.window.fetchCalls.length );
+
+	const fbCall = r.window.fbqCalls[ 0 ] || [];
+	check( 'browser_only: nachgeholter Pixel trägt dieselbe event_id wie der Server-Request (Meta dedupliziert)', fbCall[ 3 ] && fbCall[ 3 ].eventID === serverEventId );
+}
+
+{
+	// Gegenprobe: derselbe Aufbau im Default-Modus 'strict' -- dort wandert
+	// weiterhin ALLES in die Queue (unverändertes Verhalten vor v0.6.10).
+	const r = run(
+		{ consentMode: 'strict', consentEvents: [ 'cmplz_fire_categories' ] },
+		{ elements: [ viewContentPayload() ], hasConsent: false, autoTimeout: true }
+	);
+
+	check( 'strict ohne Consent: weder Pixel noch Server-Request', 0 === r.window.fbqCalls.length && 0 === r.window.fetchCalls.length );
+
+	r.window.pmsHasConsent = function () {
+		return true;
+	};
+	r.document.dispatchEvent( { type: 'cmplz_fire_categories' } );
+
+	check( 'strict + nachträglicher Consent: beides wird gemeinsam nachgeholt', 1 === r.window.fbqCalls.length && 1 === r.window.fetchCalls.length );
+	const params = new URLSearchParams( ( r.window.fetchCalls[ 0 ] || {} ).body || '' );
+	check( 'strict + nachträglicher Consent: Server-Request meldet browser_fired=1', '1' === params.get( 'browser_fired' ) );
+}
+
+{
+	// Consent liegt beim Laden bereits vor: der Modus darf keine Rolle spielen.
+	const r = run(
+		{ consentMode: 'browser_only' },
+		{ elements: [ viewContentPayload() ], hasConsent: true }
+	);
+	check( 'browser_only MIT Consent: Pixel und Server-Request laufen wie gewohnt zusammen', 1 === r.window.fbqCalls.length && 1 === r.window.fetchCalls.length );
+	const params = new URLSearchParams( ( r.window.fetchCalls[ 0 ] || {} ).body || '' );
+	check( 'browser_only MIT Consent: browser_fired=1', '1' === params.get( 'browser_fired' ) );
 }
 
 }

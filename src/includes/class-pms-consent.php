@@ -70,6 +70,45 @@ class PMS_Consent {
 	}
 
 	/**
+	 * Darf ein SERVERSEITIGES Signal (Meta CAPI, TikTok Events API) raus?
+	 *
+	 * Seit v0.6.10 die Gegenstelle zu has_marketing_consent(), das weiterhin
+	 * ausschließlich den Browser-Pixel bewacht. Welcher der beiden Gates
+	 * gilt, entscheidet der Consent-Modus (Tab "Allgemein", siehe
+	 * PMS_Settings::CONSENT_MODE_*):
+	 *
+	 * - 'strict' (Default, Verhalten aller Versionen vor v0.6.10): identisch
+	 *   zu has_marketing_consent() -- ohne Einwilligung kein Request.
+	 * - 'browser_only': serverseitige Signale laufen unabhängig vom
+	 *   Banner-Status; nur der Browser-Pixel wartet weiterhin.
+	 *
+	 * Der Modus wird NUR ausgewertet, wenn die Erkennung überhaupt etwas
+	 * blockieren würde -- liegt Einwilligung vor (oder ist die Erkennung aus),
+	 * ist das Ergebnis in beiden Modi identisch true.
+	 *
+	 * WICHTIG: 'browser_only' umgeht bewusst auch den Filter
+	 * pms_has_marketing_consent -- der ist die Korrektur für nicht erkannte
+	 * BANNER, und im flexiblen Modus hat der Betreiber ausdrücklich erklärt,
+	 * dass der Banner-Status für den Server-Pfad nicht maßgeblich ist. Wer
+	 * den Server-Pfad trotzdem programmatisch stoppen möchte, filtert
+	 * pms_has_server_consent (bzw. weiterhin global pms_allow_tracking).
+	 *
+	 * @return bool
+	 */
+	public static function has_server_consent() {
+		$strict  = PMS_Settings::CONSENT_MODE_STRICT === PMS_Settings::consent_mode();
+		$consent = $strict ? self::has_marketing_consent() : true;
+
+		/**
+		 * Serverseitiges Consent-Ergebnis überschreiben.
+		 *
+		 * @param bool $consent Ob serverseitige Signale gesendet werden dürfen.
+		 * @param bool $strict  Ob der strikte Consent-Modus aktiv ist.
+		 */
+		return (bool) apply_filters( 'pms_has_server_consent', $consent, $strict );
+	}
+
+	/**
 	 * Consent-Status aus WP Consent API bzw. bekannten Banner-Cookies ermitteln.
 	 *
 	 * @return bool

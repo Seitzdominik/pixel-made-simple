@@ -35,6 +35,52 @@ class PMS_Settings {
 	const ALLOWED_LOG_RETENTION_DAYS = array( 3, 7, 14, 30 );
 
 	/**
+	 * Consent-Modi (Tab "Allgemein" -> Box "Automatische Cookie-Banner-
+	 * Erkennung", seit v0.6.10). Steuert, WIE streng eine fehlende
+	 * Marketing-Einwilligung durchgesetzt wird -- NICHT, ob überhaupt erkannt
+	 * wird (das bleibt consent_detection):
+	 *
+	 * - 'strict' (Default): Browser-Pixel UND serverseitige CAPI/Events-API
+	 *   bleiben blockiert, bis der Besucher einwilligt. Der bisherige, seit
+	 *   jeher einzige Modus -- Bestandsinstallationen ohne gespeicherten Wert
+	 *   landen über den get()-Default automatisch hier.
+	 * - 'browser_only': nur der Browser-Pixel wartet auf die Einwilligung; die
+	 *   serverseitigen Signale laufen unabhängig vom Banner-Status.
+	 *
+	 * Die Auswertung sitzt in PMS_Consent::has_server_consent() (siehe dort);
+	 * PMS_Consent::has_marketing_consent() bleibt unverändert der reine
+	 * Browser-Gate und ist von diesem Setting bewusst NICHT betroffen.
+	 */
+	const CONSENT_MODE_STRICT       = 'strict';
+	const CONSENT_MODE_BROWSER_ONLY = 'browser_only';
+	const ALLOWED_CONSENT_MODES     = array( self::CONSENT_MODE_STRICT, self::CONSENT_MODE_BROWSER_ONLY );
+
+	/**
+	 * Lebensdauer eines Test Event Codes in Sekunden (12 Stunden) -- gilt seit
+	 * v0.6.10 für Meta UND TikTok gleichermaßen (siehe
+	 * active_meta_test_event_code()/active_tiktok_test_event_code()).
+	 *
+	 * Bewusst als fester Zahlenwert statt 12 * HOUR_IN_SECONDS: eine
+	 * Klassenkonstante darf keinen defined()-Check enthalten, und
+	 * HOUR_IN_SECONDS ist im Stub-Test-Harness nicht garantiert vorhanden
+	 * (dev-tools/test-suite.php lädt kein WordPress).
+	 */
+	const TEST_CODE_MAX_AGE = 43200;
+
+	/**
+	 * Die zwei Test-Code-Schlüsselpaare (Code + Zeitstempel), auf die
+	 * TEST_CODE_MAX_AGE angewendet wird. Kommt eine dritte Plattform mit
+	 * eigenem Test-Modus dazu, gehört sie hierhin -- sanitize_settings() und
+	 * expire_test_code() lesen beide ausschließlich aus diesem Array.
+	 *
+	 * @var array<string,array{code:string,timestamp:string}>
+	 */
+	const TEST_CODE_KEYS = array(
+		'meta'   => array( 'code' => 'test_event_code', 'timestamp' => 'test_code_created_at' ),
+		'tiktok' => array( 'code' => 'tiktok_test_event_code', 'timestamp' => 'tiktok_test_code_created_at' ),
+	);
+
+	/**
 	 * Läuft gerade die Pro-Version?
 	 *
 	 * Defensiv per defined()-Check statt eines nackten PMS_IS_PRO-Zugriffs:
@@ -123,6 +169,10 @@ class PMS_Settings {
 			// Global. Consent-Erkennung ist bei Neuinstallation bewusst aktiv (DSGVO).
 			'exclude_admins'        => 1,
 			'consent_detection'     => 1,
+			// Siehe CONSENT_MODE_*-Konstanten oben. Default ist bewusst der
+			// strikte Modus: er entspricht exakt dem Verhalten aller Versionen
+			// vor v0.6.10, sodass ein Update nichts stillschweigend lockert.
+			'consent_mode'          => self::CONSENT_MODE_STRICT,
 			// Meta.
 			'pixel_enabled'         => 0,
 			'pixel_id'              => '',
@@ -152,6 +202,13 @@ class PMS_Settings {
 			'tiktok_pixel_id'     => '',
 			'tiktok_capi_enabled' => 0,
 			'tiktok_access_token' => '',
+			// TikTok-Pendant zu test_event_code/test_code_created_at: wird als
+			// test_event_code in den Events-API-Request aufgenommen, solange er
+			// gesetzt UND jünger als TEST_CODE_MAX_AGE ist. Seit v0.6.10 mit
+			// exakt demselben 12h-Auto-Expiry wie der Meta-Code -- beide laufen
+			// über dieselbe Implementierung, siehe expire_test_code().
+			'tiktok_test_event_code'      => '',
+			'tiktok_test_code_created_at' => 0,
 			// Erweiterte Tracking-Features. Privacy-by-Default: Formular-Grabber
 			// und UTM-Attribution sind bei Neuinstallation bewusst DEAKTIVIERT,
 			// da sie zusätzliche personenbezogene Daten (Formularinhalte,
@@ -159,6 +216,18 @@ class PMS_Settings {
 			// eingeloggte Administratoren und bleibt daher aktiv.
 			'form_tracking'        => 0,
 			'form_event_type'      => 'Lead',
+			// Multi-Platform-Formular-Leads (seit v0.6.10): Google Ads und
+			// TikTok bekommen für dieselbe Absendung ihr eigenes Event --
+			// rein browserseitig, exakt wie bei den URL-Events (siehe
+			// PMS_Frontend::build_google_js()/build_tiktok_js(); es gibt für
+			// keine der beiden Plattformen einen Server-Dispatch außerhalb
+			// des Purchase-Trackings). Beide sind Pro-only, weil die
+			// Plattformen selbst es sind -- ohne Pro rendert der Tab dafür
+			// gesperrte Controls (siehe PMS_Admin::render_advanced_tab()).
+			// Wie bei den URL-Events gilt: kein Conversion-Label -> kein
+			// Google-Ads-Aufruf (siehe sanitize_event()).
+			'form_tiktok_event'    => 'SubmitForm',
+			'form_google_label'    => '',
 			'form_url_filter'      => '',
 			'form_exclude_system'  => 1,
 			'utm_passthrough'      => 0,
@@ -214,18 +283,29 @@ class PMS_Settings {
 	public static function sanitize_settings( $input ) {
 		$input = is_array( $input ) ? $input : array();
 
-		$test_code = preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['test_event_code'] ?? '' ) );
+		$old = get_option( self::OPTION_SETTINGS, array() );
 
-		// Test-Code-Zeitstempel: bei neuem/geändertem Code neu setzen, bei
-		// unverändertem Code beibehalten (Basis für das 12h-Auto-Expiry).
-		$old        = get_option( self::OPTION_SETTINGS, array() );
-		$old_code   = is_array( $old ) ? (string) ( $old['test_event_code'] ?? '' ) : '';
-		$old_ts     = is_array( $old ) ? (int) ( $old['test_code_created_at'] ?? 0 ) : 0;
-		$created_at = 0;
+		// Test-Code-Zeitstempel (Basis für das 12h-Auto-Expiry, siehe
+		// TEST_CODE_MAX_AGE): bei neuem/geändertem Code neu setzen, bei
+		// unverändertem Code beibehalten. Seit v0.6.10 für beide Plattformen
+		// über dieselbe Schleife -- die Regel darf zwischen Meta und TikTok
+		// nicht auseinanderlaufen.
+		$test_code   = preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['test_event_code'] ?? '' ) );
+		$tiktok_code = preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['tiktok_test_event_code'] ?? '' ) );
 
-		if ( '' !== $test_code ) {
-			$created_at = ( $test_code === $old_code && $old_ts > 0 ) ? $old_ts : time();
+		$new_codes  = array( 'meta' => $test_code, 'tiktok' => $tiktok_code );
+		$timestamps = array();
+
+		foreach ( self::TEST_CODE_KEYS as $platform => $keys ) {
+			$old_code = is_array( $old ) ? (string) ( $old[ $keys['code'] ] ?? '' ) : '';
+			$old_ts   = is_array( $old ) ? (int) ( $old[ $keys['timestamp'] ] ?? 0 ) : 0;
+
+			$timestamps[ $platform ] = ( '' === $new_codes[ $platform ] )
+				? 0
+				: ( ( $new_codes[ $platform ] === $old_code && $old_ts > 0 ) ? $old_ts : time() );
 		}
+
+		$created_at = $timestamps['meta'];
 
 		// Der CAPI-Token hat nur auf Tab "Allgemein" ein echtes Feld (siehe
 		// PMS_Admin::render_advanced_tab(), die ihn bewusst NICHT als Hidden-
@@ -249,6 +329,9 @@ class PMS_Settings {
 		return array(
 			'exclude_admins'       => empty( $input['exclude_admins'] ) ? 0 : 1,
 			'consent_detection'    => empty( $input['consent_detection'] ) ? 0 : 1,
+			'consent_mode'         => in_array( (string) ( $input['consent_mode'] ?? '' ), self::ALLOWED_CONSENT_MODES, true )
+				? (string) $input['consent_mode']
+				: self::CONSENT_MODE_STRICT,
 			'pixel_enabled'        => empty( $input['pixel_enabled'] ) ? 0 : 1,
 			'pixel_id'             => preg_replace( '/\D+/', '', (string) ( $input['pixel_id'] ?? '' ) ),
 			'capi_enabled'         => empty( $input['capi_enabled'] ) ? 0 : 1,
@@ -268,10 +351,21 @@ class PMS_Settings {
 			'tiktok_pixel_id'      => preg_replace( '/[^A-Za-z0-9]+/', '', (string) ( $input['tiktok_pixel_id'] ?? '' ) ),
 			'tiktok_capi_enabled'  => empty( $input['tiktok_capi_enabled'] ) ? 0 : 1,
 			'tiktok_access_token'  => $tiktok_access_token,
+			// Dieselbe Zeichen-Whitelist wie beim Meta-Test-Code oben
+			// (TikTok-Codes haben ebenfalls die Form "TEST12345") UND seit
+			// v0.6.10 derselbe Zeitstempel für das 12h-Auto-Expiry.
+			'tiktok_test_event_code'      => $tiktok_code,
+			'tiktok_test_code_created_at' => $timestamps['tiktok'],
 			'form_tracking'        => empty( $input['form_tracking'] ) ? 0 : 1,
 			'form_event_type'      => in_array( (string) ( $input['form_event_type'] ?? '' ), self::form_event_types(), true )
 				? (string) $input['form_event_type']
 				: 'Lead',
+			'form_tiktok_event'    => in_array( (string) ( $input['form_tiktok_event'] ?? '' ), self::form_tiktok_event_types(), true )
+				? (string) $input['form_tiktok_event']
+				: 'SubmitForm',
+			// Dieselbe Zeichen-Whitelist wie beim per-Event google_label in
+			// sanitize_event() und beim wc_/sc_google_conversion_label.
+			'form_google_label'    => preg_replace( '/[^A-Za-z0-9_\-]+/', '', (string) ( $input['form_google_label'] ?? '' ) ),
 			'form_url_filter'      => self::sanitize_url_filter( $input['form_url_filter'] ?? '' ),
 			'form_exclude_system'  => empty( $input['form_exclude_system'] ) ? 0 : 1,
 			'utm_passthrough'      => empty( $input['utm_passthrough'] ) ? 0 : 1,
@@ -359,6 +453,20 @@ class PMS_Settings {
 	}
 
 	/**
+	 * Erlaubte TikTok-Event-Typen für den Formular-Auto-Grabber (seit
+	 * v0.6.10). Bewusst eine kuratierte Teilmenge von tiktok_event_types()
+	 * statt der vollen Liste: die dort ebenfalls enthaltenen Shop-Events
+	 * (AddToCart, CompletePayment ...) ergeben für eine Formular-Absendung
+	 * keinen Sinn und würden TikToks Diagnostics-Prüfungen (die für diese
+	 * Events value/currency/contents erwarten) unnötig auslösen.
+	 *
+	 * @return string[]
+	 */
+	public static function form_tiktok_event_types() {
+		return array( 'SubmitForm', 'Contact', 'CompleteRegistration', 'Subscribe' );
+	}
+
+	/**
 	 * URL-Filter säubern: kommagetrennte Pfade, kleingeschrieben.
 	 *
 	 * @param mixed $value Rohwert aus dem Formular.
@@ -431,6 +539,123 @@ class PMS_Settings {
 		$type     = (string) ( $settings['form_event_type'] ?? 'Lead' );
 
 		return in_array( $type, self::form_event_types(), true ) ? $type : 'Lead';
+	}
+
+	/**
+	 * Konfigurierter TikTok-Event-Typ für Formular-Absendungen.
+	 *
+	 * @return string Einer aus form_tiktok_event_types().
+	 */
+	public static function form_tiktok_event() {
+		$settings = self::get();
+		$type     = (string) ( $settings['form_tiktok_event'] ?? 'SubmitForm' );
+
+		return in_array( $type, self::form_tiktok_event_types(), true ) ? $type : 'SubmitForm';
+	}
+
+	/**
+	 * Konfiguriertes Google-Ads-Conversion-Label für Formular-Absendungen.
+	 * Leer = keine Google-Ads-Conversion für Formular-Leads (dieselbe Regel
+	 * wie bei URL-Events und beim Purchase-Label).
+	 *
+	 * @return string
+	 */
+	public static function form_google_label() {
+		$settings = self::get();
+
+		return preg_replace( '/[^A-Za-z0-9_\-]+/', '', (string) ( $settings['form_google_label'] ?? '' ) );
+	}
+
+	/**
+	 * Noch gültiger Meta-Test-Event-Code (leerer String, wenn keiner gesetzt
+	 * oder der gesetzte abgelaufen ist).
+	 *
+	 * @param array $settings Bereits geladene Einstellungen (spart ein get()).
+	 * @return string
+	 */
+	public static function active_meta_test_event_code( array $settings = array() ) {
+		return self::expire_test_code( 'meta', $settings );
+	}
+
+	/**
+	 * Noch gültiger TikTok-Test-Event-Code -- exakt dieselbe 12h-Regel wie
+	 * beim Meta-Pendant darüber (seit v0.6.10).
+	 *
+	 * @param array $settings Bereits geladene Einstellungen (spart ein get()).
+	 * @return string
+	 */
+	public static function active_tiktok_test_event_code( array $settings = array() ) {
+		return self::expire_test_code( 'tiktok', $settings );
+	}
+
+	/**
+	 * Gemeinsame Auto-Expiry-Logik für beide Test-Event-Codes.
+	 *
+	 * Ein abgelaufener Code wird nicht nur ignoriert, sondern SOFORT aus der
+	 * Datenbank entfernt (Code + Zeitstempel auf ''/0). Genau das ist der
+	 * Zweck des Mechanismus: Ein vergessener Test-Code darf nicht dauerhaft
+	 * echte Conversions in den Test-Events-Stream der Plattform umleiten, wo
+	 * sie in den Live-Berichten fehlen. Das Leeren macht den Ablauf zudem im
+	 * Admin sichtbar, ohne dass es dort eine zweite Zeitrechnung braucht
+	 * (siehe PMS_Admin::render_general_tab(), das diese Methode beim Rendern
+	 * der Box aufruft -- ein abgelaufener Code ist damit spätestens beim
+	 * nächsten Blick auf die Einstellungsseite weg, auch wenn seit dem Ablauf
+	 * kein einziges Event mehr gefeuert wurde).
+	 *
+	 * Zeitstempel 0 bedeutet "kein Ablauf bekannt" und lässt den Code bewusst
+	 * stehen -- dieser Fall entsteht nur bei von Hand in die Datenbank
+	 * geschriebenen Werten, nicht über sanitize_settings().
+	 *
+	 * @param string $platform 'meta' oder 'tiktok' (Schlüssel aus TEST_CODE_KEYS).
+	 * @param array  $settings Bereits geladene Einstellungen; leer = selbst laden.
+	 * @return string Noch gültiger Code oder leerer String.
+	 */
+	private static function expire_test_code( $platform, array $settings = array() ) {
+		if ( ! isset( self::TEST_CODE_KEYS[ $platform ] ) ) {
+			return '';
+		}
+
+		$keys = self::TEST_CODE_KEYS[ $platform ];
+
+		if ( empty( $settings ) ) {
+			$settings = self::get();
+		}
+
+		$code = (string) ( $settings[ $keys['code'] ] ?? '' );
+
+		if ( '' === $code ) {
+			return '';
+		}
+
+		$created_at = (int) ( $settings[ $keys['timestamp'] ] ?? 0 );
+
+		if ( $created_at > 0 && ( time() - $created_at ) > self::TEST_CODE_MAX_AGE ) {
+			// Immer gegen den FRISCHEN Datenbankstand schreiben, nicht gegen
+			// das übergebene $settings-Array: Aufrufer reichen hier teils eine
+			// Momentaufnahme herein, die sie selbst noch weiterverwenden (z. B.
+			// PMS_CAPI::send_events()). Würde die zurückgeschrieben, könnten
+			// zwischenzeitlich woanders gespeicherte Änderungen verlorengehen.
+			$stored = self::get();
+			$stored[ $keys['code'] ]      = '';
+			$stored[ $keys['timestamp'] ] = 0;
+			update_option( self::OPTION_SETTINGS, $stored );
+
+			return '';
+		}
+
+		return $code;
+	}
+
+	/**
+	 * Aktiver Consent-Modus (siehe CONSENT_MODE_*-Konstanten oben).
+	 *
+	 * @return string 'strict' oder 'browser_only'.
+	 */
+	public static function consent_mode() {
+		$settings = self::get();
+		$mode     = (string) ( $settings['consent_mode'] ?? self::CONSENT_MODE_STRICT );
+
+		return in_array( $mode, self::ALLOWED_CONSENT_MODES, true ) ? $mode : self::CONSENT_MODE_STRICT;
 	}
 
 	/**

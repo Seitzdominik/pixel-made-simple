@@ -126,6 +126,12 @@ class PMS_Pro_WooCommerce {
 				// render_initiate_checkout_payload()) liest das Skript den
 				// aktuellen Warenkorb selbst über die WooCommerce Store API.
 				'storeCartUrl'  => rest_url( 'wc/store/v1/cart' ),
+				// Consent-Modus (seit v0.6.10): steuert in diesem Skript, ob der
+				// CAPI-Request bei fehlender Einwilligung mit in die Consent-Queue
+				// wandert ('strict') oder sofort rausgeht, während nur der
+				// Browser-Pixel wartet ('browser_only'). Serverseitige
+				// Gegenstelle: PMS_Consent::has_server_consent().
+				'consentMode'   => PMS_Settings::consent_mode(),
 				// Google Ads (gtag) und TikTok Pixel (ttq) sind seit v0.6.6
 				// zusätzliche Ziele für ViewContent/AddToCart/InitiateCheckout.
 				// pms-woocommerce.js prüft NICHT nur typeof window.gtag/ttq
@@ -271,7 +277,10 @@ class PMS_Pro_WooCommerce {
 			wp_send_json_error( array( 'reason' => 'tracking_disabled' ), 200 );
 		}
 
-		if ( ! PMS_Consent::has_marketing_consent() ) {
+		// Server-Gate (siehe PMS_Consent::has_server_consent()) -- dieser
+		// Endpunkt sendet ausschließlich die Meta-CAPI; über den Browser-Pixel
+		// hat pms-woocommerce.js bereits selbst entschieden.
+		if ( ! PMS_Consent::has_server_consent() ) {
 			wp_send_json_error( array( 'reason' => 'no_consent' ), 200 );
 		}
 

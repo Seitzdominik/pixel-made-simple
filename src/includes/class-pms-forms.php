@@ -128,7 +128,11 @@ class PMS_Forms {
 			wp_send_json_error( array( 'reason' => 'tracking_disabled' ), 200 );
 		}
 
-		if ( ! PMS_Consent::has_marketing_consent() ) {
+		// Server-Gate (siehe PMS_Consent::has_server_consent()): der
+		// Browser-Pixel dieses Leads ist zu diesem Zeitpunkt bereits
+		// clientseitig entschieden worden (frontend.js), hier geht es nur noch
+		// um den CAPI-Request.
+		if ( ! PMS_Consent::has_server_consent() ) {
 			wp_send_json_error( array( 'reason' => 'no_consent' ), 200 );
 		}
 

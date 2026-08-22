@@ -148,7 +148,8 @@ function FakeEvent( type, opts ) {
  * (die Datei ist eine selbstaufrufende IIFE).
  *
  * @param {Object} cfgOverrides window.pms_settings.
- * @param {Object} domOverrides { registry, cookie, referrer, path, search }.
+ * @param {Object} domOverrides { registry, cookie, referrer, path, search,
+ *                                noFbq, noGtag, noTtq, hasConsent }.
  * @return {Object} { window, document } für Assertions.
  */
 function run( cfgOverrides, domOverrides ) {
@@ -159,7 +160,7 @@ function run( cfgOverrides, domOverrides ) {
 	doc.cookie = domOverrides.cookie || '';
 	doc.referrer = domOverrides.referrer || '';
 
-	const win = { fbqCalls: [], fetchCalls: [] };
+	const win = { fbqCalls: [], fetchCalls: [], gtagCalls: [], ttqCalls: [] };
 	win.location = { pathname: domOverrides.path || '/', search: domOverrides.search || '' };
 	win.pms_settings = Object.assign( { formTracking: false, utmFormFill: false }, cfgOverrides );
 
@@ -169,6 +170,31 @@ function run( cfgOverrides, domOverrides ) {
 	if ( ! domOverrides.noFbq ) {
 		win.fbq = function () {
 			win.fbqCalls.push( Array.prototype.slice.call( arguments ) );
+		};
+	}
+
+	// Google Ads (gtag) und TikTok (ttq) für Multi-Platform-Formular-Leads
+	// (v0.6.10). ttq hat bewusst dieselbe Form wie TikToks echtes Snippet --
+	// eine aufrufbare FUNKTION mit angehängter .track()-Methode, nicht ein
+	// reines Objekt (frontend.js prüft 'function' === typeof window.ttq,
+	// siehe dieselbe Falle im WooCommerce-Harness).
+	if ( ! domOverrides.noGtag ) {
+		win.gtag = function () {
+			win.gtagCalls.push( Array.prototype.slice.call( arguments ) );
+		};
+	}
+	if ( ! domOverrides.noTtq ) {
+		win.ttq = function () {};
+		win.ttq.track = function () {
+			win.ttqCalls.push( Array.prototype.slice.call( arguments ) );
+		};
+	}
+
+	// Consent-Bootstrap aus class-pms-frontend.php: window.pmsHasConsent
+	// existiert nur, wenn das Tracking beim Rendern noch blockiert war.
+	if ( undefined !== domOverrides.hasConsent ) {
+		win.pmsHasConsent = function () {
+			return domOverrides.hasConsent;
 		};
 	}
 
@@ -429,6 +455,107 @@ console.log( '\n=== 4. UTM-Form-Fill: Randfälle ===' );
 	);
 	check( 'name-Attribut hat Vorrang vor CSS-Klasse', 'per-name' === byName.value && '' === byClass.value );
 }
+
+/* ---------------------------------------------------------------------
+ * 5. v0.6.10: Multi-Platform-Formular-Leads + flexibler Consent-Modus
+ * ------------------------------------------------------------------- */
+
+console.log( '\n=== 5. Formular-Leads: Google Ads/TikTok zusätzlich zu Meta, Consent-Modus ===' );
+
+const LEAD_CFG = {
+	formTracking: true,
+	utmFormFill: false,
+	eventType: 'Lead',
+	urlFilter: [],
+	excludeSystem: true,
+	ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+	nonce: 'test-nonce',
+};
+
+function submitLead( r ) {
+	const handlers = r.document._listeners.submit || [];
+	handlers[ 0 ]( { target: createField( { tag: 'form' } ) } );
+}
+
+{
+	const r = run(
+		Object.assign( {}, LEAD_CFG, { tiktokEvent: 'SubmitForm', googleTagId: 'AW-123456789', googleLabel: 'FormLbl' } ),
+		{}
+	);
+	submitLead( r );
+
+	check( '5.1 Meta-Pixel feuert wie bisher', 1 === r.window.fbqCalls.length && 'Lead' === r.window.fbqCalls[ 0 ][ 1 ] );
+	check( '5.2 TikTok: ttq.track() feuert mit dem konfigurierten Event-Typ', 1 === r.window.ttqCalls.length && 'SubmitForm' === r.window.ttqCalls[ 0 ][ 0 ] );
+	check( '5.3 TikTok: dieselbe event_id wie im fbq()-Aufruf', r.window.ttqCalls[ 0 ][ 2 ].event_id === r.window.fbqCalls[ 0 ][ 3 ].eventID );
+	check( '5.4 Google Ads: gtag(event, conversion) mit send_to = TagID/Label', 1 === r.window.gtagCalls.length && 'conversion' === r.window.gtagCalls[ 0 ][ 1 ] && 'AW-123456789/FormLbl' === r.window.gtagCalls[ 0 ][ 2 ].send_to );
+}
+
+{
+	// Kein Conversion-Label konfiguriert -> kein Google-Aufruf (dieselbe Regel
+	// wie bei URL-Events und beim Purchase-Label).
+	const r = run(
+		Object.assign( {}, LEAD_CFG, { tiktokEvent: 'SubmitForm', googleTagId: 'AW-123456789', googleLabel: '' } ),
+		{}
+	);
+	submitLead( r );
+	check( '5.5 Ohne Conversion-Label: KEIN gtag()-Aufruf, TikTok/Meta unberührt', 0 === r.window.gtagCalls.length && 1 === r.window.ttqCalls.length && 1 === r.window.fbqCalls.length );
+}
+
+{
+	// Plattform in den Einstellungen nicht aktiv -> der Server liefert leere
+	// Werte (siehe PMS_Frontend::enqueue_frontend()), also darf nichts feuern,
+	// obwohl window.gtag/window.ttq durch ein fremdes Tool existieren könnten.
+	const r = run( Object.assign( {}, LEAD_CFG, { tiktokEvent: '', googleTagId: '', googleLabel: '' } ), {} );
+	submitLead( r );
+	check( '5.6 Leere Konfiguration: weder gtag() noch ttq.track(), obwohl beide SDKs existieren', 0 === r.window.gtagCalls.length && 0 === r.window.ttqCalls.length );
+	check( '5.7 Leere Konfiguration: Meta-Pixel feuert trotzdem', 1 === r.window.fbqCalls.length );
+}
+
+{
+	// SDKs fehlen (z. B. Plattform serverseitig deaktiviert) -> kein Crash.
+	const r = run(
+		Object.assign( {}, LEAD_CFG, { tiktokEvent: 'SubmitForm', googleTagId: 'AW-1', googleLabel: 'L' } ),
+		{ noGtag: true, noTtq: true }
+	);
+	submitLead( r );
+	check( '5.8 Fehlende gtag/ttq-SDKs: kein Crash, Meta-Pixel und AJAX laufen weiter', 1 === r.window.fbqCalls.length && 1 === r.window.fetchCalls.length );
+}
+
+{
+	// Consent-Modus 'strict' (Default) ohne Einwilligung: kompletter Abbruch.
+	const r = run(
+		Object.assign( {}, LEAD_CFG, { consentMode: 'strict', tiktokEvent: 'SubmitForm', googleTagId: 'AW-1', googleLabel: 'L' } ),
+		{ hasConsent: false }
+	);
+	submitLead( r );
+	check( '5.9 strict ohne Consent: kein Pixel UND kein AJAX-Request (unverändertes Verhalten)', 0 === r.window.fbqCalls.length && 0 === r.window.fetchCalls.length );
+}
+
+{
+	// Consent-Modus 'browser_only': Pixel bleiben aus, der CAPI-Request geht raus.
+	const r = run(
+		Object.assign( {}, LEAD_CFG, { consentMode: 'browser_only', tiktokEvent: 'SubmitForm', googleTagId: 'AW-1', googleLabel: 'L' } ),
+		{ hasConsent: false }
+	);
+	submitLead( r );
+	check( '5.10 browser_only ohne Consent: AJAX-/CAPI-Request geht raus', 1 === r.window.fetchCalls.length );
+	check( '5.11 browser_only ohne Consent: KEIN fbq/gtag/ttq-Aufruf', 0 === r.window.fbqCalls.length && 0 === r.window.gtagCalls.length && 0 === r.window.ttqCalls.length );
+
+	const params = new URLSearchParams( r.window.fetchCalls[ 0 ].body );
+	check( '5.12 browser_only ohne Consent: browser_fired=0 im AJAX-Body', '0' === params.get( 'browser_fired' ) );
+	check( '5.13 browser_only ohne Consent: Kontaktdaten/Event-Name werden trotzdem übertragen', 'Lead' === params.get( 'event_name' ) && '' !== ( params.get( 'event_id' ) || '' ) );
+}
+
+{
+	// browser_only MIT Consent verhält sich exakt wie strict mit Consent.
+	const r = run(
+		Object.assign( {}, LEAD_CFG, { consentMode: 'browser_only', tiktokEvent: 'SubmitForm', googleTagId: 'AW-1', googleLabel: 'L' } ),
+		{ hasConsent: true }
+	);
+	submitLead( r );
+	check( '5.14 browser_only MIT Consent: Pixel und AJAX laufen wie gewohnt', 1 === r.window.fbqCalls.length && 1 === r.window.ttqCalls.length && 1 === r.window.gtagCalls.length && 1 === r.window.fetchCalls.length );
+}
+
 
 console.log( '\n==============================' );
 console.log( 'Ergebnis: ' + pass + ' bestanden, ' + fail + ' fehlgeschlagen' );
