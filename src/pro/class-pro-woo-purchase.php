@@ -29,19 +29,23 @@
  *    ohne Browser-Komponente (Meta-CAPI + TikTok-Events-API) -- fängt
  *    Bestellungen ab, bei denen der Kunde nach der Zahlung nicht auf die
  *    Danke-Seite zurückkehrt (externe Payment-Gateways wie PayPal/Klarna,
- *    die teils direkt weiterleiten). Greift nur, wenn Weg 1 diese Bestellung
- *    noch nicht markiert hat.
+ *    die teils direkt weiterleiten). Greift nur, wenn der Server-Pfad für
+ *    diese Bestellung noch nicht gelaufen ist.
  *
- * Dedup-Flag: `_pms_purchase_tracked` als Order-Meta über die WC_Order-
+ * **Wichtig:** Weg 2 feuert bei vielen Gateways NICHT erst nach Weg 1,
+ * sondern schon davor -- siehe BROWSER_TRACKED_META_KEY unten. Deshalb
+ * bewachen seit v0.6.9 ZWEI unabhängige Order-Meta-Flags die beiden Pfade:
+ * `_pms_purchase_tracked` (Server) und `_pms_purchase_browser_tracked`
+ * (Browser). Beide laufen über die WC_Order-
  * eigene CRUD-API (get_meta()/update_meta_data()+save()), NICHT über
  * update_post_meta()/get_post_meta() -- Bestellungen liegen seit WooCommerce
  * High-Performance Order Storage (HPOS) nicht mehr zwingend als wp_posts-
  * Zeile vor, raw post-meta-Funktionen würden dort auf die falsche/eine gar
  * nicht existierende ID zugreifen. Dieselbe "native WC-CRUD statt Rohzugriff"
- * -Regel wie bei den Produktdaten in class-pro-woo-product-data.php. EIN
- * Flag für alle drei Plattformen zusammen (keine Pro-Plattform-Granularität)
- * -- dieselbe "eine Bestellung = ein Bearbeitungsversuch"-Vereinfachung wie
- * schon vor der Multi-Platform-Erweiterung.
+ * -Regel wie bei den Produktdaten in class-pro-woo-product-data.php. Je Flag
+ * gilt es für alle drei Plattformen gemeinsam (keine Pro-Plattform-
+ * Granularität) -- dieselbe "eine Bestellung = ein Bearbeitungsversuch"-
+ * Vereinfachung wie schon vor der Multi-Platform-Erweiterung.
  *
  * **Unverifiziert gegen echte Google-/TikTok-Testdaten:** Die genauen
  * Feld-/Hash-Anforderungen von Google Enhanced Conversions (welche
@@ -60,7 +64,41 @@ defined( 'ABSPATH' ) || exit;
 
 class PMS_Pro_Woo_Purchase {
 
+	/**
+	 * Dedup-Flag für den SERVER-Pfad (Meta CAPI + TikTok Events API).
+	 */
 	const TRACKED_META_KEY = '_pms_purchase_tracked';
+
+	/**
+	 * Dedup-Flag für den BROWSER-Pfad (fbq/gtag/ttq auf der Danke-Seite).
+	 *
+	 * Bewusst ein ZWEITES, unabhängiges Flag statt des gemeinsamen
+	 * TRACKED_META_KEY (Bugfix v0.6.9). Bis v0.6.8 bewachte ein einziges Flag
+	 * beide Pfade -- mit der Folge, dass der Browser-Pixel auf der Danke-Seite
+	 * bei den meisten Zahlungsarten NIE gerendert wurde:
+	 *
+	 * WooCommerce ruft bei sehr vielen Gateways schon WÄHREND des Checkouts
+	 * (WC_Checkout::process_checkout() -> WC_Payment_Gateway::process_payment())
+	 * payment_complete() bzw. update_status('processing') auf -- z. B. setzt
+	 * die Kernmethode "Nachnahme" die Bestellung dort direkt auf "processing".
+	 * Damit feuern woocommerce_payment_complete /
+	 * woocommerce_order_status_processing (unsere Fallback-Hooks) BEVOR der
+	 * Kunde auf /kasse/order-received/... weitergeleitet wird. Der Fallback
+	 * setzte das gemeinsame Flag, und der kurz darauf laufende
+	 * woocommerce_thankyou-Hook stieg wegen already_tracked() sofort wieder
+	 * aus -- kein fbq/gtag/ttq im Quelltext, obwohl der CAPI-Versand lief.
+	 * Genau das war neben dem Loader-Fehler (siehe plugins_loaded-Block in
+	 * pixel-made-simple-pro.php) die zweite Ursache des gemeldeten
+	 * "auf der Danke-Seite steht kein Tracking-Code"-Symptoms.
+	 *
+	 * Zwei getrennte Flags sind hier gefahrlos, weil beide Pfade dieselbe
+	 * deterministische event_id verwenden (siehe event_id()): Meta, TikTok und
+	 * GA4 deduplizieren Browser- und Server-Event ohnehin gegeneinander --
+	 * exakt der Zweck dieser ID. Was die Flags verhindern sollen, ist etwas
+	 * anderes: dass DERSELBE Pfad ein zweites Mal läuft (Reload der
+	 * Danke-Seite bzw. mehrere Fallback-Hooks für dieselbe Bestellung).
+	 */
+	const BROWSER_TRACKED_META_KEY = '_pms_purchase_browser_tracked';
 
 	public static function init() {
 		if ( ! class_exists( 'WooCommerce' ) ) {
@@ -70,9 +108,11 @@ class PMS_Pro_Woo_Purchase {
 		add_action( 'woocommerce_thankyou', array( __CLASS__, 'track_thankyou' ) );
 
 		// Alle drei Fallback-Hooks laufen auf denselben Handler -- die
-		// _pms_purchase_tracked-Prüfung darin macht sie gegenseitig (und
-		// gegen die Danke-Seite) idempotent, unabhängig davon, welcher
-		// zuerst feuert oder ob mehrere für dieselbe Bestellung feuern.
+		// _pms_purchase_tracked-Prüfung darin macht sie untereinander (und
+		// gegenüber dem Server-Teil der Danke-Seite) idempotent, unabhängig
+		// davon, welcher zuerst feuert oder ob mehrere für dieselbe
+		// Bestellung feuern. Den Browser-Teil der Danke-Seite blockieren sie
+		// bewusst NICHT (eigenes Flag, siehe BROWSER_TRACKED_META_KEY).
 		add_action( 'woocommerce_payment_complete', array( __CLASS__, 'maybe_track_fallback' ) );
 		add_action( 'woocommerce_order_status_completed', array( __CLASS__, 'maybe_track_fallback' ), 10, 2 );
 		add_action( 'woocommerce_order_status_processing', array( __CLASS__, 'maybe_track_fallback' ), 10, 2 );
@@ -133,7 +173,18 @@ class PMS_Pro_Woo_Purchase {
 		}
 
 		$order = wc_get_order( $order_id );
-		if ( ! $order instanceof WC_Order || self::already_tracked( $order ) ) {
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+
+		// Browser- und Server-Pfad werden GETRENNT bewertet (siehe
+		// BROWSER_TRACKED_META_KEY oben): hat ein Fallback-Hook während des
+		// Checkouts bereits die CAPI bedient, muss die Danke-Seite trotzdem
+		// noch ihren Browser-Pixel rendern -- und umgekehrt.
+		$browser_pending = ! self::already_browser_tracked( $order );
+		$server_pending  = ! self::already_tracked( $order );
+
+		if ( ! $browser_pending && ! $server_pending ) {
 			return;
 		}
 
@@ -142,10 +193,21 @@ class PMS_Pro_Woo_Purchase {
 			return;
 		}
 
-		self::print_pixel_scripts( $order, $custom_data );
-		self::dispatch_capi( $order, $custom_data );
-		self::dispatch_tiktok_capi( $order, $custom_data );
-		self::mark_tracked( $order );
+		$mark = array();
+
+		if ( $browser_pending ) {
+			self::print_pixel_scripts( $order, $custom_data );
+			$mark[] = self::BROWSER_TRACKED_META_KEY;
+		}
+
+		if ( $server_pending ) {
+			self::dispatch_capi( $order, $custom_data );
+			self::dispatch_tiktok_capi( $order, $custom_data );
+			$mark[] = self::TRACKED_META_KEY;
+		}
+
+		// Ein einziger save()-Aufruf für beide Flags.
+		self::mark_tracked( $order, $mark );
 	}
 
 	/**
@@ -193,6 +255,31 @@ class PMS_Pro_Woo_Purchase {
 	}
 
 	/**
+	 * transaction_id für Google Ads und GA4: die ROHE WooCommerce-Bestellnummer,
+	 * bewusst OHNE das "pms_order_"-Präfix der Event-ID (Änderung in v0.6.9).
+	 *
+	 * Warum hier ein anderer Wert als bei Meta/TikTok: event_id() bedient einen
+	 * rein plugin-internen Zweck -- Browser- und Server-Event derselben
+	 * Bestellung gegeneinander deduplizieren. Der Wert muss dafür nur auf
+	 * beiden Seiten identisch sein, seine Form ist egal. Googles
+	 * transaction_id erfüllt zwar dieselbe Dedup-Aufgabe, ist aber zusätzlich
+	 * das Feld, über das ein Shop-Betreiber GA4-Umsätze wieder seinen echten
+	 * Bestellungen zuordnet (GA4-Bestellberichte, Offline-Conversion-Import
+	 * bei Google Ads). Ein Präfix macht diesen Abgleich unnötig umständlich,
+	 * ohne irgendeinen Vorteil zu bringen -- die Bestellnummer ist innerhalb
+	 * eines Shops bereits eindeutig.
+	 *
+	 * Für Meta/TikTok bleibt event_id() unverändert: dort ist die ID nur ein
+	 * Dedup-Token und taucht in keinem Bericht auf.
+	 *
+	 * @param int $order_id Bestell-ID.
+	 * @return string
+	 */
+	private static function transaction_id( $order_id ) {
+		return (string) absint( $order_id );
+	}
+
+	/**
 	 * Bereits getrackt? Liest über die WC_Order-eigene Meta-API (HPOS-sicher,
 	 * siehe Klassen-Doku oben).
 	 *
@@ -204,13 +291,38 @@ class PMS_Pro_Woo_Purchase {
 	}
 
 	/**
-	 * Als getrackt markieren (siehe Klassen-Doku oben für die HPOS-Begründung).
+	 * Wurde der Browser-Pixel für diese Bestellung bereits ausgegeben?
+	 * Getrennt von already_tracked() -- siehe BROWSER_TRACKED_META_KEY oben.
 	 *
 	 * @param WC_Order $order Bestellung.
+	 * @return bool
+	 */
+	private static function already_browser_tracked( WC_Order $order ) {
+		return '1' === (string) $order->get_meta( self::BROWSER_TRACKED_META_KEY, true );
+	}
+
+	/**
+	 * Als getrackt markieren (siehe Klassen-Doku oben für die HPOS-Begründung).
+	 *
+	 * Nimmt seit v0.6.9 eine Liste von Meta-Keys entgegen, damit die
+	 * Danke-Seite Browser- und Server-Flag in EINEM save() setzen kann statt
+	 * die Bestellung zweimal zu schreiben. Der Default entspricht dem
+	 * bisherigen Verhalten (nur der Server-Pfad), weshalb der Fallback-Weg
+	 * unverändert aufrufen kann.
+	 *
+	 * @param WC_Order $order     Bestellung.
+	 * @param string[] $meta_keys Zu setzende Meta-Keys.
 	 * @return void
 	 */
-	private static function mark_tracked( WC_Order $order ) {
-		$order->update_meta_data( self::TRACKED_META_KEY, 1 );
+	private static function mark_tracked( WC_Order $order, array $meta_keys = array( self::TRACKED_META_KEY ) ) {
+		if ( empty( $meta_keys ) ) {
+			return;
+		}
+
+		foreach ( $meta_keys as $meta_key ) {
+			$order->update_meta_data( $meta_key, 1 );
+		}
+
 		$order->save();
 	}
 
@@ -412,7 +524,7 @@ class PMS_Pro_Woo_Purchase {
 		}
 
 		if ( ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) ) {
-			$fire .= self::google_conversion_js( $order, $custom_data, $event_id, $settings );
+			$fire .= self::google_conversion_js( $order, $custom_data, $settings );
 		}
 
 		// GA4 (seit v0.6.8): eigenständig von der Google-Ads-Conversion oben --
@@ -421,7 +533,7 @@ class PMS_Pro_Woo_Purchase {
 		// für dieselbe Unterscheidung bei den URL-Events). Ein Shop kann GA4
 		// ohne Google Ads betreiben, deshalb eigene, unabhängige Prüfung.
 		if ( '' !== trim( (string) ( $settings['ga4_measurement_id'] ?? '' ) ) ) {
-			$fire .= self::ga4_purchase_js( $custom_data, $event_id );
+			$fire .= self::ga4_purchase_js( $order, $custom_data );
 		}
 
 		if ( ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) ) {
@@ -471,13 +583,15 @@ class PMS_Pro_Woo_Purchase {
 	 * Google-Ads-URL-Events (PMS_Settings::sanitize_event(): "Google braucht
 	 * zwingend ein Conversion Label").
 	 *
+	 * transaction_id ist seit v0.6.9 die ROHE Bestellnummer, nicht mehr die
+	 * präfixierte Event-ID (siehe transaction_id() unten).
+	 *
 	 * @param WC_Order $order       Bestellung.
 	 * @param array    $custom_data Von build_order_custom_data().
-	 * @param string   $event_id    Deterministische Event-ID (als transaction_id).
 	 * @param array    $settings    Plugin-Einstellungen.
 	 * @return string JS-Fragment oder leerer String.
 	 */
-	private static function google_conversion_js( WC_Order $order, array $custom_data, $event_id, array $settings ) {
+	private static function google_conversion_js( WC_Order $order, array $custom_data, array $settings ) {
 		$label = trim( (string) ( $settings['wc_google_conversion_label'] ?? '' ) );
 		if ( '' === $label ) {
 			return '';
@@ -489,7 +603,7 @@ class PMS_Pro_Woo_Purchase {
 			'send_to'        => $tag_id . '/' . $label,
 			'value'          => $custom_data['value'],
 			'currency'       => $custom_data['currency'],
-			'transaction_id' => $event_id,
+			'transaction_id' => self::transaction_id( $order->get_id() ),
 		);
 
 		if ( ! empty( $settings['wc_purchase_advanced_matching'] ) ) {
@@ -514,9 +628,10 @@ class PMS_Pro_Woo_Purchase {
 	 * Das Event geht stattdessen an jedes per gtag('config', ...) registrierte
 	 * Ziel, das mit einem Standard-Event wie "purchase" etwas anfängt (also
 	 * GA4-Properties; ein Google-Ads-Tag ignoriert es einfach).
-	 * transaction_id = dieselbe deterministische Event-ID wie bei Meta/TikTok/
-	 * Google Ads -- GA4 dedupliziert purchase-Events serverseitig anhand
-	 * dieses Felds, exakt derselbe Zweck wie Metas eventID.
+	 * transaction_id = die rohe WooCommerce-Bestellnummer (seit v0.6.9, siehe
+	 * transaction_id() unten) -- GA4 dedupliziert purchase-Events serverseitig
+	 * anhand dieses Felds, im selben Sinne wie Metas eventID, erwartet dafür
+	 * laut Dokumentation aber ausdrücklich die Bestellnummer des Shops.
 	 *
 	 * items[] nutzt dasselbe {item_id,price,quantity}-Schema wie
 	 * contentsToGoogleItems() in pms-woocommerce.js (view_item/add_to_cart/
@@ -524,11 +639,11 @@ class PMS_Pro_Woo_Purchase {
 	 * als die drei Browser-Events) aus $custom_data['contents'] kommt, nicht
 	 * aus einem Client-Payload.
 	 *
-	 * @param array  $custom_data Von build_order_custom_data().
-	 * @param string $event_id    Deterministische Event-ID (als transaction_id).
+	 * @param WC_Order $order       Bestellung.
+	 * @param array    $custom_data Von build_order_custom_data().
 	 * @return string JS-Fragment oder leerer String.
 	 */
-	private static function ga4_purchase_js( array $custom_data, $event_id ) {
+	private static function ga4_purchase_js( WC_Order $order, array $custom_data ) {
 		$items = array_map(
 			static function ( $item ) {
 				return array(
@@ -541,7 +656,7 @@ class PMS_Pro_Woo_Purchase {
 		);
 
 		$params = array(
-			'transaction_id' => $event_id,
+			'transaction_id' => self::transaction_id( $order->get_id() ),
 			'value'          => $custom_data['value'],
 			'currency'       => $custom_data['currency'],
 			'items'          => $items,

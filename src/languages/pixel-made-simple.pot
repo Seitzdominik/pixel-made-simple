@@ -2,9 +2,9 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Pixel Made Simple 0.6.8\n"
+"Project-Id-Version: Pixel Made Simple 0.6.9\n"
 "Report-Msgid-Bugs-To: https://sdv.design\n"
-"POT-Creation-Date: 2026-08-20 15:01+0000\n"
+"POT-Creation-Date: 2026-08-22 06:34+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"

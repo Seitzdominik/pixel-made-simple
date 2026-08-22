@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple Pro
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Pro add-on for Pixel Made Simple: everything in the free version plus [Pro-only features go here].
- * Version:           0.6.8
+ * Version:           0.6.9
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -49,7 +49,7 @@ if ( defined( 'PMS_IS_PRO' ) && false === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', true );
-define( 'PMS_VERSION', '0.6.8' );
+define( 'PMS_VERSION', '0.6.9' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -151,10 +151,58 @@ PMS_Forms::init();
 PMS_Tools::init();
 PMS_Pro_Features::init();
 PMS_Pro_UTM::init();
-PMS_Pro_WooCommerce::init();
-PMS_Pro_Woo_Purchase::init();
-PMS_Pro_SureCart::init();
-PMS_Pro_SureCart_Purchase::init();
+
+/*
+ * E-Commerce-Integrationen bewusst ERST auf plugins_loaded initialisieren,
+ * NICHT direkt hier im Bootstrap.
+ *
+ * Grund (Bugfix v0.6.9): PMS_Pro_WooCommerce::init()/PMS_Pro_Woo_Purchase::init()
+ * (und die beiden SureCart-Pendants) brechen sofort per return ab, wenn die
+ * jeweilige Shop-Hauptklasse noch nicht existiert. WordPress lädt aktive
+ * Plugins aber in der ALPHABETISCH sortierten Reihenfolge der
+ * active_plugins-Option (activate_plugin() ruft sort() darauf auf) --
+ * "pixel-made-simple-pro" sortiert damit VOR "woocommerce" und ebenso vor
+ * "surecart". An dieser Stelle im Request ist deren Hauptdatei also noch gar
+ * nicht eingebunden, class_exists( 'WooCommerce' ) ist false, und sämtliche
+ * Hooks (woocommerce_thankyou, woocommerce_payment_complete,
+ * wp_enqueue_scripts, wp_ajax_pms_woo_track, der pms_capi_event_data-Filter
+ * ...) wurden nie registriert -- ohne jede Fehlermeldung, weil ein nicht
+ * registrierter Hook schlicht nie feuert.
+ *
+ * Symptom dieses Fehlers: Auf der WooCommerce-Danke-Seite
+ * (/kasse/order-received/<id>/) erscheint kein Purchase-Skript im Quelltext
+ * und im Tab "Event Log" taucht kein Purchase-Event auf -- betroffen waren
+ * aber ALLE Shop-Events (ViewContent/AddToCart/InitiateCheckout ebenso wie
+ * die komplette SureCart-Integration), nicht nur Purchase. In einer echten
+ * WordPress-Instanz reproduziert und nach diesem Fix verifiziert, siehe
+ * dev-tools/test-wp-environment.js (Szenario "E-Commerce-Hooks").
+ *
+ * plugins_loaded feuert erst, nachdem WordPress ALLE aktiven Plugin-
+ * Hauptdateien eingebunden hat -- der class_exists()-Guard in den init()-
+ * Methoden ist dort erstmals aussagekräftig. Priorität 20 statt der
+ * Standard-10, damit auch Shop-Plugins sicher erkannt werden, die ihre
+ * eigene Hauptklasse selbst erst auf plugins_loaded (Priorität 10)
+ * bereitstellen: Callbacks derselben Priorität laufen in
+ * Registrierungsreihenfolge, und diese Datei registriert wegen derselben
+ * alphabetischen Ladereihenfolge zwangsläufig zuerst. Sämtliche von diesen
+ * init()-Methoden registrierten Hooks feuern ohnehin erst deutlich später
+ * (Template-Rendering, wp_enqueue_scripts, admin-ajax), Priorität 20 ist
+ * also unkritisch früh genug.
+ *
+ * Für künftige Sessions: Jede weitere Integration, deren init() die Existenz
+ * eines FREMDEN Plugins prüft, gehört in genau diesen Block -- nicht in die
+ * direkten init()-Aufrufe darüber.
+ */
+add_action(
+	'plugins_loaded',
+	static function () {
+		PMS_Pro_WooCommerce::init();
+		PMS_Pro_Woo_Purchase::init();
+		PMS_Pro_SureCart::init();
+		PMS_Pro_SureCart_Purchase::init();
+	},
+	20
+);
 
 // Die Live-Debug-Leiste registriert sich erst, wenn ein Administrator im
 // Frontend unterwegs ist – reguläre Besucher erzeugen keinerlei Overhead.

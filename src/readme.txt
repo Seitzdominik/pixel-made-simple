@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, google analytics, tiktok pixel, c
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.8
+Stable tag: 0.6.9
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -90,6 +90,12 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.9 =
+* **Behoben (Pro): WooCommerce- und SureCart-Tracking wurden überhaupt nicht ausgeführt.** Die E-Commerce-Integrationen wurden beim Start des Plugins initialisiert – also zu einem Zeitpunkt, zu dem WordPress WooCommerce bzw. SureCart noch gar nicht geladen hatte, weil es Plugins in alphabetischer Reihenfolge lädt und „pixel-made-simple-pro" vor beiden liegt. Ihre Prüfung „Ist WooCommerce überhaupt aktiv?" fiel dadurch immer negativ aus, und es wurde kein einziger Hook registriert – ohne jede Fehlermeldung. Betroffen waren sämtliche Shop-Events beider Plattformen (ViewContent, AddToCart, InitiateCheckout und Purchase). Die Initialisierung erfolgt jetzt erst, nachdem WordPress alle Plugins geladen hat.
+* **Behoben (Pro): Auf der WooCommerce-Danke-Seite wurde kein Browser-Tracking-Code ausgegeben.** Browser- und Serverpfad des Purchase-Events teilten sich bisher eine gemeinsame Markierung an der Bestellung. Da WooCommerce bei vielen Zahlungsarten (z. B. Nachnahme) den Bestellstatus schon während des Bezahlvorgangs setzt, lief der serverseitige Versand regelmäßig vor dem Aufruf der Danke-Seite – und markierte die Bestellung als erledigt, bevor der Browser-Pixel überhaupt zum Zug kam. Beide Wege haben jetzt eine eigene Markierung: Der Browser-Pixel wird auf der Danke-Seite zuverlässig ausgegeben, ein erneuter Seitenaufruf (F5) löst weiterhin nichts doppelt aus, und die gemeinsame Event-ID sorgt dafür, dass Meta, TikTok und GA4 Browser- und Server-Event weiterhin als ein einziges Ereignis zählen.
+* Geändert (Pro): Die Transaktions-ID der WooCommerce-Purchase-Events für Google Ads und GA4 ist jetzt die reine Bestellnummer (vorher mit vorangestelltem „pms_order_"). Damit lassen sich GA4-Umsatzberichte direkt den Bestellungen im Shop zuordnen. Die interne Event-ID für die Meta-/TikTok-Deduplizierung bleibt davon unberührt.
+* `dev-tools/test-wp-environment.js` prüft jetzt zusätzlich in einer echten WordPress-Instanz, dass sämtliche WooCommerce- und SureCart-Hooks trotz der alphabetischen Ladereihenfolge registriert werden; `dev-tools/test-suite.php` deckt die getrennten Browser-/Server-Markierungen und beide ID-Formate ab (486 → 508 PHP-Tests).
 
 = 0.6.8 =
 * Neu (Pro): **Google Analytics 4 (GA4).** Neues Feld „GA4 Measurement ID" in der bestehenden Google-Ads-Box auf Tab „Allgemein" – eigenständig von Google Ads, funktioniert auch ohne konfigurierten Google-Ads-Tag. Teilt sich denselben gtag.js-Loader wie Google Ads: Sind auf einer Website sowohl Google Ads als auch GA4 konfiguriert, wird gtag.js nur einmal geladen, mit je einem eigenen `gtag('config', …)`-Aufruf pro Ziel. `view_item`/`add_to_cart`/`begin_checkout` aus dem bestehenden WooCommerce-/SureCart-Tracking erreichen GA4 automatisch, sobald die Measurement-ID gesetzt ist; `purchase` (WooCommerce-Danke-Seite inkl. Server-Side-Fallback sowie SureCart) sendet zusätzlich ein eigenes, von der Google-Ads-Conversion unabhängiges GA4-Standardevent mit Bestellwert, Währung und Positionen.

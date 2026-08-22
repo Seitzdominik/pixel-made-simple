@@ -2246,21 +2246,21 @@ $GLOBALS['stub']['options']['pms_settings'] = array_merge(
 $g_order    = make_test_order( array( 'id' => 2001 ) );
 $g_custom   = call_private( 'PMS_Pro_Woo_Purchase', 'build_order_custom_data', $g_order );
 $g_settings = $GLOBALS['stub']['options']['pms_settings'];
-$g_js       = call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, 'pms_order_2001', $g_settings );
+$g_js       = call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, $g_settings );
 
 check( 'google_conversion_js(): gtag-Conversion-Aufruf enthalten', false !== strpos( $g_js, "window.gtag('event','conversion'" ) );
 check( 'google_conversion_js(): send_to kombiniert Tag-ID und Label', false !== strpos( $g_js, '"send_to":"AW-123456789\/AbCdEfGh"' ) );
-check( 'google_conversion_js(): transaction_id ist die deterministische Event-ID', false !== strpos( $g_js, '"transaction_id":"pms_order_2001"' ) );
+check( 'google_conversion_js(): transaction_id ist die ROHE Bestellnummer (seit v0.6.9), nicht die praefixierte Event-ID', false !== strpos( $g_js, '"transaction_id":"2001"' ) );
 check( 'google_conversion_js(): value/currency aus custom_data', false !== strpos( $g_js, '"value":55' ) && false !== strpos( $g_js, '"currency":"EUR"' ) );
 check( 'google_conversion_js(): ohne aktivierte Advanced Matching kein user_data', false === strpos( $g_js, 'user_data' ) );
 
 $g_settings_no_label                               = $g_settings;
 $g_settings_no_label['wc_google_conversion_label']  = '';
-check( 'google_conversion_js(): leeres Label -> kein Aufruf (dieselbe Regel wie bei Google-URL-Events)', '' === call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, 'pms_order_2001', $g_settings_no_label ) );
+check( 'google_conversion_js(): leeres Label -> kein Aufruf (dieselbe Regel wie bei Google-URL-Events)', '' === call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, $g_settings_no_label ) );
 
 $g_settings_am                                   = $g_settings;
 $g_settings_am['wc_purchase_advanced_matching']  = 1;
-$g_js_am = call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, 'pms_order_2001', $g_settings_am );
+$g_js_am = call_private( 'PMS_Pro_Woo_Purchase', 'google_conversion_js', $g_order, $g_custom, $g_settings_am );
 check( 'google_conversion_js(): mit Advanced Matching ist user_data enthalten', false !== strpos( $g_js_am, 'user_data' ) );
 
 /* --- 22c. hash_google_phone(): E.164-Format, bewusst abweichend von Metas hash_phone() --- */
@@ -2887,7 +2887,7 @@ PMS_Pro_Woo_Purchase::track_thankyou( $ga4_order->get_id() );
 $ga4_purchase_output = ob_get_clean();
 
 check( '24e.1 GA4-Purchase: gtag(event, purchase) wird ausgegeben', false !== strpos( $ga4_purchase_output, "gtag('event','purchase'" ) );
-check( '24e.2 GA4-Purchase: transaction_id ist die deterministische Order-ID', false !== strpos( $ga4_purchase_output, '"transaction_id":"pms_order_2005"' ) );
+check( '24e.2 GA4-Purchase: transaction_id ist die ROHE Bestellnummer (seit v0.6.9) -- GA4-Berichte sollen sich den echten Bestellungen zuordnen lassen', false !== strpos( $ga4_purchase_output, '"transaction_id":"2005"' ) );
 check( '24e.3 GA4-Purchase: value/currency aus der Bestellung (55.00 EUR gross, Default wc_purchase_value_type)', false !== strpos( $ga4_purchase_output, '"value":55' ) && false !== strpos( $ga4_purchase_output, '"currency":"EUR"' ) );
 check( '24e.4 GA4-Purchase: items[] enthält beide Bestellpositionen mit item_id/price/quantity', false !== strpos( $ga4_purchase_output, '"item_id":"501","price":20,"quantity":2' ) && false !== strpos( $ga4_purchase_output, '"item_id":"777","price":9.99,"quantity":1' ) );
 check( '24e.5 GA4-Purchase: KEIN send_to (unabhängig von einer Google-Ads-Conversion, die hier nicht konfiguriert ist)', false === strpos( $ga4_purchase_output, 'send_to' ) );
@@ -2899,6 +2899,145 @@ unset( $_GET['tab'], $_GET['page'] );
 $GLOBALS['stub']['current_user_can']        = false;
 $GLOBALS['stub']['options']['pms_settings'] = array();
 $GLOBALS['stub']['options']['pms_events']   = array();
+
+echo "\n=== 25. Purchase-Dedup-Trennung Browser/Server (v0.6.9-Bugfix) ===\n";
+
+/*
+ * Bis v0.6.8 bewachte EIN gemeinsames Order-Meta-Flag (_pms_purchase_tracked)
+ * sowohl den Browser- als auch den Server-Pfad. Weil WooCommerce bei vielen
+ * Zahlungsarten schon WÄHREND des Checkouts payment_complete() bzw.
+ * update_status('processing') aufruft (z. B. Nachnahme), lief der
+ * Server-Side-Fallback dort regelmäßig VOR der Danke-Seite -- und der danach
+ * folgende woocommerce_thankyou-Hook stieg wegen already_tracked() sofort
+ * wieder aus. Ergebnis: kein einziger fbq/gtag/ttq-Aufruf im Quelltext der
+ * Danke-Seite, obwohl die CAPI korrekt bedient wurde.
+ *
+ * Dieser Abschnitt stellt genau diese Reihenfolge nach (Fallback zuerst,
+ * Danke-Seite danach) und prüft beide Richtungen der jetzt getrennten Flags.
+ */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled' => 1,
+		'pixel_enabled'       => 1,
+		'pixel_id'            => '1234567890',
+		'capi_enabled'        => 1,
+		'capi_token'          => 'test-token',
+		'consent_detection'   => 0,
+	)
+);
+reset_consent_cache();
+
+/* --- 25a. Der gemeldete Fall: Fallback feuert zuerst, Danke-Seite danach. --- */
+
+$split_order = make_test_order( array( 'id' => 3001 ) );
+$GLOBALS['stub']['captured_posts'] = array();
+
+// Schritt 1: woocommerce_order_status_processing o. Ä. während des Checkouts.
+PMS_Pro_Woo_Purchase::maybe_track_fallback( $split_order->get_id() );
+
+check( '25a.1 Fallback vor der Danke-Seite: löst den CAPI-Request aus', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( '25a.2 Fallback vor der Danke-Seite: setzt NUR das Server-Flag', true === call_private( 'PMS_Pro_Woo_Purchase', 'already_tracked', $split_order ) );
+check( '25a.3 Fallback vor der Danke-Seite: lässt das Browser-Flag unberührt', false === call_private( 'PMS_Pro_Woo_Purchase', 'already_browser_tracked', $split_order ) );
+
+// Schritt 2: der Kunde landet auf /kasse/order-received/... -- genau hier
+// erschien bis v0.6.8 nichts mehr im Quelltext.
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $split_order->get_id() );
+$split_output = ob_get_clean();
+
+check( '25a.4 Danke-Seite nach dem Fallback: Browser-Pixel wird TROTZDEM gerendert (der eigentliche Bugfix)', false !== strpos( $split_output, "fbq('track','Purchase'" ) );
+check( '25a.5 Danke-Seite nach dem Fallback: identische event_id wie der Server-Pfad -> Meta dedupliziert', false !== strpos( $split_output, "eventID:'pms_order_3001'" ) );
+check( '25a.6 Danke-Seite nach dem Fallback: KEIN zweiter CAPI-Request (Server-Flag greift weiterhin)', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( '25a.7 Danke-Seite nach dem Fallback: setzt jetzt auch das Browser-Flag', true === call_private( 'PMS_Pro_Woo_Purchase', 'already_browser_tracked', $split_order ) );
+
+// Schritt 3: F5 auf der Danke-Seite -> weder Browser- noch Server-Pfad erneut.
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $split_order->get_id() );
+$split_reload = ob_get_clean();
+
+check( '25a.8 Reload der Danke-Seite: kein zweiter Browser-Pixel', false === strpos( $split_reload, "fbq('track','Purchase'" ) );
+check( '25a.9 Reload der Danke-Seite: weiterhin nur ein CAPI-Request', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+
+/* --- 25b. Umgekehrte Reihenfolge (Danke-Seite zuerst): unverändertes
+ * Verhalten gegenüber v0.6.8 -- beide Flags werden dort gemeinsam gesetzt,
+ * ein späterer Fallback darf nichts mehr auslösen. --- */
+
+$split_order2 = make_test_order( array( 'id' => 3002 ) );
+$GLOBALS['stub']['captured_posts'] = array();
+
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $split_order2->get_id() );
+$split_output2 = ob_get_clean();
+
+check( '25b.1 Danke-Seite zuerst: Browser-Pixel wird gerendert', false !== strpos( $split_output2, "eventID:'pms_order_3002'" ) );
+check( '25b.2 Danke-Seite zuerst: CAPI-Request läuft im selben Aufruf', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+check( '25b.3 Danke-Seite zuerst: setzt BEIDE Flags in einem Durchgang', true === call_private( 'PMS_Pro_Woo_Purchase', 'already_tracked', $split_order2 ) && true === call_private( 'PMS_Pro_Woo_Purchase', 'already_browser_tracked', $split_order2 ) );
+
+PMS_Pro_Woo_Purchase::maybe_track_fallback( $split_order2->get_id() );
+check( '25b.4 Späterer Fallback: löst für dieselbe Bestellung KEINEN weiteren CAPI-Request aus', 1 === count( $GLOBALS['stub']['captured_posts'] ) );
+
+/* --- 25c. mark_tracked(): ein einziger save() für beide Flags, und der
+ * Default-Parameter hält das bisherige Fallback-Verhalten unverändert. --- */
+
+$mark_order = make_test_order( array( 'id' => 3003 ) );
+$mark_order->saved = false;
+call_private( 'PMS_Pro_Woo_Purchase', 'mark_tracked', $mark_order, array( PMS_Pro_Woo_Purchase::TRACKED_META_KEY, PMS_Pro_Woo_Purchase::BROWSER_TRACKED_META_KEY ) );
+check( '25c.1 mark_tracked(): setzt beide übergebenen Meta-Keys', 1 === $mark_order->get_meta( PMS_Pro_Woo_Purchase::TRACKED_META_KEY ) && 1 === $mark_order->get_meta( PMS_Pro_Woo_Purchase::BROWSER_TRACKED_META_KEY ) );
+check( '25c.2 mark_tracked(): speichert die Bestellung (ein save() für beide Flags)', true === $mark_order->saved );
+
+$mark_order2 = make_test_order( array( 'id' => 3004 ) );
+call_private( 'PMS_Pro_Woo_Purchase', 'mark_tracked', $mark_order2 );
+check( '25c.3 mark_tracked(): Default-Aufruf setzt weiterhin NUR das Server-Flag (Fallback-Pfad unverändert)', 1 === $mark_order2->get_meta( PMS_Pro_Woo_Purchase::TRACKED_META_KEY ) && '' === (string) $mark_order2->get_meta( PMS_Pro_Woo_Purchase::BROWSER_TRACKED_META_KEY ) );
+
+$mark_order3 = make_test_order( array( 'id' => 3005 ) );
+$mark_order3->saved = false;
+call_private( 'PMS_Pro_Woo_Purchase', 'mark_tracked', $mark_order3, array() );
+check( '25c.4 mark_tracked(): leere Key-Liste schreibt die Bestellung gar nicht erst', false === $mark_order3->saved );
+
+/* --- 25d. Die zwei ID-Formate nebeneinander in EINEM Danke-Seiten-Aufruf:
+ * Meta/TikTok bekommen die präfixierte Dedup-Event-ID, Google Ads/GA4 die
+ * rohe Bestellnummer (siehe transaction_id() in class-pro-woo-purchase.php).
+ * Beide Werte im selben Output zu prüfen ist die eigentliche Absicherung --
+ * eine spätere Vereinheitlichung "aus Konsistenzgründen" würde hier sofort
+ * auffallen. --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled'        => 1,
+		'pixel_enabled'              => 1,
+		'pixel_id'                   => '1234567890',
+		'capi_enabled'               => 0,
+		'capi_token'                 => '',
+		'consent_detection'          => 0,
+		'google_enabled'             => 1,
+		'google_tag_id'              => 'AW-123456789',
+		'wc_google_conversion_label' => 'AbCdEfGh',
+		'ga4_measurement_id'         => 'G-ABC123',
+		'tiktok_enabled'             => 1,
+		'tiktok_pixel_id'            => 'TT123',
+	)
+);
+reset_consent_cache();
+
+$id_order = make_test_order( array( 'id' => 3010 ) );
+
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $id_order->get_id() );
+$id_output = ob_get_clean();
+
+check( '25d.1 Meta: eventID bleibt die präfixierte Dedup-ID', false !== strpos( $id_output, "eventID:'pms_order_3010'" ) );
+check( '25d.2 TikTok: event_id bleibt dieselbe präfixierte Dedup-ID wie bei Meta', false !== strpos( $id_output, "event_id:'pms_order_3010'" ) );
+check( '25d.3 Google Ads: transaction_id ist die rohe Bestellnummer', false !== strpos( $id_output, '"send_to":"AW-123456789\/AbCdEfGh"' ) && false !== strpos( $id_output, '"transaction_id":"3010"' ) );
+check( '25d.4 GA4: transaction_id ist ebenfalls die rohe Bestellnummer', false !== strpos( $id_output, "gtag('event','purchase'" ) && 2 === substr_count( $id_output, '"transaction_id":"3010"' ) );
+check( '25d.5 Keine präfixierte ID in einem transaction_id-Feld (Google/GA4 dürfen sie nicht übernehmen)', false === strpos( $id_output, '"transaction_id":"pms_order_' ) );
+
+$GLOBALS['stub']['captured_posts'] = array();
+$GLOBALS['stub']['wc_orders']      = array();
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array();
 
 echo "\n==============================\n";
 echo 'Ergebnis: ' . $GLOBALS['t_pass'] . ' bestanden, ' . $GLOBALS['t_fail'] . " fehlgeschlagen\n";
