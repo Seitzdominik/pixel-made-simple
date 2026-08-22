@@ -119,6 +119,12 @@ class PMS_Forms {
 		// Meta-Plattform selbst deaktiviert ist.
 		$browser_fired = ! empty( $_POST['browser_fired'] );
 
+		// Seit v0.6.11: Hat der Browser zusätzlich die Google-Ads-Conversion
+		// gefeuert? Google hat für Formular-Leads keinen Server-Pfad, dessen
+		// Ergebnis man protokollieren könnte -- ohne diese Meldung des Clients
+		// bliebe der Dispatch im Event Log komplett unsichtbar.
+		$google_fired = ! empty( $_POST['google_fired'] );
+
 		if ( ! empty( $settings['exclude_admins'] ) && current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'reason' => 'admin_excluded' ), 200 );
 		}
@@ -134,6 +140,16 @@ class PMS_Forms {
 		// um den CAPI-Request.
 		if ( ! PMS_Consent::has_server_consent() ) {
 			wp_send_json_error( array( 'reason' => 'no_consent' ), 200 );
+		}
+
+		// Google-Ads-Zeile unabhängig vom Meta-/CAPI-Pfad protokollieren: sie
+		// beschreibt einen rein browserseitigen Dispatch (http_status 0), der
+		// auch dann stattgefunden hat, wenn die Meta-CAPI gleich darunter
+		// aussteigt. Match Keys bleiben leer -- die Formular-Conversion für
+		// Google Ads überträgt keine Nutzerdaten (Enhanced Conversions gibt es
+		// in diesem Plugin nur beim Purchase-Tracking).
+		if ( $google_fired && class_exists( 'PMS_Logger' ) ) {
+			PMS_Logger::record( $event_name, $event_id, 'browser', 0, array(), '', PMS_Logger::PLATFORM_GOOGLE );
 		}
 
 		if ( empty( $settings['capi_enabled'] ) || empty( $settings['pixel_id'] ) || empty( $settings['capi_token'] ) ) {

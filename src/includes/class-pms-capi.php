@@ -217,7 +217,12 @@ class PMS_CAPI {
 					$source,
 					$code,
 					$match_keys,
-					$message
+					$message,
+					// Seit v0.6.11 explizit, obwohl es dem Default entspricht:
+					// die Tabelle trägt jetzt mehrere Plattformen (siehe
+					// PMS_Logger::PLATFORM_*), da soll an der Schreibstelle
+					// ohne Nachschlagen erkennbar sein, welche gemeint ist.
+					PMS_Logger::PLATFORM_META
 				);
 			}
 		}

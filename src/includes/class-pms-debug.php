@@ -18,9 +18,13 @@ class PMS_Debug {
 			return;
 		}
 
-		// Für aussagekräftige Statuscodes wird der CAPI-Request in diesem
-		// Request blockierend gesendet (nur für eingeloggte Administratoren).
+		// Für aussagekräftige Statuscodes werden die serverseitigen Requests in
+		// diesem Request blockierend gesendet (nur für eingeloggte
+		// Administratoren). Seit v0.6.11 gilt das auch für die TikTok Events
+		// API -- ohne diesen zweiten Filter stünde dort dauerhaft "gesendet"
+		// statt eines echten 200, während Meta daneben den echten Code zeigt.
 		add_filter( 'pms_capi_blocking', '__return_true' );
+		add_filter( 'pms_tiktok_capi_blocking', '__return_true' );
 		add_action( 'wp_footer', array( __CLASS__, 'render' ), 99 );
 	}
 
@@ -115,6 +119,11 @@ class PMS_Debug {
 			'reason'      => self::reason_label( PMS_Frontend::get_skip_reason() ),
 			'events'      => $events,
 			'capi'        => PMS_CAPI::get_log(),
+			// TikTok Events API (Pro, seit v0.6.11): eigenes request-lokales
+			// Log neben Metas, damit beide serverseitigen Ziele nebeneinander
+			// sichtbar sind statt nur Meta. Leer, wenn die Klasse gar nicht
+			// geladen ist (Free) oder in diesem Request nichts gesendet wurde.
+			'tiktokCapi'  => class_exists( 'PMS_Pro_TikTok_CAPI' ) ? PMS_Pro_TikTok_CAPI::get_log() : array(),
 			'attribution' => $attribution,
 			'i18n'        => array(
 				'title'       => __( 'Pixel Made Simple – Live Debug', 'pixel-made-simple' ),
@@ -231,9 +240,23 @@ class PMS_Debug {
 			. 'if(ev.capi==="pending"&&c){ev.capi=c.status;ev.code=c.code;ev.message=c.message;}'
 			. 'ev.matchKeys=("browser_only"===ev.capi||"off"===ev.capi)?[]:keys;addRow(ev);});'
 			. 'if(!d.events.length){var e=document.createElement("div");e.className="pms-row pms-muted";e.textContent=d.i18n.noEvents;body.appendChild(e);}'
+			// Serverseitige Dispatches, die kein konfiguriertes URL-Event sind
+			// (aktuell: TikTok Events API) -- bekommen eine eigene Zeile mit
+			// Plattform-Kennzeichnung, statt in Metas CAPI-Pille unterzugehen.
+			. 'd.tiktokCapi.forEach(function(c){var row=document.createElement("div");row.className="pms-row";'
+			. 'var h=\'<span class="pms-name">\'+esc((c.events||[]).join(", ")||"-")+"</span>";'
+			. 'h+=pill("pms-neutral","TikTok");'
+			. 'h+=("ok"===c.status?pill("pms-ok","Events API: "+(c.code||200)+" OK"):("sent"===c.status?pill("pms-ok","Events API: gesendet"):pill("pms-err","Events API: "+(c.code?c.code+" ":"")+(c.message||c.status))));'
+			. 'if(c.match_keys&&c.match_keys.length){h+=\' <span class="pms-muted">\'+esc(d.i18n.matchKeys+": "+c.match_keys.join(", "))+"</span>";}'
+			. 'row.innerHTML=h;body.appendChild(row);});'
 			. 'if(d.attribution&&Object.keys(d.attribution).length){var a=document.createElement("div");a.className="pms-row";'
 			. 'a.innerHTML=\'<span class="pms-name">\'+esc(d.i18n.attribution)+"</span><code>"+esc(JSON.stringify(d.attribution))+"</code>";body.appendChild(a);}'
-			. 'document.addEventListener("pms:event",function(e){var det=e.detail||{};addRow({name:det.event,eventId:det.eventId,browser:det.browser,capi:det.capi,matchKeys:[]});'
+			// pms:event trägt seit v0.6.11 zusätzlich det.platforms -- die Liste
+			// der Ziele, die im Browser TATSÄCHLICH gefeuert haben (Meta,
+			// Google Ads, GA4, TikTok). Damit sind Google-/GA4-Dispatches im
+			// Debugger nachvollziehbar, obwohl sie serverseitig keinen
+			// Request und damit keine Event-Log-Zeile erzeugen.
+			. 'document.addEventListener("pms:event",function(e){var det=e.detail||{};addRow({name:det.event,eventId:det.eventId,browser:det.browser,capi:det.capi,platforms:det.platforms||[],matchKeys:[]});'
 			. 'if(root.classList.contains("pms-min")){toggle();}});'
 			. 'document.addEventListener("pms:capi",function(e){var det=e.detail||{};'
 			. 'var rows=body.querySelectorAll(\'.pms-row[data-event-id="\'+(det.eventId||"")+\'"]\');'

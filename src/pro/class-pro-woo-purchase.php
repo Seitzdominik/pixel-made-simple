@@ -524,7 +524,20 @@ class PMS_Pro_Woo_Purchase {
 		}
 
 		if ( ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) ) {
-			$fire .= self::google_conversion_js( $order, $custom_data, $settings );
+			$google_js = self::google_conversion_js( $order, $custom_data, $settings );
+			$fire     .= $google_js;
+
+			// Seit v0.6.11 im Event Log nachvollziehbar. Anders als Meta/TikTok
+			// gibt es für Google Ads keinen Server-Request, dessen Ergebnis man
+			// protokollieren könnte -- die Conversion wird hier serverseitig in
+			// die Danke-Seite gerendert und im Browser ausgeführt. Genau das
+			// hält die Zeile fest: source 'browser', http_status 0. Der leere
+			// Rückgabewert von google_conversion_js() (kein Conversion-Label
+			// konfiguriert) darf dabei KEINE Zeile erzeugen -- sonst stünde im
+			// Log eine Conversion, die nie gefeuert hat.
+			if ( '' !== $google_js ) {
+				self::log_browser_dispatch( 'Purchase', $event_id, PMS_Logger::PLATFORM_GOOGLE, $order, $settings );
+			}
 		}
 
 		// GA4 (seit v0.6.8): eigenständig von der Google-Ads-Conversion oben --
@@ -533,7 +546,12 @@ class PMS_Pro_Woo_Purchase {
 		// für dieselbe Unterscheidung bei den URL-Events). Ein Shop kann GA4
 		// ohne Google Ads betreiben, deshalb eigene, unabhängige Prüfung.
 		if ( '' !== trim( (string) ( $settings['ga4_measurement_id'] ?? '' ) ) ) {
-			$fire .= self::ga4_purchase_js( $order, $custom_data );
+			$ga4_js = self::ga4_purchase_js( $order, $custom_data );
+			$fire  .= $ga4_js;
+
+			if ( '' !== $ga4_js ) {
+				self::log_browser_dispatch( 'Purchase', $event_id, PMS_Logger::PLATFORM_GA4, $order, $settings );
+			}
 		}
 
 		if ( ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ) ) {
@@ -569,6 +587,47 @@ class PMS_Pro_Woo_Purchase {
 			// verweigerter Consent), statt endlos zu pollen.
 			. 'setTimeout(function(){clearInterval(iv);},30000);}})();'
 		);
+	}
+
+	/**
+	 * Eine rein browserseitig ausgeführte Conversion im Event Log festhalten
+	 * (seit v0.6.11).
+	 *
+	 * Google Ads und GA4 haben -- anders als Meta CAPI und die TikTok Events
+	 * API -- keinen Server-zu-Server-Pfad; ihre Aufrufe rendert diese Klasse
+	 * in die Danke-Seite und der Browser führt sie aus. Es gibt deshalb weder
+	 * einen HTTP-Status noch eine Antwort zum Protokollieren: Die Zeile hält
+	 * fest, DASS der Aufruf ausgeliefert wurde (source 'browser',
+	 * http_status 0 -- dieselbe Semantik wie bei einem Formular-Lead ohne
+	 * aktive CAPI, siehe PMS_Forms::handle_lead()).
+	 *
+	 * Match Keys: Google Enhanced Conversions hängen am selben Opt-in wie
+	 * Metas Advanced Matching (wc_purchase_advanced_matching). Ist es aus,
+	 * geht die Conversion ohne Nutzerdaten raus -- die Spalte bleibt dann
+	 * korrekt leer.
+	 *
+	 * @param string   $event_name Event-Name fürs Log.
+	 * @param string   $event_id   Event-ID.
+	 * @param string   $platform   PMS_Logger::PLATFORM_GOOGLE|PLATFORM_GA4.
+	 * @param WC_Order $order      Bestellung (für die Enhanced-Conversions-Felder).
+	 * @param array    $settings   Plugin-Einstellungen.
+	 * @return void
+	 */
+	private static function log_browser_dispatch( $event_name, $event_id, $platform, WC_Order $order, array $settings ) {
+		if ( ! class_exists( 'PMS_Logger' ) ) {
+			return;
+		}
+
+		$match_keys = array();
+
+		// GA4-Purchase-Events tragen grundsätzlich keine Nutzerdaten (reines
+		// Standard-E-Commerce-Event) -- Enhanced Conversions gibt es nur für
+		// die Google-Ads-Conversion.
+		if ( PMS_Logger::PLATFORM_GOOGLE === $platform && ! empty( $settings['wc_purchase_advanced_matching'] ) ) {
+			$match_keys = array_keys( self::build_google_user_data( $order ) );
+		}
+
+		PMS_Logger::record( $event_name, $event_id, 'browser', 0, $match_keys, '', $platform );
 	}
 
 	/**
@@ -883,25 +942,19 @@ class PMS_Pro_Woo_Purchase {
 			$body['test_event_code'] = $tiktok_test_code;
 		}
 
-		/**
-		 * Für Debugging auf blockierend schalten, analog zu
-		 * pms_capi_blocking für Meta (class-pms-capi.php).
-		 *
-		 * @param bool $blocking Standard: false (fire-and-forget).
-		 */
-		$blocking = (bool) apply_filters( 'pms_tiktok_capi_blocking', false );
-
-		wp_remote_post(
-			'https://business-api.tiktok.com/open_api/v1.3/event/track/',
+		// Versand + Protokollierung seit v0.6.11 zentral in
+		// PMS_Pro_TikTok_CAPI (siehe dortige Klassen-Doku): dadurch landet
+		// jeder Events-API-Request mit HTTP-Status und Match Keys im Event
+		// Log, analog zu Meta. array_keys($user) liefert genau die Feldnamen,
+		// nie die Werte.
+		PMS_Pro_TikTok_CAPI::send(
+			$body,
+			(string) $settings['tiktok_access_token'],
 			array(
-				'timeout'   => $blocking ? 5 : 2,
-				'blocking'  => $blocking,
-				'headers'   => array(
-					'Content-Type' => 'application/json',
-					'Access-Token' => (string) $settings['tiktok_access_token'],
-				),
-				'body'      => wp_json_encode( $body ),
-				'sslverify' => true,
+				'event_name' => 'CompletePayment',
+				'event_id'   => self::event_id( $order->get_id() ),
+				'match_keys' => array_keys( $user ),
+				'source'     => 'capi',
 			)
 		);
 	}

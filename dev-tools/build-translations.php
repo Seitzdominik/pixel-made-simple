@@ -365,6 +365,13 @@ $de = array(
 	'Automatically tracks ViewContent, AddToCart, InitiateCheckout and Purchase for SureCart, deduplicated via the same event ID as in the browser. Purchase additionally uses a server-side fallback for orders that reach a paid status outside the regular checkout confirmation (e.g. asynchronous payment methods).' => 'Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für SureCart, dedupliziert über dieselbe Event-ID wie im Browser. Purchase nutzt zusätzlich einen serverseitigen Fallback für Bestellungen, die außerhalb der regulären Checkout-Bestätigung einen bezahlten Status erreichen (z. B. asynchrone Zahlungsmethoden).',
 	'Sends hashed billing details from the checkout (email, phone, name, address) to the Conversions API for better match quality. Mind data privacy.' => 'Sendet gehashte Rechnungsdaten des Checkouts (E-Mail, Telefon, Name, Adresse) für eine bessere Zuordnungsqualität an die Conversions API. Beachte den Datenschutz.',
 	'Automatically track ViewContent, AddToCart, InitiateCheckout and Purchase for SureCart — deduplicated via the same event ID as in the browser, with a server-side fallback for orders that reach a paid status outside the regular checkout confirmation. Available in Pixel Made Simple Pro.' => 'Trackt automatisch ViewContent, AddToCart, InitiateCheckout und Purchase für SureCart – dedupliziert über dieselbe Event-ID wie im Browser, mit serverseitigem Fallback für Bestellungen, die außerhalb der regulären Checkout-Bestätigung einen bezahlten Status erreichen. Verfügbar in Pixel Made Simple Pro.',
+	// v0.6.11: Plattform-Achse im Event Log
+	'Filter by platform' => 'Nach Plattform filtern',
+	'All platforms' => 'Alle Plattformen',
+	// Markennamen -- bleiben unübersetzt, brauchen aber einen Eintrag,
+	// damit der Validator sie nicht als fehlend meldet.
+	'Meta' => 'Meta',
+	'GA4' => 'GA4',
 	// v0.6.10: Consent-Modus, TikTok-Test-Code, Multi-Platform-Formular-Leads, UI-Politur
 	'About GDPR blocking:' => 'Hinweis zur DSGVO-Blockade:',
 	'When this mode is active, both client-side pixels and server-side CAPI calls are blocked until the visitor consents in the cookie banner. Without consent no data is transmitted to Meta, Google or TikTok. This can visibly reduce the conversion numbers reported in your ad account.' => 'Ist dieser Modus aktiv, werden sowohl clientseitige Pixel als auch serverseitige CAPI-Calls blockiert, bis der Besucher im Consent-Banner zustimmt. Ohne Einwilligung werden keine Daten an Meta, Google oder TikTok übermittelt. Dies kann die gemeldeten Conversion-Zahlen im Werbekonto sichtbar reduzieren.',

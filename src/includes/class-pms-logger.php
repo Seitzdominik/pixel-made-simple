@@ -19,10 +19,38 @@ class PMS_Logger {
 	 * Update ohne erneute Aktivierung eingespielt wird, register_activation_hook
 	 * also gar nicht feuert).
 	 */
-	const DB_VERSION        = '1.0.0';
+	const DB_VERSION        = '1.1.0';
 	const DB_VERSION_OPTION = 'pms_log_db_version';
 
 	const CRON_HOOK = 'pms_cleanup_event_log_cron';
+
+	/**
+	 * Ziel-Plattform einer Log-Zeile (Spalte "platform", seit v0.6.11).
+	 *
+	 * Zweite, von "source" UNABHÄNGIGE Achse: "platform" beantwortet WOHIN das
+	 * Event ging (Meta/Google Ads/TikTok/GA4), "source" WIE es dorthin kam
+	 * (browser/capi/both). Bis v0.6.10 gab es nur die zweite Achse, weil
+	 * ausschließlich Meta protokolliert wurde -- Zeilen aus dieser Zeit
+	 * bekommen über den Spalten-Default korrekt 'meta'.
+	 */
+	const PLATFORM_META   = 'meta';
+	const PLATFORM_GOOGLE = 'google';
+	const PLATFORM_TIKTOK = 'tiktok';
+	const PLATFORM_GA4    = 'ga4';
+
+	/**
+	 * Anzeigenamen der Plattformen (Event-Log-Tabelle + Filter).
+	 *
+	 * @return array<string,string>
+	 */
+	public static function platform_labels() {
+		return array(
+			self::PLATFORM_META   => __( 'Meta', 'pixel-made-simple' ),
+			self::PLATFORM_GOOGLE => __( 'Google Ads', 'pixel-made-simple' ),
+			self::PLATFORM_TIKTOK => __( 'TikTok', 'pixel-made-simple' ),
+			self::PLATFORM_GA4    => __( 'GA4', 'pixel-made-simple' ),
+		);
+	}
 
 	/**
 	 * Obergrenzen für die Admin-Tabelle: MAX_FETCH wird unblockiert per SQL
@@ -106,6 +134,7 @@ class PMS_Logger {
 			event_name VARCHAR(64) NOT NULL DEFAULT '',
 			event_id VARCHAR(128) NOT NULL DEFAULT '',
 			source VARCHAR(20) NOT NULL DEFAULT '',
+			platform VARCHAR(20) NOT NULL DEFAULT 'meta',
 			http_status SMALLINT NOT NULL DEFAULT 0,
 			user_data_keys VARCHAR(255) NOT NULL DEFAULT '',
 			error_message TEXT NULL,
@@ -172,13 +201,22 @@ class PMS_Logger {
 	 *                                siehe class-pms-capi.php für die genaue
 	 *                                Unterscheidung anhand von error_message).
 	 * @param string[] $user_data_keys Namen der übergebenen user_data-Felder.
-	 * @param string   $error_message  Fehlertext der Meta-API, falls vorhanden.
+	 * @param string   $error_message  Fehlertext der Plattform-API, falls vorhanden.
+	 * @param string   $platform       Ziel-Plattform (PLATFORM_*), Default 'meta'
+	 *                                 -- siehe Konstanten oben. Der Default hält
+	 *                                 alle Aufrufer aus der Zeit vor v0.6.11
+	 *                                 unverändert gültig.
 	 * @return void
 	 */
-	public static function record( $event_name, $event_id, $source, $http_status, array $user_data_keys = array(), $error_message = '' ) {
+	public static function record( $event_name, $event_id, $source, $http_status, array $user_data_keys = array(), $error_message = '', $platform = self::PLATFORM_META ) {
 		global $wpdb;
 
 		$error_message = wp_strip_all_tags( (string) $error_message );
+
+		$platform = (string) $platform;
+		if ( ! isset( self::platform_labels()[ $platform ] ) ) {
+			$platform = self::PLATFORM_META;
+		}
 
 		$wpdb->insert(
 			self::table_name(),
@@ -187,11 +225,12 @@ class PMS_Logger {
 				'event_name'     => substr( (string) $event_name, 0, 64 ),
 				'event_id'       => substr( (string) $event_id, 0, 128 ),
 				'source'         => substr( (string) $source, 0, 20 ),
+				'platform'       => $platform,
 				'http_status'    => (int) $http_status,
 				'user_data_keys' => substr( implode( ', ', array_map( 'sanitize_key', $user_data_keys ) ), 0, 255 ),
 				'error_message'  => '' !== $error_message ? substr( $error_message, 0, 1000 ) : null,
 			),
-			array( '%s', '%s', '%s', '%s', '%d', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s' )
 		);
 	}
 
@@ -232,6 +271,7 @@ class PMS_Logger {
 	 * @param array $args {
 	 *     @type string $status     '' (alle) oder 'error' (nur Fehlerzeilen, siehe is_error_row()).
 	 *     @type string $event_name '' (alle) oder exakter Event-Name.
+	 *     @type string $platform   '' (alle) oder eine PLATFORM_*-Konstante.
 	 *     @type int    $limit      Max. Anzahl Ergebnisse (Default DISPLAY_LIMIT).
 	 * }
 	 * @return array[] Assoziative Zeilen-Arrays.
@@ -246,15 +286,21 @@ class PMS_Logger {
 			return array();
 		}
 
-		$status_filter = isset( $args['status'] ) ? (string) $args['status'] : '';
-		$event_filter  = isset( $args['event_name'] ) ? (string) $args['event_name'] : '';
+		$status_filter   = isset( $args['status'] ) ? (string) $args['status'] : '';
+		$event_filter    = isset( $args['event_name'] ) ? (string) $args['event_name'] : '';
+		$platform_filter = isset( $args['platform'] ) ? (string) $args['platform'] : '';
 
-		if ( '' !== $status_filter || '' !== $event_filter ) {
+		if ( '' !== $status_filter || '' !== $event_filter || '' !== $platform_filter ) {
 			$rows = array_values(
 				array_filter(
 					$rows,
-					static function ( $row ) use ( $status_filter, $event_filter ) {
+					static function ( $row ) use ( $status_filter, $event_filter, $platform_filter ) {
 						if ( '' !== $event_filter && $row['event_name'] !== $event_filter ) {
+							return false;
+						}
+						// Zeilen aus der Zeit vor der platform-Spalte zählen als
+						// Meta (damals wurde nur Meta protokolliert).
+						if ( '' !== $platform_filter && ( $row['platform'] ?? self::PLATFORM_META ) !== $platform_filter ) {
 							return false;
 						}
 						if ( 'error' === $status_filter && ! self::is_error_row( $row ) ) {

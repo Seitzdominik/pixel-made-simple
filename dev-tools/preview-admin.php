@@ -138,7 +138,7 @@ function plugin_basename( $f ) { return basename( $f ); }
 
 /**
  * Minimaler $wpdb-Ersatz nur für PMS_Logger::get_entries() (Event-Log-Tab-
- * Vorschau) -- liefert drei feste Beispielzeilen, die die Status-Badge-
+ * Vorschau) -- liefert feste Beispielzeilen, die die Status-Badge-
  * Varianten und source-Varianten abdecken: Fire-and-Forget (http_status 0
  * ohne Fehlertext -> grün "Gesendet"), bestätigtes 2xx (-> grün "200 OK")
  * und ein 4xx mit Fehlertext (-> rot). Seit v0.6.10 gibt es für die ersten
@@ -155,19 +155,31 @@ class PMS_Preview_Wpdb {
 			array(
 				'id' => 3, 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 120 ),
 				'event_name' => 'Lead', 'event_id' => 'abcd1234-ef56-7890-abcd-1234567890ab',
-				'source' => 'both', 'http_status' => 0,
+				'source' => 'both', 'http_status' => 0, 'platform' => 'meta',
 				'user_data_keys' => 'em, fbc, client_ip_address', 'error_message' => null,
 			),
 			array(
 				'id' => 2, 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 3600 ),
 				'event_name' => 'Purchase', 'event_id' => 'efgh5678-ab12-3456-efgh-567890abcdef',
-				'source' => 'capi', 'http_status' => 200,
-				'user_data_keys' => 'client_ip_address, client_user_agent', 'error_message' => null,
+				'source' => 'capi', 'http_status' => 200, 'platform' => 'tiktok',
+				'user_data_keys' => 'ip, user_agent, email', 'error_message' => null,
+			),
+			array(
+				'id' => 4, 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 300 ),
+				'event_name' => 'Purchase', 'event_id' => 'pms_order_4711',
+				'source' => 'browser', 'http_status' => 0, 'platform' => 'google',
+				'user_data_keys' => 'email, phone_number', 'error_message' => null,
+			),
+			array(
+				'id' => 5, 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 300 ),
+				'event_name' => 'Purchase', 'event_id' => 'pms_order_4711',
+				'source' => 'browser', 'http_status' => 0, 'platform' => 'ga4',
+				'user_data_keys' => '', 'error_message' => null,
 			),
 			array(
 				'id' => 1, 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 7200 ),
 				'event_name' => 'Lead', 'event_id' => 'ijkl9012-cd34-5678-ijkl-901234567890',
-				'source' => 'capi', 'http_status' => 400,
+				'source' => 'capi', 'http_status' => 400, 'platform' => 'meta',
 				'user_data_keys' => 'client_ip_address', 'error_message' => 'Invalid parameter: access_token',
 			),
 		);

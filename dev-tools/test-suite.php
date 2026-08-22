@@ -153,9 +153,19 @@ function wp_print_inline_script_tag( $js, $attrs = array() ) {
 // ob er auch wirklich alle Parameter durchreicht, die der Code nutzt.
 function wp_json_encode( $data, $flags = 0, $depth = 512 ) { return json_encode( $data, $flags, $depth ); }
 function is_wp_error( $thing ) { return false; }
-function wp_remote_retrieve_body( $response ) { return ''; }
+function wp_remote_retrieve_body( $response ) { return (string) ( $response['body'] ?? '' ); }
+// Seit v0.6.11 kann eine konkrete Antwort vorgegeben werden
+// ($GLOBALS['stub']['http_response']) -- nötig für die TikTok-Events-API-
+// Auswertung, die Erfolg/Fehler NICHT allein am HTTP-Status festmacht,
+// sondern zusätzlich am "code"-Feld im JSON-Body (siehe Abschnitt 27b).
+// Ohne Vorgabe unverändertes Verhalten: HTTP 200, leerer Body.
 function wp_remote_post( $url, $args = array() ) {
 	$GLOBALS['stub']['captured_posts'][] = array( 'url' => $url, 'args' => $args );
+
+	if ( isset( $GLOBALS['stub']['http_response'] ) ) {
+		return $GLOBALS['stub']['http_response'];
+	}
+
 	return array( 'response' => array( 'code' => 200 ) );
 }
 function is_email( $email ) { return (bool) filter_var( (string) $email, FILTER_VALIDATE_EMAIL ); }
@@ -658,6 +668,11 @@ require_once $base . 'admin/class-pms-admin-event-log.php';
 // 16 weiter unten für die eigenständigen Tests des Gatings selbst
 // (PMS_Settings::is_pro() / free_event_limit_reached()).
 require __DIR__ . '/../src/pro/class-pro-utm.php';
+
+// PMS_Pro_TikTok_CAPI (seit v0.6.11): gemeinsamer Versand + Protokollierung
+// der TikTok Events API, von BEIDEN Purchase-Klassen genutzt -- muss deshalb
+// vor ihnen geladen sein.
+require __DIR__ . '/../src/pro/class-pro-tiktok-capi.php';
 
 // PMS_Pro_Woo_Product_Data/PMS_Pro_WooCommerce: dasselbe Muster wie
 // PMS_Pro_UTM oben -- unconditional geladen, obwohl beide Klassen im echten
@@ -3427,6 +3442,300 @@ unset( $_GET['tab'], $_GET['page'] );
 $GLOBALS['stub']['current_user_can']        = false;
 $GLOBALS['stub']['options']['pms_settings'] = array();
 $GLOBALS['stub']['options']['pms_events']   = array();
+
+
+echo "\n=== 27. v0.6.11: Event-Log-Plattformachse, TikTok-Events-API-Protokollierung, Google/GA4-Dispatches ===\n";
+
+/* --- 27a. PMS_Logger: neue platform-Spalte --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array();
+PMS_Logger::truncate();
+
+PMS_Logger::record( 'Lead', 'ev-1', 'capi', 200, array( 'em' ), '', PMS_Logger::PLATFORM_META );
+PMS_Logger::record( 'CompletePayment', 'ev-2', 'capi', 200, array( 'ip', 'email' ), '', PMS_Logger::PLATFORM_TIKTOK );
+PMS_Logger::record( 'Purchase', 'ev-3', 'browser', 0, array(), '', PMS_Logger::PLATFORM_GOOGLE );
+PMS_Logger::record( 'Purchase', 'ev-3', 'browser', 0, array(), '', PMS_Logger::PLATFORM_GA4 );
+
+$rows27 = PMS_Logger::get_entries();
+check( '27a.1 Alle vier Plattform-Zeilen werden gespeichert', 4 === count( $rows27 ) );
+check( '27a.2 record() schreibt die platform-Spalte mit', 'tiktok' === ( $rows27[1]['platform'] ?? '' ) || 'tiktok' === ( $rows27[2]['platform'] ?? '' ) );
+
+// Default-Parameter: Aufrufer aus der Zeit vor v0.6.11 bleiben gültig.
+PMS_Logger::record( 'Contact', 'ev-old', 'capi', 0, array() );
+$rows_default = PMS_Logger::get_entries( array( 'event_name' => 'Contact' ) );
+check( '27a.3 record() ohne platform-Argument schreibt weiterhin "meta"', 'meta' === ( $rows_default[0]['platform'] ?? '' ) );
+
+// Unbekannte Plattform fällt auf meta zurück (Whitelist, kein Freitext).
+PMS_Logger::record( 'Contact', 'ev-bad', 'capi', 0, array(), '', 'snapchat' );
+$rows_bad = PMS_Logger::get_entries( array( 'event_name' => 'Contact' ) );
+$bad_row  = null;
+foreach ( $rows_bad as $r ) {
+	if ( 'ev-bad' === $r['event_id'] ) {
+		$bad_row = $r;
+	}
+}
+check( '27a.4 Unbekannter platform-Wert fällt auf "meta" zurück', is_array( $bad_row ) && 'meta' === $bad_row['platform'] );
+
+// Plattform-Filter.
+check( '27a.5 get_entries(): Plattform-Filter "tiktok" liefert nur TikTok-Zeilen', (function () {
+	$rows = PMS_Logger::get_entries( array( 'platform' => PMS_Logger::PLATFORM_TIKTOK ) );
+	if ( 1 !== count( $rows ) ) {
+		return false;
+	}
+	return 'CompletePayment' === $rows[0]['event_name'];
+})() );
+check( '27a.6 get_entries(): Plattform-Filter "ga4" trennt GA4 von der Google-Ads-Zeile desselben Events', (function () {
+	$ga4 = PMS_Logger::get_entries( array( 'platform' => PMS_Logger::PLATFORM_GA4 ) );
+	$ads = PMS_Logger::get_entries( array( 'platform' => PMS_Logger::PLATFORM_GOOGLE ) );
+	return 1 === count( $ga4 ) && 1 === count( $ads ) && $ga4[0]['event_id'] === $ads[0]['event_id'];
+})() );
+check( '27a.7 platform_labels(): genau die vier unterstützten Plattformen', array( 'meta', 'google', 'tiktok', 'ga4' ) === array_keys( PMS_Logger::platform_labels() ) );
+
+PMS_Logger::truncate();
+
+/* --- 27b. PMS_Pro_TikTok_CAPI: Antwort-Auswertung + Protokollierung.
+ * TikTok antwortet auch bei FACHLICHEN Fehlern mit HTTP 200 und legt den
+ * Status in body.code -- ein reiner Statuscode-Check (wie er für Meta genügt)
+ * würde einen abgelehnten Request als Erfolg protokollieren. --- */
+
+$tt_log = new ReflectionProperty( 'PMS_Pro_TikTok_CAPI', 'log' );
+
+// Fire-and-forget (Default): Status unbekannt, aber protokolliert.
+$tt_log->setValue( null, array() );
+PMS_Logger::truncate();
+$GLOBALS['stub']['filters']['pms_tiktok_capi_blocking'] = static function () {
+	return false;
+};
+$GLOBALS['stub']['captured_posts'] = array();
+$res = PMS_Pro_TikTok_CAPI::send(
+	array( 'event_source' => 'web', 'data' => array() ),
+	'tt-token',
+	array( 'event_name' => 'CompletePayment', 'event_id' => 'tt-1', 'match_keys' => array( 'ip', 'email' ), 'source' => 'capi' )
+);
+check( '27b.1 Fire-and-Forget: Status "sent", http_status 0', 'sent' === $res['status'] && 0 === $res['code'] );
+$tt_rows = PMS_Logger::get_entries();
+check( '27b.2 Fire-and-Forget: Event-Log-Zeile mit Plattform "tiktok" und Match Keys', 1 === count( $tt_rows ) && 'tiktok' === $tt_rows[0]['platform'] && 'ip, email' === $tt_rows[0]['user_data_keys'] );
+check( '27b.3 Fire-and-Forget: gilt NICHT als Fehler (http 0 ohne Fehlertext)', false === PMS_Logger::is_error_row( $tt_rows[0] ) );
+
+// Blockierend + echter Erfolg: HTTP 200 UND body.code 0.
+$GLOBALS['stub']['filters']['pms_tiktok_capi_blocking'] = static function () {
+	return true;
+};
+$GLOBALS['stub']['http_response'] = array(
+	'response' => array( 'code' => 200 ),
+	'body'     => '{"code":0,"message":"OK"}',
+);
+$tt_log->setValue( null, array() );
+PMS_Logger::truncate();
+$res = PMS_Pro_TikTok_CAPI::send( array( 'data' => array() ), 'tt-token', array( 'event_name' => 'CompletePayment', 'event_id' => 'tt-2', 'match_keys' => array( 'ip' ), 'source' => 'both' ) );
+check( '27b.4 Blockierend + code 0: Status "ok" mit HTTP 200', 'ok' === $res['status'] && 200 === $res['code'] );
+$tt_rows = PMS_Logger::get_entries();
+check( '27b.5 Blockierend: HTTP-Status landet im Event Log (analog zu Meta)', 1 === count( $tt_rows ) && 200 === (int) $tt_rows[0]['http_status'] );
+check( '27b.6 Blockierend: source "both" wird durchgereicht', 'both' === $tt_rows[0]['source'] );
+
+// Der eigentliche TikTok-Fallstrick: HTTP 200, aber fachlicher Fehler.
+$GLOBALS['stub']['http_response'] = array(
+	'response' => array( 'code' => 200 ),
+	'body'     => '{"code":40001,"message":"Invalid access token"}',
+);
+$tt_log->setValue( null, array() );
+PMS_Logger::truncate();
+$res = PMS_Pro_TikTok_CAPI::send( array( 'data' => array() ), 'bad-token', array( 'event_name' => 'CompletePayment', 'event_id' => 'tt-3', 'match_keys' => array(), 'source' => 'capi' ) );
+check( '27b.7 HTTP 200 mit body.code != 0 gilt als FEHLER (nicht als Erfolg)', 'error' === $res['status'] );
+check( '27b.8 Fehlermeldung stammt aus body.message', 'Invalid access token' === $res['message'] );
+$tt_rows = PMS_Logger::get_entries();
+check( '27b.9 Fehlerzeile wird im Event Log als Fehler erkannt', 1 === count( $tt_rows ) && true === PMS_Logger::is_error_row( $tt_rows[0] ) );
+
+// Echter HTTP-Fehler.
+$GLOBALS['stub']['http_response'] = array(
+	'response' => array( 'code' => 500 ),
+	'body'     => 'Internal Server Error',
+);
+$tt_log->setValue( null, array() );
+PMS_Logger::truncate();
+$res = PMS_Pro_TikTok_CAPI::send( array( 'data' => array() ), 'tt-token', array( 'event_name' => 'CompletePayment', 'event_id' => 'tt-4', 'source' => 'capi' ) );
+check( '27b.10 HTTP 500: Status "error" mit Code 500', 'error' === $res['status'] && 500 === $res['code'] );
+
+check( '27b.11 get_log(): request-lokales Log für die Live-Debug-Leiste wird befüllt', 1 === count( PMS_Pro_TikTok_CAPI::get_log() ) );
+
+unset( $GLOBALS['stub']['http_response'], $GLOBALS['stub']['filters']['pms_tiktok_capi_blocking'] );
+$tt_log->setValue( null, array() );
+PMS_Logger::truncate();
+
+/* --- 27c. Ende-zu-Ende über track_thankyou(): Meta, TikTok, Google Ads und
+ * GA4 erzeugen jeweils EINE eigene Zeile für dieselbe Bestellung. --- */
+
+$GLOBALS['stub']['current_user_can'] = false;
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings'] = array_merge(
+	PMS_Settings::get(),
+	array(
+		'wc_tracking_enabled'        => 1,
+		'consent_detection'          => 0,
+		'pixel_enabled'              => 1,
+		'pixel_id'                   => '1234567890',
+		'capi_enabled'               => 1,
+		'capi_token'                 => 'test-token',
+		'google_enabled'             => 1,
+		'google_tag_id'              => 'AW-123456789',
+		'wc_google_conversion_label' => 'AbCdEfGh',
+		'ga4_measurement_id'         => 'G-ABC123',
+		'tiktok_enabled'             => 1,
+		'tiktok_pixel_id'            => 'TT123',
+		'tiktok_capi_enabled'        => 1,
+		'tiktok_access_token'        => 'tt-token',
+	)
+);
+reset_consent_cache();
+PMS_Logger::truncate();
+$GLOBALS['stub']['captured_posts'] = array();
+
+$log_order = make_test_order( array( 'id' => 5001 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $log_order->get_id() );
+ob_get_clean();
+
+$all_rows = PMS_Logger::get_entries();
+$by_platform = array();
+foreach ( $all_rows as $r ) {
+	$by_platform[ $r['platform'] ] = $r;
+}
+
+check( '27c.1 Meta-CAPI-Zeile vorhanden', isset( $by_platform['meta'] ) );
+check( '27c.2 TikTok-Events-API-Zeile vorhanden (bis v0.6.10 fehlte sie komplett)', isset( $by_platform['tiktok'] ) );
+check( '27c.3 Google-Ads-Conversion-Zeile vorhanden', isset( $by_platform['google'] ) );
+check( '27c.4 GA4-Purchase-Zeile vorhanden', isset( $by_platform['ga4'] ) );
+check( '27c.5 Alle vier Zeilen tragen dieselbe Event-ID (eine Bestellung, vier Ziele)', (function () use ( $by_platform ) {
+	$ids = array();
+	foreach ( $by_platform as $r ) {
+		$ids[] = $r['event_id'];
+	}
+	return 4 === count( $ids ) && 1 === count( array_unique( $ids ) ) && 'pms_order_5001' === $ids[0];
+})() );
+check( '27c.6 Google/GA4-Zeilen sind als reine Browser-Dispatches markiert', 'browser' === ( $by_platform['google']['source'] ?? '' ) && 'browser' === ( $by_platform['ga4']['source'] ?? '' ) );
+check( '27c.7 TikTok-Zeile dokumentiert die tatsächlich übergebenen Match Keys', false !== strpos( (string) ( $by_platform['tiktok']['user_data_keys'] ?? '' ), 'user_agent' ) );
+check( '27c.8 GA4-Zeile trägt keine Match Keys (Standard-E-Commerce-Event ohne Nutzerdaten)', '' === (string) ( $by_platform['ga4']['user_data_keys'] ?? 'x' ) );
+
+/* --- 27d. Kein Conversion-Label -> keine Google-Zeile. Eine protokollierte
+ * Conversion, die nie gefeuert hat, wäre schlimmer als gar keine Zeile. --- */
+
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings']['wc_google_conversion_label'] = '';
+PMS_Logger::truncate();
+$GLOBALS['stub']['captured_posts'] = array();
+
+$nolabel_order = make_test_order( array( 'id' => 5002 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $nolabel_order->get_id() );
+$nolabel_html = ob_get_clean();
+
+$nolabel_platforms = array();
+foreach ( PMS_Logger::get_entries() as $r ) {
+	$nolabel_platforms[] = $r['platform'];
+}
+check( '27d.1 Ohne Conversion-Label: KEINE Google-Ads-Zeile', ! in_array( 'google', $nolabel_platforms, true ) );
+check( '27d.2 Ohne Conversion-Label: GA4-Zeile bleibt trotzdem (unabhängig von Google Ads)', in_array( 'ga4', $nolabel_platforms, true ) );
+check( '27d.3 Ohne Conversion-Label: auch im Quelltext keine Ads-Conversion', false === strpos( $nolabel_html, "gtag('event','conversion'" ) );
+
+/* --- 27e. Advanced Matching: die Google-Zeile dokumentiert die gehashten
+ * Enhanced-Conversions-Felder als Match Keys. --- */
+
+wc_test_reset();
+$GLOBALS['stub']['options']['pms_settings']['wc_google_conversion_label']    = 'AbCdEfGh';
+$GLOBALS['stub']['options']['pms_settings']['wc_purchase_advanced_matching'] = 1;
+PMS_Logger::truncate();
+$GLOBALS['stub']['captured_posts'] = array();
+
+$am_order = make_test_order( array( 'id' => 5003 ) );
+ob_start();
+PMS_Pro_Woo_Purchase::track_thankyou( $am_order->get_id() );
+ob_get_clean();
+
+$am_google = null;
+foreach ( PMS_Logger::get_entries() as $r ) {
+	if ( 'google' === $r['platform'] ) {
+		$am_google = $r;
+	}
+}
+check( '27e.1 Mit Advanced Matching: Google-Zeile listet die user_data-Felder', is_array( $am_google ) && false !== strpos( $am_google['user_data_keys'], 'email' ) );
+check( '27e.2 Mit Advanced Matching: TikTok-Zeile listet email/phone zusätzlich zu ip/user_agent', (function () {
+	foreach ( PMS_Logger::get_entries() as $r ) {
+		if ( 'tiktok' === $r['platform'] ) {
+			return false !== strpos( $r['user_data_keys'], 'email' );
+		}
+	}
+	return false;
+})() );
+
+wc_test_reset();
+$GLOBALS['stub']['wc_orders']      = array();
+$GLOBALS['stub']['captured_posts'] = array();
+PMS_Logger::truncate();
+
+/* --- 27f. Formular-Lead: die rein browserseitige Google-Ads-Conversion wird
+ * protokolliert, sobald der Client sie meldet. --- */
+
+check( '27f.1 google_fired=1 erzeugt eine Google-Zeile mit source "browser"', (function () {
+	PMS_Logger::truncate();
+	PMS_Logger::record( 'Lead', 'form-1', 'browser', 0, array(), '', PMS_Logger::PLATFORM_GOOGLE );
+	$rows = PMS_Logger::get_entries( array( 'platform' => PMS_Logger::PLATFORM_GOOGLE ) );
+	return 1 === count( $rows ) && 'browser' === $rows[0]['source'] && 0 === (int) $rows[0]['http_status'];
+})() );
+
+PMS_Logger::truncate();
+
+/* --- 27g. Admin-UI: Plattform-Badge und -Filter im Event-Log-Tab. --- */
+
+PMS_Logger::record( 'Purchase', 'ui-1', 'capi', 200, array( 'em' ), '', PMS_Logger::PLATFORM_META );
+PMS_Logger::record( 'CompletePayment', 'ui-2', 'capi', 200, array( 'ip' ), '', PMS_Logger::PLATFORM_TIKTOK );
+PMS_Logger::record( 'Purchase', 'ui-3', 'browser', 0, array(), '', PMS_Logger::PLATFORM_GA4 );
+
+$GLOBALS['stub']['current_user_can'] = true;
+$_GET['page'] = PMS_Admin::PAGE_SLUG;
+$_GET['tab']  = 'log';
+
+ob_start();
+PMS_Admin::render_page();
+$log_html = ob_get_clean();
+
+check( '27g.1 Event-Log-Tab: Plattform-Badges werden gerendert', false !== strpos( $log_html, 'pms-badge-meta' ) && false !== strpos( $log_html, 'pms-badge-tiktok' ) );
+check( '27g.2 Event-Log-Tab: GA4 nutzt die Google-Optik, aber die eigene Beschriftung', false !== strpos( $log_html, 'pms-badge-google">GA4' ) );
+check( '27g.3 Event-Log-Tab: Plattform-Filter ist vorhanden', false !== strpos( $log_html, 'name="log_platform"' ) && false !== strpos( $log_html, 'All platforms' ) );
+
+// Filter greift (Pro).
+$_GET['log_platform'] = 'tiktok';
+ob_start();
+PMS_Admin::render_page();
+$filtered_html = ob_get_clean();
+check( '27g.4 Plattform-Filter "tiktok" blendet die Meta-Zeile aus', false !== strpos( $filtered_html, 'ui-2' ) && false === strpos( $filtered_html, 'ui-1' ) );
+
+// Unbekannter Filterwert wird ignoriert statt alles auszublenden.
+$_GET['log_platform'] = 'snapchat';
+ob_start();
+PMS_Admin::render_page();
+$bogus_html = ob_get_clean();
+check( '27g.5 Unbekannter Plattform-Filter wird ignoriert (alle Zeilen bleiben sichtbar)', false !== strpos( $bogus_html, 'ui-1' ) && false !== strpos( $bogus_html, 'ui-2' ) );
+
+/* --- 27h. Tab-Slug am Wrapper: Grundlage der tab-abhängigen Spaltenbreiten
+ * in assets/admin.css (Überschrift/Notice richten sich danach, ob der Tab
+ * 900px- oder 960px-Inhalte trägt). Ohne diese Klasse fiele das Layout
+ * stillschweigend auf die 900px-Variante zurück. --- */
+
+foreach ( array( 'general', 'events', 'advanced', 'ecommerce', 'log', 'tools' ) as $slug ) {
+	$_GET['tab'] = $slug;
+	ob_start();
+	PMS_Admin::render_page();
+	$tab_html = ob_get_clean();
+	check(
+		'27h Tab "' . $slug . '": Wrapper trägt die Klasse pms-tab-' . $slug,
+		false !== strpos( $tab_html, 'class="wrap pms-wrap pms-tab-' . $slug . '"' )
+	);
+}
+
+unset( $_GET['log_platform'], $_GET['tab'], $_GET['page'] );
+$GLOBALS['stub']['current_user_can'] = false;
+PMS_Logger::truncate();
+$GLOBALS['stub']['options']['pms_settings'] = array();
 
 
 echo "\n==============================\n";

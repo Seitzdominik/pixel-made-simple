@@ -274,6 +274,12 @@
 
 		var eventId = uuid();
 		var browserFired = false;
+		// Seit v0.6.11: welche Ziele tatsächlich gefeuert haben. Wird an die
+		// Live-Debug-Leiste gemeldet (pms:event) UND an den Server, damit die
+		// rein browserseitige Google-Ads-Conversion im Event Log auftaucht
+		// (siehe PMS_Forms::handle_lead()).
+		var fired = [];
+		var googleFired = false;
 
 		if ( pixelAllowed && 'function' === typeof window.fbq ) {
 			// KEIN test_event_code hier (Bugfix v0.5.7): Meta's Pixel-SDK
@@ -281,12 +287,15 @@
 			// im Test-Stream. Der Test-Code bleibt CAPI-only (class-pms-capi.php).
 			window.fbq( 'track', EVENT_NAME, {}, { eventID: eventId } );
 			browserFired = true;
+			fired.push( 'Meta' );
 		}
 
 		// Google Ads: nur mit konfiguriertem Conversion-Label (dieselbe Regel
 		// wie bei URL-Events, siehe PMS_Settings::sanitize_event()).
 		if ( pixelAllowed && GOOGLE_TAG_ID && GOOGLE_LABEL && 'function' === typeof window.gtag ) {
 			window.gtag( 'event', 'conversion', { send_to: GOOGLE_TAG_ID + '/' + GOOGLE_LABEL } );
+			googleFired = true;
+			fired.push( 'Google Ads' );
 		}
 
 		// TikTok: dieselbe event_id wie Meta -- TikToks Events API sendet für
@@ -294,6 +303,7 @@
 		// trotzdem konsistent zu allen anderen Zielen dieses Events.
 		if ( pixelAllowed && TIKTOK_EVENT && 'function' === typeof window.ttq ) {
 			window.ttq.track( TIKTOK_EVENT, {}, { event_id: eventId } );
+			fired.push( 'TikTok' );
 		}
 
 		emit( 'pms:event', {
@@ -302,6 +312,7 @@
 			browser: browserFired ? 'fired' : ( pixelAllowed ? 'no_pixel' : 'blocked' ),
 			capi: 'pending',
 			source: sourceLabel,
+			platforms: fired,
 			hasEmail: !! data.email,
 			hasPhone: !! data.phone
 		} );
@@ -320,6 +331,10 @@
 		// Browser-Pixel tatsächlich gefeuert hat (window.fbq könnte fehlen,
 		// z. B. weil die Meta-Plattform selbst deaktiviert ist).
 		body.append( 'browser_fired', browserFired ? '1' : '0' );
+		// Nur die Google-Ads-Conversion braucht der Server: Meta deckt
+		// browser_fired ab, und für TikTok gibt es bei Formular-Leads keinen
+		// Server-Pfad (siehe CLAUDE.md, "Bekannte Trade-offs").
+		body.append( 'google_fired', googleFired ? '1' : '0' );
 
 		if ( data.email ) {
 			body.append( 'email', data.email );

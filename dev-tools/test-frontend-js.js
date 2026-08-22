@@ -132,7 +132,12 @@ function createDocument() {
 			listeners[ type ] = listeners[ type ] || [];
 			listeners[ type ].push( fn );
 		},
-		dispatchEvent() {
+		// Bis v0.6.10 ein No-Op -- dadurch waren die pms:event/pms:capi-
+		// Meldungen von frontend.js an die Live-Debug-Leiste hier gar nicht
+		// prüfbar (die beiden Shop-Harnesses konnten das längst). Seit
+		// v0.6.11 werden die registrierten Listener tatsächlich aufgerufen.
+		dispatchEvent( evt ) {
+			( listeners[ evt && evt.type ] || [] ).forEach( ( fn ) => fn( evt ) );
 			return true;
 		},
 	};
@@ -216,6 +221,11 @@ function run( cfgOverrides, domOverrides ) {
 		document: doc,
 		URLSearchParams,
 		Event: FakeEvent,
+		// frontend.js' emit() nutzt CustomEvent -- ohne diesen Eintrag warf der
+		// Aufruf einen ReferenceError, den emit() still schluckt.
+		CustomEvent: function ( type, opts ) {
+			return { type: type, detail: opts && opts.detail };
+		},
 		console,
 		setTimeout: () => 0,
 		clearTimeout: () => {},
@@ -544,6 +554,38 @@ function submitLead( r ) {
 	const params = new URLSearchParams( r.window.fetchCalls[ 0 ].body );
 	check( '5.12 browser_only ohne Consent: browser_fired=0 im AJAX-Body', '0' === params.get( 'browser_fired' ) );
 	check( '5.13 browser_only ohne Consent: Kontaktdaten/Event-Name werden trotzdem übertragen', 'Lead' === params.get( 'event_name' ) && '' !== ( params.get( 'event_id' ) || '' ) );
+}
+
+{
+	// v0.6.11: gefeuerte Plattformen werden gemeldet -- an die Debug-Leiste
+	// (pms:event detail.platforms) und, für Google Ads, an den Server.
+	const events = [];
+	const r = run(
+		Object.assign( {}, LEAD_CFG, { tiktokEvent: 'SubmitForm', googleTagId: 'AW-1', googleLabel: 'L' } ),
+		{}
+	);
+	r.document.addEventListener( 'pms:event', ( e ) => events.push( e.detail ) );
+	submitLead( r );
+
+	check( '5.15 pms:event meldet alle drei gefeuerten Plattformen an die Debug-Leiste', (function () {
+		const det = events.find( ( d ) => d && Array.isArray( d.platforms ) && d.platforms.length );
+		return !! det && det.platforms.indexOf( 'Meta' ) > -1 && det.platforms.indexOf( 'Google Ads' ) > -1 && det.platforms.indexOf( 'TikTok' ) > -1;
+	})() );
+
+	const params = new URLSearchParams( r.window.fetchCalls[ 0 ].body );
+	check( '5.16 AJAX-Body meldet google_fired=1 (Grundlage der Google-Zeile im Event Log)', '1' === params.get( 'google_fired' ) );
+}
+
+{
+	// Ohne Conversion-Label darf google_fired NICHT gemeldet werden -- sonst
+	// stünde im Event Log eine Conversion, die nie gefeuert hat.
+	const r = run(
+		Object.assign( {}, LEAD_CFG, { tiktokEvent: 'SubmitForm', googleTagId: 'AW-1', googleLabel: '' } ),
+		{}
+	);
+	submitLead( r );
+	const params = new URLSearchParams( r.window.fetchCalls[ 0 ].body );
+	check( '5.17 Ohne Conversion-Label: google_fired=0', '0' === params.get( 'google_fired' ) );
 }
 
 {

@@ -52,12 +52,12 @@
 	box-shadow: 0 0 0 1px #fff, 0 0 0 3px #2271b1;
 }
 
-/* Abschnitts-Überschriften */
+/* Abschnitts-Überschriften. Die max-width steht weiter unten bei den
+   tab-abhängigen Spaltenbreiten. */
 .pms-section-title {
 	margin: 32px 0 4px;
 	padding-bottom: 8px;
 	border-bottom: 1px solid #dcdcde;
-	max-width: 900px;
 	font-size: 16px;
 }
 
@@ -226,11 +226,37 @@
 	box-sizing: border-box;
 }
 
-/* Bündig zur 960px-Spalte aus Tabelle/Toggle-Leiste: mit border-box zählt
-   der Balken links jetzt mit, deshalb dieselbe Zahl wie dort statt der
-   früheren, von Hand gegengerechneten 928px. */
+/* Spaltenbreiten (seit v0.6.11 tab-abhängig, siehe pms-tab-*-Klasse am
+   Wrapper in PMS_Admin::render_page()):
+
+   - Einstellungs-Tabs (Allgemein, Erweitertes Tracking, E-Commerce): 900px,
+     die Breite von .pms-accordion/.pms-pro-teaser.
+   - Datenlastige Tabs (URL-Events, Event Log): 960px, die Breite von
+     .pms-events-table/.pms-global-toggle-form.
+
+   .pms-section-title und .notice.inline kommen auf BEIDEN Sorten vor und
+   hatten davor eine feste Breite -- die Überschriften-Linie endete auf dem
+   Events-Tab 60px vor der Tabelle, und die Konflikt-Notice auf dem Tab
+   "Erweitertes Tracking" ragte 60px über die Accordions hinaus. */
+.pms-section-title,
 .pms-wrap .notice.inline {
+	max-width: 900px;
+}
+
+.pms-tab-events .pms-section-title,
+.pms-tab-events .notice.inline,
+.pms-tab-log .pms-section-title,
+.pms-tab-log .notice.inline {
 	max-width: 960px;
+}
+
+/* Tab "Import / Export" ist ein Einstellungs-Tab: In Free rendert er
+   .pms-pro-teaser (900px), in Pro .pms-card (per Default 960px) -- ohne diese
+   Zeile wäre die Spaltenbreite also vom Lizenzstatus abhängig und die
+   Überschrift stünde in Pro 60px zu kurz. Die Karten dort tragen nur einen
+   Button bzw. ein Datei-Feld, 900px reichen dafür genauso. */
+.pms-tab-tools .pms-card {
+	max-width: 900px;
 }
 
 /* Aufklärendes Info-Callout (z. B. DSGVO-Hinweis in der Consent-Box).

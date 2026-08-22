@@ -166,25 +166,37 @@
 
 		function firePixels() {
 			var browserFired = false;
+			// Seit v0.6.11 mitprotokolliert: welche Ziele tatsächlich gefeuert
+			// haben. Google Ads/GA4 erzeugen keinen Server-Request und tauchen
+			// deshalb sonst nirgends auf -- die Live-Debug-Leiste liest diese
+			// Liste aus dem pms:event-Detail (siehe class-pms-debug.php).
+			var fired = [];
 
 			if ( platforms.meta && 'function' === typeof window.fbq ) {
 				window.fbq( 'track', eventName, platforms.meta, { eventID: eventId } );
 				browserFired = true;
+				fired.push( 'Meta' );
 			}
 
 			if ( cfg.googleEnabled && platforms.google && 'function' === typeof window.gtag ) {
 				window.gtag( 'event', platforms.google.event, platforms.google.params );
+				// Ein gtag('event', ...) ohne send_to erreicht JEDES per
+				// gtag('config', ...) registrierte Ziel -- Google Ads und GA4
+				// gleichermaßen (siehe PMS_Frontend::build_google_js()).
+				fired.push( cfg.ga4MeasurementId ? 'Google Ads / GA4' : 'Google Ads' );
 			}
 
 			if ( cfg.tiktokEnabled && platforms.tiktok && 'function' === typeof window.ttq ) {
 				window.ttq.track( platforms.tiktok.event, platforms.tiktok.params, { event_id: eventId } );
+				fired.push( 'TikTok' );
 			}
 
 			emit( 'pms:event', {
 				event: eventName,
 				eventId: eventId,
 				browser: browserFired ? 'fired' : 'no_pixel',
-				capi: 'pending'
+				capi: 'pending',
+				platforms: fired
 			} );
 
 			return browserFired;

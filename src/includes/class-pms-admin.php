@@ -495,7 +495,16 @@ class PMS_Admin {
 
 		$base_url = admin_url( 'admin.php?page=' . self::PAGE_SLUG );
 		?>
-		<div class="wrap pms-wrap">
+		<?php
+		// Tab-Slug am Wrapper (seit v0.6.11), damit das CSS die Spaltenbreite
+		// pro Tab treffen kann. Hintergrund: Die Einstellungs-Tabs sind 900px
+		// breit (Accordions/Teaser), die datenlastigen Tabs 960px (Tabellen).
+		// Elemente, die auf BEIDEN vorkommen -- .pms-section-title und
+		// .notice.inline -- konnten vorher nur EINE der beiden Breiten haben
+		// und standen deshalb auf dem jeweils anderen Tab sichtbar daneben
+		// (die Überschriften-Linie zu kurz bzw. die Hinweisbox zu breit).
+		?>
+		<div class="wrap pms-wrap pms-tab-<?php echo esc_attr( $active_tab ); ?>">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Pixel Made Simple', 'pixel-made-simple' ); ?></h1>
 			<hr class="wp-header-end" />
 

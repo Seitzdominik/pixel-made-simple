@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, google analytics, tiktok pixel, c
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.10
+Stable tag: 0.6.11
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -92,6 +92,15 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.11 =
+* Neu (Pro): **TikTok-Events-API-Anfragen erscheinen jetzt im Event Log** – mit HTTP-Status und den tatsächlich übergebenen Match Keys, genau wie die Meta Conversions API. Bisher wurden sie zwar gesendet, aber nirgends protokolliert. Besonderheit dabei: TikTok antwortet auch auf abgelehnte Anfragen mit HTTP 200 und meldet den eigentlichen Fehler nur in einem Feld der Antwort – solche Fälle galten bisher als Erfolg und werden jetzt korrekt als Fehler ausgewiesen.
+* Neu: **Plattform-Spalte im Event Log.** Jede Zeile zeigt jetzt als Badge, an welche Plattform das Ereignis ging (Meta, Google Ads, TikTok, GA4); in Pro lässt sich zusätzlich danach filtern. Ein Kauf erzeugt damit eine eigene, nachvollziehbare Zeile je Ziel statt nur einer Meta-Zeile.
+* Neu (Pro): **Google-Ads-Conversions und GA4-Kaufereignisse sind nachvollziehbar.** Die Purchase-Conversion für Google Ads und das GA4-Kaufereignis (WooCommerce) erscheinen als eigene Zeilen im Event Log; Formular-Leads melden ihre Google-Ads-Conversion ebenfalls. Da beide Plattformen ausschließlich im Browser arbeiten, sind diese Zeilen als „Browser" gekennzeichnet – es gibt für sie keinen Serverstatus.
+* Verbessert: **Live-Debug-Leiste.** Sie zeigt jetzt zu jedem Ereignis, welche Ziele im Browser tatsächlich gefeuert haben (Meta, Google Ads/GA4, TikTok), und listet TikTok-Events-API-Anfragen mit eigener Zeile neben den Meta-Anfragen. Für Administratoren werden TikTok-Anfragen – wie bisher schon die Meta-Anfragen – blockierend gesendet, damit statt „gesendet" der echte Statuscode erscheint.
+* Verbessert: **Einheitliche Spaltenbreiten in allen Tabs.** Überschriften und Hinweisboxen richten sich jetzt nach der Breite des jeweiligen Tab-Inhalts (Einstellungs-Tabs 900px, Tabellen-Tabs 960px). Vorher endete die Linie unter der Überschrift im Tab „URL-Events" sichtbar vor der Tabelle, die Konflikt-Warnung im Tab „Erweitertes Tracking" ragte über die Boxen hinaus, und der Tab „Import / Export" war in Pro breiter als in der kostenlosen Version.
+* Geändert: Beschreibung von Pixel Made Simple Pro im Plugin-Header aktualisiert.
+* `dev-tools/test-suite.php` deckt die Plattform-Achse, die TikTok-Antwortauswertung und die neuen Log-Zeilen ab (578 → 621 PHP-Tests); der Formular-Test-Harness kann jetzt erstmals die Meldungen an die Debug-Leiste prüfen (47/86/53 JS-Tests).
 
 = 0.6.10 =
 * Neu: **Consent-Modus (Tab „Allgemein" → Box „Automatische Cookie-Banner-Erkennung").** Ein aufklärendes Hinweisfeld erklärt, was die DSGVO-Blockade konkret bewirkt, darunter lässt sich zwischen zwei Modi wählen: „Vollständig DSGVO-konform (empfohlen für die EU)" blockiert wie bisher Browser-Pixel UND serverseitige Signale bis zur Einwilligung; „Nur Browser-Pixel blockieren" hält lediglich die Pixel zurück, während Conversions API und TikTok Events API unabhängig vom Banner-Status senden. Voreinstellung ist der strikte Modus – bestehende Installationen ändern ihr Verhalten durch das Update also nicht. Willigt der Besucher nachträglich ein, wird der Browser-Pixel im flexiblen Modus mit derselben Event-ID nachgeholt, sodass Meta/TikTok weiterhin deduplizieren.

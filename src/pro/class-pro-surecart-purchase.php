@@ -581,20 +581,19 @@ class PMS_Pro_SureCart_Purchase {
 			$body['test_event_code'] = $tiktok_test_code;
 		}
 
-		/** Dokumentiert in class-pro-woo-purchase.php */
-		$blocking = (bool) apply_filters( 'pms_tiktok_capi_blocking', false );
-
-		wp_remote_post(
-			'https://business-api.tiktok.com/open_api/v1.3/event/track/',
+		// Versand + Protokollierung seit v0.6.11 zentral in
+		// PMS_Pro_TikTok_CAPI (siehe dortige Klassen-Doku): dadurch landet
+		// jeder Events-API-Request mit HTTP-Status und Match Keys im Event
+		// Log, analog zu Meta. array_keys($user) liefert genau die Feldnamen,
+		// nie die Werte.
+		PMS_Pro_TikTok_CAPI::send(
+			$body,
+			(string) $settings['tiktok_access_token'],
 			array(
-				'timeout'   => $blocking ? 5 : 2,
-				'blocking'  => $blocking,
-				'headers'   => array(
-					'Content-Type' => 'application/json',
-					'Access-Token' => (string) $settings['tiktok_access_token'],
-				),
-				'body'      => wp_json_encode( $body ),
-				'sslverify' => true,
+				'event_name' => 'CompletePayment',
+				'event_id'   => self::event_id( $checkout->id ),
+				'match_keys' => array_keys( $user ),
+				'source'     => 'capi',
 			)
 		);
 	}

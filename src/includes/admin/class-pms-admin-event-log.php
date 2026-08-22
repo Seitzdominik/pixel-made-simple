@@ -39,14 +39,20 @@ class PMS_Admin_Event_Log {
 	public static function render_tab() {
 		$is_pro = PMS_Settings::is_pro();
 
-		$status_filter = '';
-		$event_filter  = '';
+		$status_filter   = '';
+		$event_filter    = '';
+		$platform_filter = '';
 
 		if ( $is_pro ) {
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nur lesende Filter-Auswahl, keine Zustandsänderung.
 			$status_filter = isset( $_GET['log_status'] ) ? sanitize_key( wp_unslash( $_GET['log_status'] ) ) : '';
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			$event_filter = isset( $_GET['log_event'] ) ? sanitize_text_field( wp_unslash( $_GET['log_event'] ) ) : '';
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$platform_filter = isset( $_GET['log_platform'] ) ? sanitize_key( wp_unslash( $_GET['log_platform'] ) ) : '';
+			if ( '' !== $platform_filter && ! isset( PMS_Logger::platform_labels()[ $platform_filter ] ) ) {
+				$platform_filter = '';
+			}
 		}
 		// In der Free-Version werden $_GET-Filterparameter absichtlich ignoriert,
 		// selbst wenn jemand die URL direkt manipuliert -- die Filter-Controls
@@ -57,6 +63,7 @@ class PMS_Admin_Event_Log {
 			array(
 				'status'     => $status_filter,
 				'event_name' => $event_filter,
+				'platform'   => $platform_filter,
 			)
 		);
 
@@ -66,7 +73,7 @@ class PMS_Admin_Event_Log {
 		<p class="description"><?php esc_html_e( 'Shows recent browser and Conversions API events so you can verify your tracking is working, without leaving WordPress.', 'pixel-made-simple' ); ?></p>
 
 		<div class="pms-log-toolbar">
-			<?php self::render_filters( $is_pro, $status_filter, $event_filter ); ?>
+			<?php self::render_filters( $is_pro, $status_filter, $event_filter, $platform_filter ); ?>
 			<?php self::render_retention_control( $is_pro ); ?>
 
 			<form method="post" action="<?php echo esc_url( $admin_post ); ?>" class="pms-inline-form">
@@ -123,9 +130,10 @@ class PMS_Admin_Event_Log {
 	 * @param bool   $is_pro
 	 * @param string $status_filter
 	 * @param string $event_filter
+	 * @param string $platform_filter
 	 * @return void
 	 */
-	private static function render_filters( $is_pro, $status_filter, $event_filter ) {
+	private static function render_filters( $is_pro, $status_filter, $event_filter, $platform_filter = '' ) {
 		?>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="pms-log-filters">
 			<input type="hidden" name="page" value="<?php echo esc_attr( PMS_Admin::PAGE_SLUG ); ?>" />
@@ -145,6 +153,14 @@ class PMS_Admin_Event_Log {
 						<option value="<?php echo esc_attr( $name ); ?>" <?php selected( $event_filter, $name ); ?>><?php echo esc_html( $name ); ?></option>
 					<?php endforeach; ?>
 				<?php endif; ?>
+			</select>
+
+			<label for="pms-log-platform" class="screen-reader-text"><?php esc_html_e( 'Filter by platform', 'pixel-made-simple' ); ?></label>
+			<select id="pms-log-platform" name="log_platform" <?php disabled( ! $is_pro ); ?>>
+				<option value="" <?php selected( $platform_filter, '' ); ?>><?php esc_html_e( 'All platforms', 'pixel-made-simple' ); ?></option>
+				<?php foreach ( PMS_Logger::platform_labels() as $slug => $label ) : ?>
+					<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $platform_filter, $slug ); ?>><?php echo esc_html( $label ); ?></option>
+				<?php endforeach; ?>
 			</select>
 
 			<?php if ( $is_pro ) : ?>
@@ -200,7 +216,10 @@ class PMS_Admin_Event_Log {
 		?>
 		<tr>
 			<td><?php echo esc_html( $local_time ); ?></td>
-			<td><strong><?php echo esc_html( (string) $entry['event_name'] ); ?></strong></td>
+			<td>
+				<strong><?php echo esc_html( (string) $entry['event_name'] ); ?></strong>
+				<?php self::render_platform_badge( $entry ); ?>
+			</td>
 			<td><code><?php echo esc_html( (string) $entry['event_id'] ); ?></code></td>
 			<td><?php echo esc_html( self::source_label( (string) $entry['source'] ) ); ?></td>
 			<td><?php self::render_status_badge( $entry ); ?></td>
@@ -211,6 +230,37 @@ class PMS_Admin_Event_Log {
 			</td>
 		</tr>
 		<?php
+	}
+
+	/**
+	 * Plattform-Badge neben dem Event-Namen (seit v0.6.11).
+	 *
+	 * Bewusst als Badge in der Event-Spalte statt als siebte Tabellenspalte:
+	 * die Tabelle ist bei 960px bereits gut gefüllt, und die
+	 * .pms-badge-meta/-google/-tiktok-Stile existieren aus der Events-Tabelle
+	 * ohnehin schon. Zeilen aus der Zeit vor der platform-Spalte tragen 'meta'
+	 * (damals wurde nur Meta protokolliert).
+	 *
+	 * @param array $entry
+	 * @return void
+	 */
+	private static function render_platform_badge( array $entry ) {
+		$platform = (string) ( $entry['platform'] ?? PMS_Logger::PLATFORM_META );
+		$labels   = PMS_Logger::platform_labels();
+
+		if ( ! isset( $labels[ $platform ] ) ) {
+			$platform = PMS_Logger::PLATFORM_META;
+		}
+
+		// GA4 teilt sich die Google-Optik (dieselbe Plattformfamilie), hat aber
+		// eine eigene Beschriftung.
+		$css = PMS_Logger::PLATFORM_GA4 === $platform ? PMS_Logger::PLATFORM_GOOGLE : $platform;
+
+		printf(
+			'<span class="pms-badge pms-badge-%1$s">%2$s</span>',
+			esc_attr( $css ),
+			esc_html( $labels[ $platform ] )
+		);
 	}
 
 	/**

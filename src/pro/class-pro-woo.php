@@ -156,6 +156,14 @@ class PMS_Pro_WooCommerce {
 				'googleEnabled' => ( ! empty( $settings['google_enabled'] ) && ! empty( $settings['google_tag_id'] ) )
 					|| '' !== trim( (string) ( $settings['ga4_measurement_id'] ?? '' ) ),
 				'tiktokEnabled' => ! empty( $settings['tiktok_enabled'] ) && ! empty( $settings['tiktok_pixel_id'] ),
+				// Nur für die Beschriftung in der Live-Debug-Leiste (seit
+				// v0.6.11): ein gtag('event', ...) ohne send_to erreicht Google
+				// Ads UND GA4 -- das Skript kann nur anhand dieser ID sagen, ob
+				// ein GA4-Property überhaupt konfiguriert ist. Steuert KEIN
+				// Verhalten (dafür ist googleEnabled oben zuständig); SureCart
+				// lokalisiert dieselbe ID schon seit v0.6.8, dort allerdings
+				// zusätzlich für den eigenen GA4-Purchase-Aufruf.
+				'ga4MeasurementId' => ! empty( $settings['ga4_measurement_id'] ) ? preg_replace( '/[^A-Za-z0-9\-]+/', '', (string) $settings['ga4_measurement_id'] ) : '',
 			)
 		);
 	}

@@ -592,6 +592,71 @@ console.log( '\n=== 7. Google Ads & TikTok: Enabled-Flag-Gating ===' );
 }
 
 /* ---------------------------------------------------------------------
+ * 7b. v0.6.11: gefeuerte Plattformen im pms:event-Detail
+ * ------------------------------------------------------------------- */
+
+console.log( '\n=== 7b. pms:event meldet, welche Ziele tatsächlich gefeuert haben ===' );
+
+{
+	const payload = el( {
+		tag: 'script',
+		textContent: JSON.stringify( { product_id: 1, content_id: '1', content_name: 'X', content_category: '', value: 1, currency: 'EUR', quantity: 1 } ),
+	} );
+	payload.id = 'pms-woo-view-content-data';
+
+	const events = [];
+	const r = run( { googleEnabled: true, tiktokEnabled: true, ga4MeasurementId: 'G-ABC123' }, { elements: [ payload ] } );
+	// Der Listener muss VOR dem Feuern registriert sein -- init() läuft aber
+	// synchron beim Laden. Deshalb hier stattdessen den zweiten Durchlauf
+	// über ein manuell ausgelöstes AddToCart prüfen.
+	r.document.addEventListener( 'pms:event', ( e ) => events.push( e.detail ) );
+
+	check( '7b.1 Google Ads + konfiguriertes GA4-Property werden gemeinsam ausgewiesen', (function () {
+		// Der ViewContent-Dispatch lief bereits beim Laden; hier prüfen wir das
+		// gerenderte Ergebnis über die tatsächlichen SDK-Aufrufe gegen.
+		return 1 === r.window.gtagCalls.length && 1 === r.window.ttqCalls.length && 1 === r.window.fbqCalls.length;
+	})() );
+}
+
+{
+	// AddToCart über den jQuery-Weg: hier kann der Listener vor dem Feuern
+	// registriert werden, das pms:event-Detail ist also direkt prüfbar.
+	const events = [];
+	const r = run(
+		{ googleEnabled: true, tiktokEnabled: true, ga4MeasurementId: 'G-ABC123' },
+		{ jquery: true }
+	);
+	r.document.addEventListener( 'pms:event', ( e ) => events.push( e.detail ) );
+
+	const button = el( { tag: 'a', attrs: { 'data-product_id': '77', 'data-quantity': '2' } } );
+	r.jq.trigger( 'added_to_cart', null, null, [ button ] );
+
+	check( '7b.2 pms:event trägt die Liste der gefeuerten Ziele', (function () {
+		const det = events[ 0 ];
+		return !! det && Array.isArray( det.platforms ) && det.platforms.indexOf( 'Meta' ) > -1 && det.platforms.indexOf( 'TikTok' ) > -1;
+	})() );
+	check( '7b.3 Bei konfiguriertem GA4 wird "Google Ads / GA4" ausgewiesen (ein gtag-Event erreicht beide Ziele)', (function () {
+		const det = events[ 0 ];
+		return !! det && det.platforms.indexOf( 'Google Ads / GA4' ) > -1;
+	})() );
+}
+
+{
+	// Ohne GA4-Property bleibt es bei "Google Ads".
+	const events = [];
+	const r = run( { googleEnabled: true, tiktokEnabled: false }, { jquery: true } );
+	r.document.addEventListener( 'pms:event', ( e ) => events.push( e.detail ) );
+
+	const button = el( { tag: 'a', attrs: { 'data-product_id': '77', 'data-quantity': '1' } } );
+	r.jq.trigger( 'added_to_cart', null, null, [ button ] );
+
+	check( '7b.4 Ohne GA4-Property: nur "Google Ads", TikTok fehlt (Flag aus)', (function () {
+		const det = events[ 0 ];
+		return !! det && det.platforms.indexOf( 'Google Ads' ) > -1 && det.platforms.indexOf( 'TikTok' ) === -1;
+	})() );
+}
+
+/* ---------------------------------------------------------------------
  * 8. Flexibler Consent-Modus (consentMode: 'browser_only', v0.6.10)
  * ------------------------------------------------------------------- */
 
