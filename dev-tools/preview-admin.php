@@ -147,6 +147,12 @@ function plugin_basename( $f ) { return basename( $f ); }
  * werden vom reinen Tab-Rendering nie aufgerufen, aber sicherheitshalber als
  * No-Ops vorhanden.
  */
+// Simuliert ein aktives WooCommerce, damit Tab "E-Commerce" den
+// interessanten Free-Zweig rendert: Upgrade-Callout + Pro-Teaser (seit
+// v0.6.12). Diese Zeile auskommentieren, um stattdessen den schlichten
+// "WooCommerce wurde nicht erkannt"-Hinweis zu sehen.
+class WooCommerce {}
+
 class PMS_Preview_Wpdb {
 	public $prefix = 'wp_';
 	public function get_charset_collate() { return ''; }

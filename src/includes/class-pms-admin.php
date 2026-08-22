@@ -335,6 +335,22 @@ class PMS_Admin {
 	}
 
 	/**
+	 * Kleines "PRO"-Badge neben einem einzelnen gesperrten Control (seit
+	 * v0.6.12). Ergänzt das "sichtbar, aber gesperrt"-Muster um ein
+	 * eindeutiges Warum -- ein bloßes disabled-Feld sieht sonst nach einem
+	 * Fehler aus. Für ganze Boxen bleibt render_pro_teaser_box() zuständig.
+	 *
+	 * @return void
+	 */
+	public static function pro_badge() {
+		printf(
+			'<span class="pms-pro-inline" title="%1$s">%2$s</span>',
+			esc_attr__( 'Available in Pixel Made Simple Pro', 'pixel-made-simple' ),
+			esc_html__( 'Pro', 'pixel-made-simple' )
+		);
+	}
+
+	/**
 	 * Info-Tooltip (Dashicon mit reiner CSS-Hover-Box).
 	 *
 	 * @param string $text Hilfetext.
@@ -641,6 +657,7 @@ class PMS_Admin {
 					<th scope="row">
 						<label for="pms-form-tiktok-event"><?php esc_html_e( 'TikTok event type', 'pixel-made-simple' ); ?></label>
 						<?php if ( ! $forms_pro ) : ?>
+							<?php self::pro_badge(); ?>
 							<?php self::tip( __( 'Sending form leads to TikTok is a Pro feature.', 'pixel-made-simple' ) ); ?>
 						<?php endif; ?>
 					</th>
@@ -658,6 +675,7 @@ class PMS_Admin {
 				<tr>
 					<th scope="row">
 						<label for="pms-form-google-label"><?php esc_html_e( 'Google Ads conversion label (form leads)', 'pixel-made-simple' ); ?></label>
+						<?php if ( ! $forms_pro ) { self::pro_badge(); } ?>
 						<?php self::tip( __( 'Optional. Google Ads → Conversions → your lead action → “Use tag” → the part after the slash in send_to. Leave empty to skip the Google Ads conversion for form leads.', 'pixel-made-simple' ) ); ?>
 					</th>
 					<td>
@@ -976,7 +994,14 @@ class PMS_Admin {
 	}
 
 	/**
-	 * Unterseite "Info & Hilfe": Version, Support-Kontakt und Tutorial-Hinweis.
+	 * Unterseite "Info & Hilfe": Version, Support, Dokumentation und
+	 * Tutorial-Hub.
+	 *
+	 * Die Tutorial-Karten sind bewusst modular (ein Array, eine Schleife):
+	 * Kommt ein Thema dazu, reicht ein weiterer Eintrag in $tutorials -- kein
+	 * neues Markup. Alle Karten verlinken derzeit auf DIESELBE
+	 * Tutorial-Übersicht; sobald es Einzel-URLs pro Video gibt, bekommt der
+	 * jeweilige Eintrag einfach ein eigenes 'url'.
 	 *
 	 * @return void
 	 */
@@ -985,10 +1010,35 @@ class PMS_Admin {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'pixel-made-simple' ) );
 		}
 
-		$support_email = 'dominik@seitzdominik.de';
-		$video_url     = 'https://www.youtube.com/watch?v=PLATZHALTER'; // Platzhalter – hier später die Tutorial-URL eintragen.
+		$support_email = 'support@pixelmadesimple.com';
+		$site_url      = 'https://pixelmadesimple.com';
+		$docs_url      = 'https://pixelmadesimple.com/docs';
+		$tutorials_url = 'https://pixelmadesimple.com/tutorials';
+
+		$tutorials = array(
+			array(
+				'icon'  => 'dashicons-controls-play',
+				'title' => __( 'Quick start', 'pixel-made-simple' ),
+				'text'  => __( 'Install, connect your first pixel and verify that events arrive – in about ten minutes.', 'pixel-made-simple' ),
+			),
+			array(
+				'icon'  => 'dashicons-admin-links',
+				'title' => __( 'Meta CAPI setup', 'pixel-made-simple' ),
+				'text'  => __( 'Access token, Conversions API and event deduplication via a shared event ID.', 'pixel-made-simple' ),
+			),
+			array(
+				'icon'  => 'dashicons-chart-line',
+				'title' => __( 'Google Ads & GA4', 'pixel-made-simple' ),
+				'text'  => __( 'Google Tag, Consent Mode v2, conversion labels and a GA4 property side by side.', 'pixel-made-simple' ),
+			),
+			array(
+				'icon'  => 'dashicons-cart',
+				'title' => __( 'E-commerce tracking', 'pixel-made-simple' ),
+				'text'  => __( 'ViewContent, AddToCart, InitiateCheckout and Purchase for WooCommerce and SureCart.', 'pixel-made-simple' ),
+			),
+		);
 		?>
-		<div class="wrap pms-wrap">
+		<div class="wrap pms-wrap pms-tab-help">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Info & Help', 'pixel-made-simple' ); ?></h1>
 			<hr class="wp-header-end" />
 
@@ -1011,9 +1061,9 @@ class PMS_Admin {
 					<p class="description">
 						<?php
 						printf(
-							/* translators: %s: developer website link */
+							/* translators: %s: link to the Pixel Made Simple website */
 							esc_html__( 'Developed by %s.', 'pixel-made-simple' ),
-							'<a href="https://sdv.design" target="_blank" rel="noopener noreferrer">Dominik Seitz – sdv.design</a>'
+							'<a href="' . esc_url( $site_url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Pixel Made Simple – Dominik Seitz', 'pixel-made-simple' ) . '</a>'
 						);
 						?>
 					</p>
@@ -1021,19 +1071,46 @@ class PMS_Admin {
 			</div>
 
 			<div class="pms-card">
-				<h2><?php esc_html_e( 'Video Tutorial', 'pixel-made-simple' ); ?></h2>
+				<h2><?php esc_html_e( 'Documentation', 'pixel-made-simple' ); ?></h2>
 				<div class="pms-card-body">
-					<div class="pms-video-box">
-						<span class="dashicons dashicons-video-alt3" aria-hidden="true"></span>
-						<div>
-							<p><?php esc_html_e( 'A step-by-step video tutorial on setting up the plugin is coming soon:', 'pixel-made-simple' ); ?></p>
-							<p>
-								<a class="button button-secondary" href="<?php echo esc_url( $video_url ); ?>" target="_blank" rel="noopener noreferrer">
-									<?php esc_html_e( 'Watch the tutorial on YouTube', 'pixel-made-simple' ); ?>
+					<div class="pms-info-callout">
+						<span class="dashicons dashicons-book-alt" aria-hidden="true"></span>
+						<div class="pms-info-callout-body">
+							<p><?php esc_html_e( 'Setup guides, every setting explained and answers to the most common tracking questions.', 'pixel-made-simple' ); ?></p>
+							<p class="pms-upgrade-cta">
+								<a class="button button-secondary" href="<?php echo esc_url( $docs_url ); ?>" target="_blank" rel="noopener noreferrer">
+									<span class="dashicons dashicons-external" aria-hidden="true"></span>
+									<?php esc_html_e( 'Official documentation', 'pixel-made-simple' ); ?>
 								</a>
 							</p>
 						</div>
 					</div>
+				</div>
+			</div>
+
+			<div class="pms-card">
+				<h2><?php esc_html_e( 'Video tutorials', 'pixel-made-simple' ); ?></h2>
+				<div class="pms-card-body">
+					<p class="description"><?php esc_html_e( 'Short, focused walkthroughs for the four things people set up most often.', 'pixel-made-simple' ); ?></p>
+
+					<div class="pms-tutorial-grid">
+						<?php foreach ( $tutorials as $tutorial ) : ?>
+							<a class="pms-tutorial-card" href="<?php echo esc_url( isset( $tutorial['url'] ) ? $tutorial['url'] : $tutorials_url ); ?>" target="_blank" rel="noopener noreferrer">
+								<span class="dashicons <?php echo esc_attr( $tutorial['icon'] ); ?>" aria-hidden="true"></span>
+								<span class="pms-tutorial-card-body">
+									<strong><?php echo esc_html( $tutorial['title'] ); ?></strong>
+									<span class="description"><?php echo esc_html( $tutorial['text'] ); ?></span>
+								</span>
+							</a>
+						<?php endforeach; ?>
+					</div>
+
+					<p class="pms-upgrade-cta">
+						<a class="button button-secondary" href="<?php echo esc_url( $tutorials_url ); ?>" target="_blank" rel="noopener noreferrer">
+							<span class="dashicons dashicons-video-alt3" aria-hidden="true"></span>
+							<?php esc_html_e( 'View all tutorials', 'pixel-made-simple' ); ?>
+						</a>
+					</p>
 				</div>
 			</div>
 		</div>
@@ -1418,6 +1495,34 @@ class PMS_Admin {
 
 			<h2 class="pms-section-title"><?php esc_html_e( 'E-Commerce', 'pixel-made-simple' ); ?></h2>
 
+			<?php
+			// Upgrade-Callout: nur, wenn tatsächlich ein Shop-System vorhanden
+			// ist, das von Pro profitieren würde. Ohne WooCommerce UND ohne
+			// SureCart rendert der Tab weiter unten ohnehin nur Hinweiskarten
+			// ("nicht erkannt") -- ein Upgrade-Aufruf wäre dort sinnlos, weil
+			// auch Pro nichts zu tracken hätte.
+			$shop_detected = class_exists( 'WooCommerce' )
+				|| class_exists( 'SureCart' )
+				|| function_exists( 'surecart' );
+
+			if ( $shop_detected && ! PMS_Settings::is_pro() ) :
+				?>
+				<div class="pms-info-callout pms-info-callout-upgrade">
+					<span class="dashicons dashicons-lock" aria-hidden="true"></span>
+					<div class="pms-info-callout-body">
+						<p><?php esc_html_e( 'Automatic e-commerce tracking for WooCommerce & SureCart including the Conversions API is exclusive to Pixel Made Simple Pro.', 'pixel-made-simple' ); ?></p>
+						<p class="pms-upgrade-cta">
+							<a class="button button-primary" href="<?php echo esc_url( self::upgrade_url( 'ecommerce' ) ); ?>" target="_blank" rel="noopener noreferrer">
+								<span class="dashicons dashicons-star-filled" aria-hidden="true"></span>
+								<?php esc_html_e( 'Upgrade to Pro', 'pixel-made-simple' ); ?>
+							</a>
+						</p>
+					</div>
+				</div>
+				<?php
+			endif;
+			?>
+
 			<?php if ( ! class_exists( 'WooCommerce' ) ) : ?>
 				<?php
 				// Nicht erkannte Integration: bewusst OHNE den blauen
@@ -1662,14 +1767,20 @@ class PMS_Admin {
 							</td>
 							<td><strong><?php echo esc_html( $event['name'] ); ?></strong></td>
 							<td class="pms-col-platforms">
+								<?php
+								// Einheitliche Status-Optik seit v0.6.12 (siehe
+								// .pms-badge-active in assets/admin.css): alle drei
+								// Badges sagen dasselbe aus ("Plattform für dieses
+								// Event aktiv"), also tragen sie auch dieselbe Farbe.
+								?>
 								<?php if ( ! empty( $event['meta_enabled'] ) ) : ?>
-									<span class="pms-badge pms-badge-meta">Meta · <?php echo esc_html( $event['event_type'] ); ?></span>
+									<span class="pms-badge pms-badge-active">Meta · <?php echo esc_html( $event['event_type'] ); ?></span>
 								<?php endif; ?>
 								<?php if ( ! empty( $event['google_enabled'] ) ) : ?>
-									<span class="pms-badge pms-badge-google">Google Ads · <?php echo esc_html( $event['google_label'] ); ?></span>
+									<span class="pms-badge pms-badge-active">Google Ads · <?php echo esc_html( $event['google_label'] ); ?></span>
 								<?php endif; ?>
 								<?php if ( ! empty( $event['tiktok_enabled'] ) ) : ?>
-									<span class="pms-badge pms-badge-tiktok">TikTok · <?php echo esc_html( $event['tiktok_event'] ); ?></span>
+									<span class="pms-badge pms-badge-active">TikTok · <?php echo esc_html( $event['tiktok_event'] ); ?></span>
 								<?php endif; ?>
 							</td>
 							<td>
@@ -1713,7 +1824,8 @@ class PMS_Admin {
 	 * @return void
 	 */
 	private static function render_event_form( $event ) {
-		$is_edit = is_array( $event );
+		$is_edit   = is_array( $event );
+		$forms_pro = PMS_Settings::is_pro();
 
 		$values = wp_parse_args(
 			$is_edit ? $event : array(),
@@ -1807,23 +1919,39 @@ class PMS_Admin {
 									<?php endforeach; ?>
 								</select>
 							</div>
-							<div class="pms-platform-row">
+							<?php
+							// Google Ads/TikTok sind seit v0.6.2 Pro-only Plattformen
+							// (siehe render_general_tab()). In Free deshalb gesperrt
+							// UND ohne name-Attribut: der Browser sendet disabled-
+							// Felder ohnehin nicht mit, das fehlende name schließt
+							// jede Restunsicherheit aus. Die serverseitige
+							// Durchsetzung sitzt unabhängig davon in
+							// handle_save_event() (Defense-in-Depth) -- dort werden
+							// die beiden Flags in Free aus dem GESPEICHERTEN Event
+							// übernommen statt aus dem POST, damit ein Downgrade von
+							// Pro eine bestehende Konfiguration nicht beim ersten
+							// Bearbeiten verliert.
+							$platform_row_class = $forms_pro ? 'pms-platform-row' : 'pms-platform-row pms-locked';
+							?>
+							<div class="<?php echo esc_attr( $platform_row_class ); ?>">
 								<label class="pms-platform-check">
-									<input type="checkbox" name="platform_google" value="1" <?php checked( ! empty( $values['google_enabled'] ) ); ?> />
+									<input type="checkbox" <?php echo $forms_pro ? 'name="platform_google"' : 'disabled'; ?> value="1" <?php checked( ! empty( $values['google_enabled'] ) ); ?> />
 									<strong>Google Ads</strong>
+									<?php if ( ! $forms_pro ) { self::pro_badge(); } ?>
 								</label>
-								<input type="text" class="regular-text code" name="google_label"
+								<input type="text" class="regular-text code" <?php echo $forms_pro ? 'name="google_label"' : 'disabled'; ?>
 									value="<?php echo esc_attr( $values['google_label'] ); ?>"
 									placeholder="AbCdEfGhIjK123"
 									aria-label="<?php esc_attr_e( 'Google Ads conversion label', 'pixel-made-simple' ); ?>" />
 								<?php self::tip( __( 'Google Ads → Conversion goals → click the action → Tag setup → snippet → copy the label after the slash (AW-XXX/LABEL).', 'pixel-made-simple' ) ); ?>
 							</div>
-							<div class="pms-platform-row">
+							<div class="<?php echo esc_attr( $platform_row_class ); ?>">
 								<label class="pms-platform-check">
-									<input type="checkbox" name="platform_tiktok" value="1" <?php checked( ! empty( $values['tiktok_enabled'] ) ); ?> />
+									<input type="checkbox" <?php echo $forms_pro ? 'name="platform_tiktok"' : 'disabled'; ?> value="1" <?php checked( ! empty( $values['tiktok_enabled'] ) ); ?> />
 									<strong>TikTok</strong>
+									<?php if ( ! $forms_pro ) { self::pro_badge(); } ?>
 								</label>
-								<select id="pms-tiktok-event" name="tiktok_event" aria-label="<?php esc_attr_e( 'TikTok event type', 'pixel-made-simple' ); ?>">
+								<select id="pms-tiktok-event" <?php echo $forms_pro ? 'name="tiktok_event"' : 'disabled'; ?> aria-label="<?php esc_attr_e( 'TikTok event type', 'pixel-made-simple' ); ?>">
 									<?php foreach ( PMS_Settings::tiktok_event_types() as $type ) : ?>
 										<option value="<?php echo esc_attr( $type ); ?>" <?php selected( $values['tiktok_event'], $type ); ?>>
 											<?php echo esc_html( $type ); ?>
@@ -1884,6 +2012,57 @@ class PMS_Admin {
 	 * ------------------------------------------------------------------- */
 
 	/**
+	 * Plattform-Felder eines Events aus dem Formular auflösen -- inklusive der
+	 * serverseitigen Free/Pro-Durchsetzung (seit v0.6.12).
+	 *
+	 * Google Ads und TikTok sind Pro-only Plattformen (siehe
+	 * render_general_tab()). Die Free-UI rendert beide Zeilen bereits gesperrt
+	 * und ohne name-Attribut (render_event_form()), aber ein direkter POST an
+	 * admin-post.php darf sie ebenso wenig aktivieren -- dasselbe
+	 * Defense-in-Depth-Prinzip wie bei PMS_Tools::handle_export() und den
+	 * *_active()-Prüfungen im Frontend.
+	 *
+	 * In Free werden die beiden Flags NICHT hart auf 0 gesetzt, sondern aus
+	 * dem bereits GESPEICHERTEN Event übernommen: Nach einem Downgrade von Pro
+	 * trägt ein Event womöglich noch eine Google-/TikTok-Konfiguration. Die ist
+	 * in Free ohnehin wirkungslos (PMS_Frontend::google_active()/
+	 * tiktok_active() prüfen is_pro() unabhängig davon), soll aber nicht
+	 * dadurch verlorengehen, dass jemand ein anderes Feld desselben Events
+	 * bearbeitet -- exakt das Prinzip, das preserve_hidden_settings() für die
+	 * Einstellungs-Tabs umsetzt.
+	 *
+	 * Bewusst als reine Funktion MIT explizitem $is_pro statt eines internen
+	 * PMS_Settings::is_pro()-Aufrufs: Die Konstante PMS_IS_PRO lässt sich in
+	 * einem PHP-Prozess nicht umdefinieren, beide Zweige wären sonst nicht im
+	 * selben Testlauf prüfbar (siehe Abschnitt 28 in dev-tools/test-suite.php).
+	 *
+	 * @param array $input  Rohwerte aus dem Formular (bereits unslashed).
+	 * @param array $stored Bisher gespeichertes Event ('' für ein neues).
+	 * @param bool  $is_pro Läuft die Pro-Version?
+	 * @return array{meta_enabled:bool,google_enabled:bool,tiktok_enabled:bool,google_label:string,tiktok_event:string}
+	 */
+	private static function resolve_event_platforms( array $input, array $stored, $is_pro ) {
+		$platforms = array(
+			'meta_enabled'   => ! empty( $input['platform_meta'] ),
+			'google_enabled' => ! empty( $input['platform_google'] ),
+			'tiktok_enabled' => ! empty( $input['platform_tiktok'] ),
+			'google_label'   => trim( sanitize_text_field( (string) ( $input['google_label'] ?? '' ) ) ),
+			'tiktok_event'   => (string) ( $input['tiktok_event'] ?? '' ),
+		);
+
+		if ( $is_pro ) {
+			return $platforms;
+		}
+
+		$platforms['google_enabled'] = ! empty( $stored['google_enabled'] );
+		$platforms['tiktok_enabled'] = ! empty( $stored['tiktok_enabled'] );
+		$platforms['google_label']   = (string) ( $stored['google_label'] ?? '' );
+		$platforms['tiktok_event']   = (string) ( $stored['tiktok_event'] ?? '' );
+
+		return $platforms;
+	}
+
+	/**
 	 * Rechte prüfen, sonst abbrechen.
 	 *
 	 * @return void
@@ -1933,15 +2112,31 @@ class PMS_Admin {
 			$event_id = sanitize_key( str_replace( '-', '', wp_generate_uuid4() ) );
 		}
 
-		$meta_enabled   = ! empty( $_POST['platform_meta'] );
-		$google_enabled = ! empty( $_POST['platform_google'] );
-		$tiktok_enabled = ! empty( $_POST['platform_tiktok'] );
+		$events = PMS_Settings::get_events();
+		$stored = ( ! $is_new && isset( $events[ $event_id ] ) ) ? $events[ $event_id ] : array();
+
+		$platforms = self::resolve_event_platforms(
+			array(
+				'platform_meta'   => ! empty( $_POST['platform_meta'] ),
+				'platform_google' => ! empty( $_POST['platform_google'] ),
+				'platform_tiktok' => ! empty( $_POST['platform_tiktok'] ),
+				'google_label'    => wp_unslash( $_POST['google_label'] ?? '' ),
+				'tiktok_event'    => wp_unslash( $_POST['tiktok_event'] ?? '' ),
+			),
+			$stored,
+			PMS_Settings::is_pro()
+		);
+
+		$meta_enabled   = $platforms['meta_enabled'];
+		$google_enabled = $platforms['google_enabled'];
+		$tiktok_enabled = $platforms['tiktok_enabled'];
+		$google_label   = $platforms['google_label'];
+		$tiktok_event   = $platforms['tiktok_event'];
 
 		if ( ! $meta_enabled && ! $google_enabled && ! $tiktok_enabled ) {
 			self::redirect_events( 'no_platform' );
 		}
 
-		$google_label = trim( sanitize_text_field( wp_unslash( $_POST['google_label'] ?? '' ) ) );
 		if ( $google_enabled && '' === $google_label ) {
 			self::redirect_events( 'missing_label' );
 		}
@@ -1958,15 +2153,13 @@ class PMS_Admin {
 				'google_enabled' => $google_enabled,
 				'google_label'   => $google_label,
 				'tiktok_enabled' => $tiktok_enabled,
-				'tiktok_event'   => wp_unslash( $_POST['tiktok_event'] ?? '' ),
+				'tiktok_event'   => $tiktok_event,
 			)
 		);
 
 		if ( null === $event ) {
 			self::redirect_events( 'invalid' );
 		}
-
-		$events = PMS_Settings::get_events();
 
 		if ( ! $is_new && ! isset( $events[ $event_id ] ) ) {
 			self::redirect_events( 'not_found' );

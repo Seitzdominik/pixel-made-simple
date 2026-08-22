@@ -3738,6 +3738,154 @@ PMS_Logger::truncate();
 $GLOBALS['stub']['options']['pms_settings'] = array();
 
 
+echo "\n=== 28. v0.6.12: Free-Locks (serverseitig), vereinheitlichte Badges, Info & Hilfe ===\n";
+
+/* --- 28a. resolve_event_platforms(): die serverseitige Durchsetzung der
+ * Pro-only-Plattformen. Bewusst mit explizitem $is_pro-Argument getestet --
+ * die Konstante PMS_IS_PRO steht ab Abschnitt 17 auf true und lässt sich im
+ * selben Prozess nicht mehr umdefinieren. --- */
+
+$post_all_on = array(
+	'platform_meta'   => true,
+	'platform_google' => true,
+	'platform_tiktok' => true,
+	'google_label'    => 'HackLabel1',
+	'tiktok_event'    => 'CompletePayment',
+);
+
+// Pro: alles wird übernommen.
+$pro_res = call_private( 'PMS_Admin', 'resolve_event_platforms', $post_all_on, array(), true );
+check( '28a.1 Pro: Google/TikTok aus dem Formular werden übernommen', true === $pro_res['google_enabled'] && true === $pro_res['tiktok_enabled'] );
+check( '28a.2 Pro: Conversion-Label und TikTok-Event kommen aus dem Formular', 'HackLabel1' === $pro_res['google_label'] && 'CompletePayment' === $pro_res['tiktok_event'] );
+
+// Free + NEUES Event: der POST darf Google/TikTok nicht aktivieren.
+$free_new = call_private( 'PMS_Admin', 'resolve_event_platforms', $post_all_on, array(), false );
+check( '28a.3 Free (neues Event): platform_google aus dem POST wird ignoriert', false === $free_new['google_enabled'] );
+check( '28a.4 Free (neues Event): platform_tiktok aus dem POST wird ignoriert', false === $free_new['tiktok_enabled'] );
+check( '28a.5 Free (neues Event): untergeschobenes Conversion-Label wird verworfen', '' === $free_new['google_label'] );
+check( '28a.6 Free (neues Event): untergeschobener TikTok-Event-Typ wird verworfen', '' === $free_new['tiktok_event'] );
+check( '28a.7 Free: Meta bleibt unangetastet (kein Pro-Feature)', true === $free_new['meta_enabled'] );
+
+// Free + BEARBEITEN eines Events, das aus einer Pro-Phase noch eine
+// Google-/TikTok-Konfiguration trägt: die muss erhalten bleiben.
+$stored_pro_event = array(
+	'google_enabled' => 1,
+	'google_label'   => 'EchtesLabel',
+	'tiktok_enabled' => 1,
+	'tiktok_event'   => 'SubmitForm',
+);
+$free_edit = call_private( 'PMS_Admin', 'resolve_event_platforms', array( 'platform_meta' => true ), $stored_pro_event, false );
+check( '28a.8 Free (Downgrade): gespeicherte Google-Konfiguration überlebt das Bearbeiten', true === $free_edit['google_enabled'] && 'EchtesLabel' === $free_edit['google_label'] );
+check( '28a.9 Free (Downgrade): gespeicherte TikTok-Konfiguration überlebt das Bearbeiten', true === $free_edit['tiktok_enabled'] && 'SubmitForm' === $free_edit['tiktok_event'] );
+
+// Free darf eine gespeicherte Konfiguration auch nicht ÄNDERN.
+$free_tamper = call_private( 'PMS_Admin', 'resolve_event_platforms', $post_all_on, $stored_pro_event, false );
+check( '28a.10 Free (Downgrade): der POST kann das gespeicherte Label nicht überschreiben', 'EchtesLabel' === $free_tamper['google_label'] );
+check( '28a.11 Free (Downgrade): der POST kann den gespeicherten TikTok-Event nicht überschreiben', 'SubmitForm' === $free_tamper['tiktok_event'] );
+
+// Free kann eine gespeicherte Pro-Konfiguration auch nicht DEAKTIVIEREN
+// (das Formular sendet die Felder gar nicht mit -- der Zustand bleibt).
+$free_off = call_private( 'PMS_Admin', 'resolve_event_platforms', array( 'platform_meta' => true ), $stored_pro_event, false );
+check( '28a.12 Free: ein fehlendes Feld schaltet die gespeicherte Plattform nicht ab', true === $free_off['google_enabled'] );
+
+// Label-Trimming/Sanitizing bleibt im Pro-Zweig aktiv.
+$pro_trim = call_private( 'PMS_Admin', 'resolve_event_platforms', array( 'platform_google' => true, 'google_label' => '  AbC123  ' ), array(), true );
+check( '28a.13 Pro: Conversion-Label wird getrimmt', 'AbC123' === $pro_trim['google_label'] );
+
+/* --- 28b. Events-Tabelle: einheitliche Badge-Klasse (v0.6.12). --- */
+
+$GLOBALS['stub']['options']['pms_settings'] = array();
+$GLOBALS['stub']['options']['pms_events_enabled'] = 1;
+$GLOBALS['stub']['options']['pms_events'] = array(
+	array(
+		'id' => 'ev-badge', 'name' => 'Alle Plattformen', 'event_type' => 'Lead',
+		'match_type' => 'exact', 'match_value' => '/danke/', 'active' => 1,
+		'meta_enabled' => 1, 'google_enabled' => 1, 'google_label' => 'AbCd1234',
+		'tiktok_enabled' => 1, 'tiktok_event' => 'SubmitForm',
+	),
+);
+$GLOBALS['stub']['current_user_can'] = true;
+$_GET['page'] = PMS_Admin::PAGE_SLUG;
+$_GET['tab']  = 'events';
+
+ob_start();
+PMS_Admin::render_page();
+$ev_html = ob_get_clean();
+
+check( '28b.1 Alle drei Plattform-Badges nutzen dieselbe Klasse pms-badge-active', 3 === substr_count( $ev_html, 'pms-badge pms-badge-active' ) );
+check( '28b.2 Keine markenbunten Badge-Klassen mehr in der Events-Tabelle', false === strpos( $ev_html, 'pms-badge-meta' ) && false === strpos( $ev_html, 'pms-badge-google' ) && false === strpos( $ev_html, 'pms-badge-tiktok' ) );
+check( '28b.3 Die Badge-Texte benennen die Plattform weiterhin ausdrücklich', false !== strpos( $ev_html, 'Meta · Lead' ) && false !== strpos( $ev_html, 'Google Ads · AbCd1234' ) && false !== strpos( $ev_html, 'TikTok · SubmitForm' ) );
+
+/* --- 28c. Event-Log behält die Plattform-Farben: dort trägt jede Zeile genau
+ * EIN Badge, das als Kategorie-Kennung dient (siehe CSS-Kommentar). --- */
+
+PMS_Logger::truncate();
+PMS_Logger::record( 'Purchase', 'badge-1', 'capi', 200, array(), '', PMS_Logger::PLATFORM_TIKTOK );
+$_GET['tab'] = 'log';
+ob_start();
+PMS_Admin::render_page();
+$log_badge_html = ob_get_clean();
+check( '28c.1 Event-Log nutzt weiterhin die plattformspezifische Badge-Klasse', false !== strpos( $log_badge_html, 'pms-badge-tiktok' ) );
+PMS_Logger::truncate();
+
+/* --- 28d. Pro-Zweig der gesperrten Controls: In Pro darf KEIN PRO-Badge und
+ * kein disabled-Attribut auftauchen (Gegenprobe zur Free-Ansicht, die
+ * dev-tools/preview-admin.php rendert -- PMS_IS_PRO ist hier true). --- */
+
+$_GET['tab'] = 'events';
+ob_start();
+PMS_Admin::render_page();
+$ev_pro_html = ob_get_clean();
+
+check( '28d.1 Pro: Event-Formular zeigt kein PRO-Badge', false === strpos( $ev_pro_html, 'pms-pro-inline' ) );
+check( '28d.2 Pro: Google-/TikTok-Zeilen sind nicht gesperrt', false === strpos( $ev_pro_html, 'pms-platform-row pms-locked' ) );
+check( '28d.3 Pro: die Plattform-Felder tragen ihre name-Attribute', false !== strpos( $ev_pro_html, 'name="platform_google"' ) && false !== strpos( $ev_pro_html, 'name="platform_tiktok"' ) && false !== strpos( $ev_pro_html, 'name="google_label"' ) && false !== strpos( $ev_pro_html, 'name="tiktok_event"' ) );
+
+$_GET['tab'] = 'advanced';
+ob_start();
+PMS_Admin::render_page();
+$adv_pro_html = ob_get_clean();
+check( '28d.4 Pro: Tab "Erweitertes Tracking" zeigt kein PRO-Badge', false === strpos( $adv_pro_html, 'pms-pro-inline' ) );
+
+/* --- 28e. E-Commerce-Upgrade-Callout: nur ohne Pro. Im Harness ist Pro aktiv
+ * UND WooCommerce vorhanden -- der Callout darf hier also NICHT erscheinen. --- */
+
+$_GET['tab'] = 'ecommerce';
+ob_start();
+PMS_Admin::render_page();
+$eco_pro_html = ob_get_clean();
+check( '28e.1 Pro + WooCommerce: kein Upgrade-Callout', false === strpos( $eco_pro_html, 'pms-info-callout-upgrade' ) );
+check( '28e.2 Pro + WooCommerce: die echte Accordion rendert statt eines Teasers', false !== strpos( $eco_pro_html, 'name="pms_settings[wc_content_id_type]"' ) );
+
+/* --- 28f. Info & Hilfe: Support, Branding, Doku und Tutorial-Hub. --- */
+
+ob_start();
+PMS_Admin::render_help_page();
+$help_html = ob_get_clean();
+
+check( '28f.1 Support-Adresse ist support@pixelmadesimple.com', false !== strpos( $help_html, 'mailto:support@pixelmadesimple.com' ) );
+check( '28f.2 Die alte persönliche Support-Adresse taucht nicht mehr auf', false === strpos( $help_html, 'seitzdominik.de' ) );
+check( '28f.3 Entwickler-Hinweis verlinkt auf pixelmadesimple.com', false !== strpos( $help_html, 'href="https://pixelmadesimple.com"' ) && false !== strpos( $help_html, 'Pixel Made Simple – Dominik Seitz' ) );
+check( '28f.4 Dokumentations-Button verlinkt auf /docs', false !== strpos( $help_html, 'https://pixelmadesimple.com/docs' ) );
+check( '28f.5 Tutorial-Grid wird gerendert', false !== strpos( $help_html, 'pms-tutorial-grid' ) );
+check( '28f.6 Genau vier Tutorial-Karten', 4 === substr_count( $help_html, 'class="pms-tutorial-card"' ) );
+check( '28f.7 Alle vier Themen sind vertreten', (function () use ( $help_html ) {
+	foreach ( array( 'Quick start', 'Meta CAPI setup', 'Google Ads & GA4', 'E-commerce tracking' ) as $title ) {
+		if ( false === strpos( $help_html, $title ) ) {
+			return false;
+		}
+	}
+	return true;
+})() );
+check( '28f.8 Karten und Sammel-Button verlinken auf die Tutorial-Übersicht', 5 === substr_count( $help_html, 'https://pixelmadesimple.com/tutorials' ) );
+check( '28f.9 Version wird angezeigt', false !== strpos( $help_html, 'v' . PMS_VERSION ) );
+
+unset( $_GET['tab'], $_GET['page'] );
+$GLOBALS['stub']['current_user_can']        = false;
+$GLOBALS['stub']['options']['pms_settings'] = array();
+$GLOBALS['stub']['options']['pms_events']   = array();
+
+
 echo "\n==============================\n";
 echo 'Ergebnis: ' . $GLOBALS['t_pass'] . ' bestanden, ' . $GLOBALS['t_fail'] . " fehlgeschlagen\n";
 exit( $GLOBALS['t_fail'] > 0 ? 1 : 0 );

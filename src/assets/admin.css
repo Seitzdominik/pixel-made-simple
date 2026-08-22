@@ -210,7 +210,7 @@
    damit Toggle-Leiste, Tabelle und Cards exakt bündig abschließen.
 
    Seit v0.6.10 gilt das ausdrücklich auch für ALLE Hinweis-/Notice-Boxen
-   (WP-Core-.notice, Info-Callout, Video-Box, Pro-Teaser). Ohne border-box
+   (WP-Core-.notice, Info-Callout, Tutorial-Karten, Pro-Teaser). Ohne border-box
    addieren sich deren Padding UND der 4px-Akzentbalken links auf die
    max-width auf – die Box ragte dadurch sichtbar über die Accordions und
    Tabellen daneben hinaus. */
@@ -221,7 +221,7 @@
 .pms-card,
 .pms-pro-teaser,
 .pms-info-callout,
-.pms-video-box,
+.pms-tutorial-card,
 .pms-wrap .notice {
 	box-sizing: border-box;
 }
@@ -286,6 +286,24 @@
 	font-size: 13px;
 	line-height: 1.6;
 	color: #3c434a;
+}
+
+/* Upgrade-Variante des Callouts (Tab "E-Commerce" ohne Pro): gelbe
+   Pro-Farbfamilie statt des blauen Info-Blaus, damit es als Angebot und nicht
+   als Systemhinweis gelesen wird -- dieselben Farben wie .pms-pro-teaser. */
+.pms-info-callout-upgrade {
+	max-width: 900px;
+	background: #fcf9f2;
+	border-color: #e8d9b5;
+	border-left-color: #dba617;
+}
+
+.pms-info-callout-upgrade .dashicons {
+	color: #dba617;
+}
+
+.pms-info-callout-upgrade .pms-upgrade-cta {
+	margin: 10px 0 0;
 }
 
 /* Hinweis unter einem gerade abgelaufenen Test-Event-Code-Feld. Bewusst
@@ -378,6 +396,22 @@
 	white-space: nowrap;
 }
 
+/* Plattform-Badges in der Events-Tabelle: seit v0.6.12 EINE gemeinsame,
+   dezente Status-Optik statt drei markenbunter Varianten (Blau/Grün/Grau).
+   In einer Zelle stehen bis zu drei davon nebeneinander -- die alten
+   Markenfarben erzeugten dort optische Unruhe, ohne Information zu tragen:
+   Der Plattformname steht ohnehin im Badge-Text. Grün steht hier für
+   "diese Plattform ist für das Event aktiv". */
+.pms-badge-active {
+	border-color: #00a32a;
+	background: #eafbea;
+	color: #005a1e;
+}
+
+/* Markenfarben bleiben für den Event-Log-Tab erhalten: dort trägt jede Zeile
+   GENAU EIN Plattform-Badge, das als Kategorie-Kennung beim Scannen der
+   Spalte hilft -- der Rainbow-Effekt aus der Events-Tabelle entsteht dort
+   also gar nicht. Siehe PMS_Admin_Event_Log::render_platform_badge(). */
 .pms-badge-meta {
 	border-color: #1877f2;
 	background: #eaf1fd;
@@ -391,6 +425,39 @@
 .pms-badge-tiktok {
 	border-color: #1d2327;
 	background: #f0f0f1;
+}
+
+/* Inline-"PRO"-Marker neben einzelnen gesperrten Controls (Free-Version).
+   Kleiner als .pms-pro-badge in den Teaser-Kopfzeilen, damit er neben einem
+   Checkbox-Label nicht dominiert -- gleiche Farbfamilie, damit beide als
+   dasselbe Signal gelesen werden. */
+.pms-pro-inline {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 0 6px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	line-height: 1.7;
+	text-transform: uppercase;
+	color: #8a6d3b;
+	background: #fcf3e3;
+	border: 1px solid #dba617;
+	border-radius: 9px;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+/* Zeile eines gesperrten Pro-Controls: Beschriftung und Feld abgedimmt, das
+   Badge daneben bleibt voll sichtbar (es ist die Erklärung dafür). */
+.pms-platform-row.pms-locked .pms-platform-check strong,
+.pms-platform-row.pms-locked select,
+.pms-platform-row.pms-locked input[type="text"] {
+	opacity: 0.5;
+}
+
+.pms-platform-row.pms-locked {
+	background: #f6f7f7;
 }
 
 /* Plattform-Zeilen im Event-Formular */
@@ -576,31 +643,61 @@
 	vertical-align: middle;
 }
 
-.pms-video-box {
+/* Tutorial-Hub (Info & Hilfe): FESTES zweispaltiges Raster.
+   Bewusst repeat(2, ...) statt auto-fit/minmax: Bei auto-fit passten in die
+   960px-Karte drei Spalten -- die vier Tutorials brachen dann als 3+1 um,
+   mit einer einzelnen Karte in der zweiten Zeile. Zwei Spalten ergeben ein
+   sauberes 2x2. Unter 782px (WP-Mobile-Breakpoint) einspaltig, siehe unten. */
+.pms-tutorial-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	margin: 12px 0 16px;
+}
+
+.pms-tutorial-card {
 	display: flex;
 	align-items: flex-start;
-	gap: 14px;
+	gap: 12px;
 	padding: 14px 16px;
-	background: #f0f6fc;
-	border: 1px solid #c5d9ed;
-	border-left: 4px solid #72aee6;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-left: 4px solid #2271b1;
 	border-radius: 3px;
+	box-sizing: border-box;
+	text-decoration: none;
+	color: inherit;
+	transition: box-shadow 0.15s ease-in-out, border-color 0.15s ease-in-out;
 }
 
-.pms-video-box .dashicons {
-	font-size: 28px;
-	width: 28px;
-	height: 28px;
+.pms-tutorial-card:hover,
+.pms-tutorial-card:focus {
+	border-color: #2271b1;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+	color: inherit;
+}
+
+.pms-tutorial-card > .dashicons {
+	flex: 0 0 auto;
+	margin-top: 1px;
 	color: #2271b1;
-	margin-top: 2px;
 }
 
-.pms-video-box p {
-	margin: 0 0 10px;
+.pms-tutorial-card-body {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
 }
 
-.pms-video-box p:last-child {
-	margin-bottom: 0;
+.pms-tutorial-card-body strong {
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.pms-tutorial-card-body .description {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.5;
 }
 
 /* Autosave-Toast (dezente Erfolgs-Meldung unten rechts) */
@@ -759,6 +856,11 @@
 }
 
 @media screen and (max-width: 782px) {
+	/* Zwei Tutorial-Spalten wären hier zu schmal für Titel + Beschreibung. */
+	.pms-tutorial-grid {
+		grid-template-columns: 1fr;
+	}
+
 	.pms-log-retention {
 		margin-left: 0;
 	}

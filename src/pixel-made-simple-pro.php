@@ -3,7 +3,7 @@
  * Plugin Name:       Pixel Made Simple Pro
  * Plugin URI:        https://pixelmadesimple.com
  * Description:       Erweitert Pixel Made Simple um serverseitiges CAPI-Tracking für Meta & TikTok, automatisiertes E-Commerce Tracking für WooCommerce & SureCart, Formular-Lead-Erfassung sowie erweiterte Event-Deduplizierung.
- * Version:           0.6.11
+ * Version:           0.6.12
  * Author:            Dominik Seitz
  * Author URI:        https://sdv.design
  * License:           GPL-2.0-or-later
@@ -49,7 +49,7 @@ if ( defined( 'PMS_IS_PRO' ) && false === PMS_IS_PRO ) {
 }
 
 define( 'PMS_IS_PRO', true );
-define( 'PMS_VERSION', '0.6.11' );
+define( 'PMS_VERSION', '0.6.12' );
 define( 'PMS_PLUGIN_FILE', __FILE__ );
 define( 'PMS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PMS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

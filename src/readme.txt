@@ -6,7 +6,7 @@ Tags: meta pixel, conversions api, google ads, google analytics, tiktok pixel, c
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.6.11
+Stable tag: 0.6.12
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -92,6 +92,14 @@ Die Quellstrings sind englisch. Im Ordner `/languages` liegen die POT-Vorlage so
 Ja, sobald keine der beiden Varianten (Free oder Pro) mehr installiert ist. `uninstall.php` löscht dann alle Plugin-Optionen inklusive des gespeicherten Access Tokens. Wechselst du von Free zu Pro (oder umgekehrt), bleibt die Konfiguration erhalten – beide nutzen denselben Options-Key.
 
 == Changelog ==
+
+= 0.6.12 =
+* Verbessert: **Einheitliche Plattform-Badges im Tab „URL-Events".** Die Spalte „Plattformen" zeigte Meta blau, Google Ads grün und TikTok grau – bei mehreren aktiven Plattformen standen so bis zu drei Farben in einer Zelle, ohne zusätzliche Information zu tragen (der Plattformname steht ohnehin im Badge). Alle drei nutzen jetzt dasselbe dezente Status-Grün. Im Event Log bleiben die Plattformfarben erhalten, da dort pro Zeile nur ein Badge steht und die Farbe beim Scannen der Spalte hilft.
+* Neu: **Überarbeiteter Tab „Info & Hilfe".** Neue Support-Adresse (support@pixelmadesimple.com), Entwickler-Hinweis mit Link auf pixelmadesimple.com, eine Info-Box mit Button zur offiziellen Dokumentation sowie ein zweispaltiger Tutorial-Bereich mit vier Karten (Schnellstart, Meta CAPI einrichten, Google Ads & GA4, E-Commerce Tracking) und einem Sammel-Link zur Tutorial-Übersicht.
+* Verbessert (kostenlose Version): **Klar gekennzeichnete Pro-Funktionen statt stiller Wirkungslosigkeit.** Im Tab „URL-Events" sind die Felder für Google Ads und TikTok jetzt gesperrt und mit einem „PRO"-Badge versehen; dasselbe gilt für den TikTok-Event-Typ und das Google-Ads-Conversion-Label beim Formular-Tracking. Bisher ließen sich diese Felder ausfüllen, obwohl die Plattformen in der kostenlosen Version ohnehin nicht senden.
+* Verbessert (kostenlose Version): Ist WooCommerce oder SureCart installiert, aber Pro nicht aktiv, erklärt der Tab „E-Commerce" jetzt mit einem eigenen Hinweis, dass automatisches E-Commerce-Tracking inklusive Conversions API Pixel Made Simple Pro vorbehalten ist – mit direktem Link zum Upgrade.
+* Sicherheit: Die gesperrten Plattform-Felder werden zusätzlich **serverseitig** durchgesetzt – ein manuell abgeschickter Formular-Request kann Google Ads oder TikTok in der kostenlosen Version nicht aktivieren. Eine nach einem Downgrade von Pro noch gespeicherte Konfiguration bleibt dabei erhalten und wird beim Bearbeiten eines Events nicht überschrieben.
+* `dev-tools/test-suite.php` deckt die serverseitige Durchsetzung in beiden Richtungen sowie die neuen Oberflächen ab (621 → 653 PHP-Tests).
 
 = 0.6.11 =
 * Neu (Pro): **TikTok-Events-API-Anfragen erscheinen jetzt im Event Log** – mit HTTP-Status und den tatsächlich übergebenen Match Keys, genau wie die Meta Conversions API. Bisher wurden sie zwar gesendet, aber nirgends protokolliert. Besonderheit dabei: TikTok antwortet auch auf abgelehnte Anfragen mit HTTP 200 und meldet den eigentlichen Fehler nur in einem Feld der Antwort – solche Fälle galten bisher als Erfolg und werden jetzt korrekt als Fehler ausgewiesen.
